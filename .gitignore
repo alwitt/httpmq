@@ -1,0 +1,6 @@
+.prepare
+*.log
+tmp
+.vscode
+*mock*
+docs
