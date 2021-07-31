@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/apex/log"
@@ -61,7 +62,7 @@ func (d *etcdDriver) Put(message common.Message, timeout time.Duration) error {
 
 // Get fetch message from target queue based on index
 func (d *etcdDriver) Get(
-	targetQueue string, index int, timeout time.Duration,
+	targetQueue string, index int64, timeout time.Duration,
 ) (common.Message, error) {
 	useContext, cancel := context.WithTimeout(context.Background(), timeout)
 	resp, err := d.client.Get(useContext, targetQueue, clientv3.WithRev(int64(index)))
@@ -117,7 +118,9 @@ func (d *etcdDriver) GetOldest(
 }
 
 // IndexRange get the oldest, and newest available index on a target queue
-func (d *etcdDriver) IndexRange(targetQueue string, timeout time.Duration) (int, int, error) {
+func (d *etcdDriver) IndexRange(
+	targetQueue string, timeout time.Duration,
+) (int64, int64, error) {
 	useContext, cancel := context.WithTimeout(context.Background(), timeout)
 	resp, err := d.client.Get(useContext, targetQueue, clientv3.WithRev(0))
 	cancel()
@@ -126,9 +129,130 @@ func (d *etcdDriver) IndexRange(targetQueue string, timeout time.Duration) (int,
 		return 0, 0, err
 	}
 	for _, kv := range resp.Kvs {
-		return int(kv.CreateRevision), int(kv.ModRevision), nil
+		return (kv.CreateRevision), (kv.ModRevision), nil
 	}
 	return -1, 0, nil
+}
+
+// ReadStream read data stream from set of queues, and process messages from each
+func (d *etcdDriver) ReadStream(targets []ReadStreamParam, stopFlag chan bool) error {
+	readSelects := make([]reflect.SelectCase, len(targets)+1)
+	dataStreams := make([]clientv3.WatchChan, len(targets))
+	activeChannels := make([]bool, len(targets))
+	for index, oneTarget := range targets {
+		theChannel := d.client.Watch(
+			context.Background(),
+			oneTarget.TargetQueue,
+			clientv3.WithRev(int64(oneTarget.StartIndex)),
+		)
+		dataStreams[index] = theChannel
+		readSelects[index] = reflect.SelectCase{
+			Dir: reflect.SelectRecv, Chan: reflect.ValueOf(theChannel),
+		}
+		activeChannels[index] = true
+	}
+	// Add a the stop flag channel
+	readSelects[len(targets)] = reflect.SelectCase{
+		Dir: reflect.SelectRecv, Chan: reflect.ValueOf(stopFlag),
+	}
+
+	// Start stream processing
+	haveActive := false
+	var reference clientv3.WatchResponse
+	for {
+		// Check whether all streams are still functional
+		haveActive = false
+		for _, isActive := range activeChannels {
+			if isActive {
+				haveActive = true
+				break
+			}
+		}
+		// All channels are now inactive
+		if !haveActive {
+			break
+		}
+		// Wait for messages
+		chosen, received, ok := reflect.Select(readSelects)
+		if ok && chosen == len(targets) {
+			// Received stop signal
+			log.WithFields(d.LogTags).Info("Received stop signal. Exiting watch")
+			return nil
+		}
+		if !ok {
+			activeChannels[chosen] = false
+			log.WithFields(d.LogTags).Infof(
+				"Watch channel for %s closed", targets[chosen].TargetQueue,
+			)
+			continue
+		}
+		// Process the received message
+		if received.Type() == reflect.TypeOf(reference) {
+			converted, ok := received.Interface().(clientv3.WatchResponse)
+			if !ok {
+				err := fmt.Errorf(
+					"unable to convert message from channel %s to clientv3.WatchResponse",
+					targets[chosen].TargetQueue,
+				)
+				log.WithError(err).WithFields(d.LogTags).Errorf(
+					"Watch failure on channel %s", targets[chosen].TargetQueue,
+				)
+				return err
+			}
+			log.WithFields(d.LogTags).Debugf(
+				"Process message from channel %s", targets[chosen].TargetQueue,
+			)
+			handlerActive, err := d.runMessageHandler(
+				targets[chosen].TargetQueue, converted, targets[chosen].Handler,
+			)
+			if err != nil {
+				log.WithError(err).WithFields(d.LogTags).Errorf(
+					"Channel %s handler failed", targets[chosen].TargetQueue,
+				)
+				return err
+			}
+			if !handlerActive {
+				activeChannels[chosen] = false
+			}
+		} else {
+			log.WithFields(d.LogTags).Errorf(
+				"Watch channel for %s send unexpected message: %v",
+				targets[chosen].TargetQueue,
+				received.Type(),
+			)
+		}
+	}
+
+	return nil
+}
+
+func (d *etcdDriver) runMessageHandler(
+	targetQueue string, msg clientv3.WatchResponse, handler MessageProcessor,
+) (bool, error) {
+	// Process potentially multiple events
+	for _, oneEvent := range msg.Events {
+		index := oneEvent.Kv.ModRevision
+		stored := oneEvent.Kv.Value
+		var message common.Message
+		if err := json.Unmarshal(stored, &message); err != nil {
+			log.WithError(err).WithFields(d.LogTags).Errorf(
+				"Failed to parse message of key %s", string(oneEvent.Kv.Key),
+			)
+			return false, err
+		}
+		handlerActive, err := handler(message, index)
+		if err != nil {
+			log.WithError(err).WithFields(d.LogTags).Errorf(
+				"Failed to process message of key %s", string(oneEvent.Kv.Key),
+			)
+			return false, err
+		}
+		if !handlerActive {
+			log.WithFields(d.LogTags).Infof("Handler for channel %s is inactive", targetQueue)
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 // Close close etcd storage driver
