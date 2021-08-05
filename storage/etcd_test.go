@@ -522,3 +522,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		assert.Equal(5, msgItr)
 	}
 }
+
+// TODO: Test behavior of the client after compaction
+
+// TODO: Test streaming from INDEX 0

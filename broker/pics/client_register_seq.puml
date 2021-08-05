@@ -1,0 +1,13 @@
+@startuml
+
+User -> Broker: Register New Client\n{\n  "name": <Client>,\n  "persistent": True\n}
+
+alt Client is new
+Broker -> "Data Store": Define new client
+
+"Data Store" -> Broker: Success
+end
+
+Broker --> User: Success
+
+@enduml
