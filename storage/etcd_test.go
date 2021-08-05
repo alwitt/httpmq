@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -504,10 +505,55 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		}
 		_, maxIdx, err := uut.IndexRange(topic, time.Second)
 		assert.Nil(err)
+		for itr := 2; itr < 5; itr++ {
+			log.Debugf("Sending test message %d", itr)
+			assert.Nil(uut.Put(testMsgs[itr], time.Second))
+		}
 		watchTargets := []ReadStreamParam{
 			{
 				TargetQueue: topic,
 				StartIndex:  maxIdx + 1,
+				Handler:     handler,
+			},
+		}
+		// Start the watching
+		assert.Nil(uut.ReadStream(watchTargets, stopSignal1))
+		assert.Equal(5, msgItr)
+	}
+
+	// Case 7: watch from REV 0 in middle of seq of messages
+	{
+		topic := uuid.New().String()
+		testMsgs := make([]common.Message, 5)
+		for itr := 0; itr < 5; itr++ {
+			testMsgs[itr] = common.Message{
+				Source: common.MessageSource{
+					Sender: uuid.New().String(),
+					SentAt: time.Now().UTC(),
+				},
+				Destination: common.MessageDestination{
+					TargetQueue: topic,
+				},
+				Tags:       map[string]string{uuid.New().String(): uuid.New().String()},
+				ReceivedAt: time.Now().UTC(),
+				Body:       []byte(uuid.New().String()),
+			}
+		}
+		// Watch handler
+		msgItr := 2
+		handler := func(msg common.Message, index int64) (bool, error) {
+			assert.EqualValues(testMsgs[msgItr], msg)
+			msgItr += 1
+			return msgItr < 5, nil
+		}
+		for itr := 0; itr < 2; itr++ {
+			log.Debugf("Sending test message %d", itr)
+			assert.Nil(uut.Put(testMsgs[itr], time.Second))
+		}
+		watchTargets := []ReadStreamParam{
+			{
+				TargetQueue: topic,
+				StartIndex:  0,
 				Handler:     handler,
 			},
 		}
@@ -523,6 +569,183 @@ func TestEtcdDriverStreaming(t *testing.T) {
 	}
 }
 
-// TODO: Test behavior of the client after compaction
+func TestEtcdDriverBasicAfterCompaction(t *testing.T) {
+	assert := assert.New(t)
+	log.SetLevel(log.DebugLevel)
 
-// TODO: Test streaming from INDEX 0
+	uut, err := CreateEtcdDriver([]string{"localhost:2379"}, time.Second*5)
+	assert.Nil(err)
+	uutCase, ok := uut.(*etcdDriver)
+	assert.True(ok)
+
+	// Case 1: create messages
+	topic1 := uuid.New().String()
+	testMsgs1 := make([]common.Message, 5)
+	{
+		for itr := 0; itr < 5; itr++ {
+			testMsgs1[itr] = common.Message{
+				Source: common.MessageSource{
+					Sender: uuid.New().String(),
+					SentAt: time.Now().UTC(),
+				},
+				Destination: common.MessageDestination{
+					TargetQueue: topic1,
+				},
+				Tags:       map[string]string{uuid.New().String(): uuid.New().String()},
+				ReceivedAt: time.Now().UTC(),
+				Body:       []byte(uuid.New().String()),
+			}
+		}
+		for idx, msg := range testMsgs1 {
+			log.Debugf("Sending test message %d", idx)
+			assert.Nil(uut.Put(msg, time.Second))
+		}
+	}
+
+	// Case 2: Trigger compaction
+	minIdx2, maxIdx2, err := uut.IndexRange(topic1, time.Second)
+	log.Debugf("MIN2 %d, MAX2 %d", minIdx2, maxIdx2)
+	assert.Nil(err)
+	_, err = uutCase.client.Compact(context.Background(), maxIdx2)
+	assert.Nil(err)
+
+	// Case 3: verify compaction occurred
+	{
+		_, err := uut.Get(topic1, minIdx2, time.Second)
+		assert.NotNil(err)
+	}
+	{
+		_, err := uut.Get(topic1, maxIdx2-1, time.Second)
+		assert.NotNil(err)
+	}
+	{
+		val, err := uut.Get(topic1, maxIdx2, time.Second)
+		assert.Nil(err)
+		assert.EqualValues(testMsgs1[4], val)
+	}
+
+	// Case 4: create more messages
+	testMsgs4 := make([]common.Message, 3)
+	{
+		for itr := 0; itr < 3; itr++ {
+			testMsgs4[itr] = common.Message{
+				Source: common.MessageSource{
+					Sender: uuid.New().String(),
+					SentAt: time.Now().UTC(),
+				},
+				Destination: common.MessageDestination{
+					TargetQueue: topic1,
+				},
+				Tags:       map[string]string{uuid.New().String(): uuid.New().String()},
+				ReceivedAt: time.Now().UTC(),
+				Body:       []byte(uuid.New().String()),
+			}
+		}
+		for idx, msg := range testMsgs4 {
+			log.Debugf("Sending test message %d", idx)
+			assert.Nil(uut.Put(msg, time.Second))
+		}
+	}
+
+	// Case 5: Trigger compaction
+	minIdx5, maxIdx5, err := uut.IndexRange(topic1, time.Second)
+	log.Debugf("MIN5 %d, MAX5 %d", minIdx5, maxIdx5)
+	assert.Nil(err)
+	assert.Equal(minIdx2, minIdx5)
+	_, err = uutCase.client.Compact(context.Background(), maxIdx5)
+	assert.Nil(err)
+
+	// Case 6: verify compaction occurred
+	{
+		_, err := uut.Get(topic1, maxIdx2, time.Second)
+		assert.NotNil(err)
+	}
+	{
+		val, err := uut.Get(topic1, maxIdx5, time.Second)
+		assert.Nil(err)
+		assert.EqualValues(testMsgs4[2], val)
+	}
+}
+
+func TestEtcdDriverStreamingAfterCompaction(t *testing.T) {
+	assert := assert.New(t)
+	log.SetLevel(log.DebugLevel)
+
+	uut, err := CreateEtcdDriver([]string{"localhost:2379"}, time.Second*5)
+	assert.Nil(err)
+	uutCase, ok := uut.(*etcdDriver)
+	assert.True(ok)
+
+	stopSignal := make(chan bool, 1)
+
+	// Case 1: create messages
+	topic := uuid.New().String()
+	testMsgs1 := make([]common.Message, 5)
+	{
+		for itr := 0; itr < 5; itr++ {
+			testMsgs1[itr] = common.Message{
+				Source: common.MessageSource{
+					Sender: uuid.New().String(),
+					SentAt: time.Now().UTC(),
+				},
+				Destination: common.MessageDestination{
+					TargetQueue: topic,
+				},
+				Tags:       map[string]string{uuid.New().String(): uuid.New().String()},
+				ReceivedAt: time.Now().UTC(),
+				Body:       []byte(uuid.New().String()),
+			}
+		}
+		for idx, msg := range testMsgs1 {
+			log.Debugf("Sending test message %d", idx)
+			assert.Nil(uut.Put(msg, time.Second))
+		}
+	}
+	minIdx1, maxIdx1, err := uut.IndexRange(topic, time.Second)
+	log.Debugf("MIN1 %d, MAX1 %d", minIdx1, maxIdx1)
+	assert.Nil(err)
+
+	// Case 2: compaction
+	_, err = uutCase.client.Compact(context.Background(), maxIdx1-2)
+	assert.Nil(err)
+
+	// Case 3: watch from beginning of topic
+	{
+		msgItr := 0
+		handler := func(msg common.Message, index int64) (bool, error) {
+			assert.EqualValues(testMsgs1[msgItr], msg)
+			msgItr += 1
+			return msgItr < 5, nil
+		}
+		watchTargets := []ReadStreamParam{
+			{
+				TargetQueue: topic,
+				StartIndex:  minIdx1,
+				Handler:     handler,
+			},
+		}
+		// Start the watching
+		assert.Nil(uut.ReadStream(watchTargets, stopSignal))
+		assert.Equal(0, msgItr)
+	}
+
+	// Case 4: watch from compaction point
+	{
+		msgItr := 2
+		handler := func(msg common.Message, index int64) (bool, error) {
+			assert.EqualValues(testMsgs1[msgItr], msg)
+			msgItr += 1
+			return msgItr < 5, nil
+		}
+		watchTargets := []ReadStreamParam{
+			{
+				TargetQueue: topic,
+				StartIndex:  maxIdx1 - 2,
+				Handler:     handler,
+			},
+		}
+		// Start the watching
+		assert.Nil(uut.ReadStream(watchTargets, stopSignal))
+		assert.Equal(5, msgItr)
+	}
+}
