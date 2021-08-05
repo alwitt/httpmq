@@ -6,11 +6,11 @@ lint: .prepare ## Lint the files
 	@golangci-lint run ./...
 
 .PHONY: compose
-compose: ## Run docker-compose to create the DEV ENV
+compose: clean .prepare ## Run docker-compose to create the DEV ENV
 	@docker-compose -f docker/docker-compose.yaml up -d
 
 .PHONY: test
-test: .prepare ## Run unittests
+test: compose .prepare ## Run unittests
 	@go test -short ./...
 
 .prepare: ## Prepare the project for local development
@@ -22,7 +22,7 @@ test: .prepare ## Run unittests
 	@touch .prepare
 
 .PHONY: clean
-clean: ## Clean up DEV ENV
+clean: .prepare ## Clean up DEV ENV
 	@docker-compose -f docker/docker-compose.yaml down
 
 help: ## Display this help screen
