@@ -1,4 +1,4 @@
-all: lint
+all: build
 
 .PHONY: lint
 lint: .prepare ## Lint the files
@@ -12,6 +12,10 @@ compose: clean .prepare ## Run docker-compose to create the DEV ENV
 .PHONY: test
 test: compose .prepare ## Run unittests
 	@go test -short ./...
+
+.PHONY: build
+build: lint ## Build project binaries
+	@go build -o etcd_mutex_throughput bin/lock_performance/*
 
 .prepare: ## Prepare the project for local development
 	@pip3 install --user pre-commit
