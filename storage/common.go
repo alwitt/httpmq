@@ -24,5 +24,7 @@ type Driver interface {
 	GetOldest(targetQueue string, timeout time.Duration) (common.Message, error)
 	IndexRange(targetQueue string, timeout time.Duration) (int64, int64, error)
 	ReadStream(targets []ReadStreamParam, stopFlag chan bool) error
+	Lock(lockName string, timeout time.Duration) error
+	Unlock(lockName string, timeout time.Duration) error
 	Close() error
 }

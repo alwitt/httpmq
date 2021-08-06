@@ -5,17 +5,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/apex/log"
 	"gitlab.com/project-nan/httpmq/common"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3/concurrency"
 )
 
 // etcdDriver storage driver interacting with ETCD
 type etcdDriver struct {
 	common.Component
-	client *clientv3.Client
+	client       *clientv3.Client
+	session      *concurrency.Session
+	knownMutexes map[string]*concurrency.Mutex
+	lclMutex     sync.Mutex
 }
 
 // CreateEtcdDriver define an etcd storage driver
@@ -28,10 +33,18 @@ func CreateEtcdDriver(servers []string, timeout time.Duration) (Driver, error) {
 		log.WithError(err).Errorf("Unable to connect with etcd servers %s", servers)
 		return nil, err
 	}
+	session, err := concurrency.NewSession(client)
+	if err != nil {
+		log.WithError(err).Errorf("Unable to create concurrency session")
+		return nil, err
+	}
 	logTags := log.Fields{"module": "storage", "component": "etcd-storage"}
 	log.WithFields(logTags).Infof("Connected with etcd servers %s", servers)
 	return &etcdDriver{
-		client: client, Component: common.Component{LogTags: logTags},
+		client:       client,
+		Component:    common.Component{LogTags: logTags},
+		session:      session,
+		knownMutexes: make(map[string]*concurrency.Mutex),
 	}, nil
 }
 
@@ -255,8 +268,46 @@ func (d *etcdDriver) runMessageHandler(
 	return true, nil
 }
 
+func (d *etcdDriver) getMutex(lockName string) *concurrency.Mutex {
+	d.lclMutex.Lock()
+	defer d.lclMutex.Unlock()
+	theMutex, ok := d.knownMutexes[lockName]
+	if !ok {
+		theMutex = concurrency.NewMutex(d.session, lockName)
+		d.knownMutexes[lockName] = theMutex
+	}
+	return theMutex
+}
+
+// Lock acquire a named lock given a timeout
+func (d *etcdDriver) Lock(lockName string, timeout time.Duration) error {
+	theMutex := d.getMutex(lockName)
+	useContext, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	if err := theMutex.Lock(useContext); err != nil {
+		log.WithError(err).WithFields(d.LogTags).Errorf("Unable to lock %s", lockName)
+		return err
+	}
+	return nil
+}
+
+// Unlock release a named lock given a timeout
+func (d *etcdDriver) Unlock(lockName string, timeout time.Duration) error {
+	theMutex := d.getMutex(lockName)
+	useContext, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	if err := theMutex.Unlock(useContext); err != nil {
+		log.WithError(err).WithFields(d.LogTags).Errorf("Unable to unlock %s", lockName)
+		return err
+	}
+	return nil
+}
+
 // Close close etcd storage driver
 func (d *etcdDriver) Close() error {
+	if err := d.session.Close(); err != nil {
+		log.WithError(err).WithFields(d.LogTags).Error("Failed to close session")
+	}
 	if err := d.client.Close(); err != nil {
 		log.WithError(err).WithFields(d.LogTags).Error("Failed to close driver")
 		return err

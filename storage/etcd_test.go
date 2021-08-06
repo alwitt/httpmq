@@ -749,3 +749,29 @@ func TestEtcdDriverStreamingAfterCompaction(t *testing.T) {
 		assert.Equal(5, msgItr)
 	}
 }
+
+func TestEtcdDriverMutex(t *testing.T) {
+	assert := assert.New(t)
+	log.SetLevel(log.DebugLevel)
+
+	uut, err := CreateEtcdDriver([]string{"localhost:2379"}, time.Second*5)
+	assert.Nil(err)
+
+	uut2, err := CreateEtcdDriver([]string{"localhost:2379"}, time.Second*5)
+	assert.Nil(err)
+
+	// Case 0: Unlock an unknown mutex
+	mutex0 := fmt.Sprintf("mtx-%s", uuid.New().String())
+	assert.NotNil(uut.Unlock(mutex0, time.Second))
+
+	// Case 1: Lock a mutex
+	mutex1 := fmt.Sprintf("mtx-%s", uuid.New().String())
+	assert.Nil(uut.Lock(mutex1, time.Second))
+
+	// Case 2: Lock again and fail
+	assert.NotNil(uut2.Lock(mutex1, time.Millisecond*10))
+
+	// Case 3: Unlock and try again
+	assert.Nil(uut.Unlock(mutex1, time.Second))
+	assert.Nil(uut2.Lock(mutex1, time.Millisecond*10))
+}
