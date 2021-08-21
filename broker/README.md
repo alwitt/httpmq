@@ -52,8 +52,13 @@ defined_at: 2021-08-02T22:30:30-07:00
 subscribed_to:
   - name: data-queue-1
     acked_index: 514
+    outstanding_index:
+      - 510
+      - 512
   - name: data-queue-2
     acked_index: 193
+    outstanding_index:
+      - 192
 ```
 
 | Field | Description | Notes |
@@ -64,6 +69,7 @@ subscribed_to:
 | `subscribed_to` | Information on the queues the client is subscribed to | |
 | `subscribed_to.[].name` | Queue name | |
 | `subscribed_to.[].acked_index` | Index of latest message the client acknowledged receiving. | |
+| `subscribed_to.[].outstanding_index` | Index of messages still awaiting acknowledgement. | |
 
 ### Registering Clients
 
@@ -97,3 +103,34 @@ Message publish occurs on a per client bases, and support publishing to multiple
 A client can subscribe to multiple message queues via the broker.
 
 ![subscribe_msg](pics/subscribe_message_seq.png "Subscribe to Message Queue")
+
+---
+## Message Delivery And Tracking
+
+![subscribe_hl](pics/subscription_high_level.png "High level diagram of subscription module")
+
+When a client subscribes for data on queues, the server starts a set of data stream reader (one for each queue the client is subscribed to). Output of the various stream readers are multiplexed over a single transport to be delivered to the client.
+
+The data stream reader is
+
+* Pulling messages from the data store for delivery.
+* Tracking the set of messages which has not been acknowledged by the client.
+
+The reader is configured to allow a certain number of in-flight messages (message awaiting ACK). Once that limit is reached, the reader is wait for ACKs from the client.
+
+Since a client subscribing for messages could connect with any one of the nodes in the broker cluster, a client is not allowed to establish two subscription sessions at the same time to maintain consistency; a client connecting to multiple nodes would create data errors in the tracking for that client, as locking is not used. This is enforced through a global data structure
+
+```yaml
+---
+active_clients_subs:
+  client-name:
+    session:
+      node: serving-cluster-node
+      connected_at: 2021-08-02T22:30:30-07:00
+  client-name-2:
+    session:
+      node: serving-cluster-node
+      connected_at: 2021-08-02T22:30:30-07:00
+```
+
+Before a node accepts to serve the subscription request of a client, it must first verify that client does not have any active sessions.
