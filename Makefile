@@ -11,6 +11,7 @@ compose: clean .prepare ## Run docker-compose to create the DEV ENV
 
 .PHONY: test
 test: compose .prepare ## Run unittests
+	# @RUN_ETCD_COMPACT_TESTS=TRUE go test -short ./...
 	@go test -short ./...
 
 .PHONY: build

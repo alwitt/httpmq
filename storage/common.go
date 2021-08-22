@@ -16,14 +16,28 @@ type ReadStreamParam struct {
 	Handler     MessageProcessor
 }
 
-// Driver storage driver
-type Driver interface {
-	Put(message common.Message, timeout time.Duration) error
-	Get(targetQueue string, index int64, timeout time.Duration) (common.Message, error)
-	GetNewest(targetQueue string, timeout time.Duration) (common.Message, error)
-	GetOldest(targetQueue string, timeout time.Duration) (common.Message, error)
+// MessageQueues message queue operator
+type MessageQueues interface {
+	// Queue related operations
+	Write(message common.Message, timeout time.Duration) error
+	Read(targetQueue string, index int64, timeout time.Duration) (common.Message, error)
+	ReadNewest(targetQueue string, timeout time.Duration) (common.Message, error)
+	ReadOldest(targetQueue string, timeout time.Duration) (common.Message, error)
 	IndexRange(targetQueue string, timeout time.Duration) (int64, int64, error)
 	ReadStream(targets []ReadStreamParam, stopFlag chan bool) error
+	// Mutex related operations
+	Lock(lockName string, timeout time.Duration) error
+	Unlock(lockName string, timeout time.Duration) error
+	Close() error
+}
+
+// KeyValueStore key-value store operator
+type KeyValueStore interface {
+	// Key-Value store related operations
+	Set(key string, value string, timeout time.Duration) error
+	Get(key string, timeout time.Duration) (string, error)
+	Delete(key string, timeout time.Duration) error
+	// Mutex related operations
 	Lock(lockName string, timeout time.Duration) error
 	Unlock(lockName string, timeout time.Duration) error
 	Close() error

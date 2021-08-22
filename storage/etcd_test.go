@@ -2,7 +2,9 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -12,13 +14,19 @@ import (
 	"gitlab.com/project-nan/httpmq/common"
 )
 
+func skipCompactionTest(t *testing.T) {
+	if os.Getenv("RUN_ETCD_COMPACT_TESTS") == "" {
+		t.Skip("Skipping ETCD compaction related tests")
+	}
+}
+
 func TestEtcdDriverBasic(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
 
-	uut, err := CreateEtcdDriver([]string{"localhost:2379"}, time.Second*5)
+	uut, _, err := CreateEtcdBackedStorage([]string{"localhost:2379"}, time.Second*5)
 	assert.Nil(err)
-	uutCase, ok := uut.(*etcdDriver)
+	uutCase, ok := uut.(*etcdBackedStorage)
 	assert.True(ok)
 
 	// Case 0: fetch on unknown topic
@@ -40,7 +48,7 @@ func TestEtcdDriverBasic(t *testing.T) {
 		Tags:        map[string]string{"flag 0": uuid.New().String()},
 		Body:        []byte(uuid.New().String()),
 	}
-	assert.Nil(uut.Put(msg1, time.Second))
+	assert.Nil(uut.Write(msg1, time.Second))
 	// Reference index
 	minIdx1, maxIdx1, err := uutCase.IndexRange(testTopic0, time.Second)
 	assert.Nil(err)
@@ -57,7 +65,7 @@ func TestEtcdDriverBasic(t *testing.T) {
 		Tags:        map[string]string{"flag 0": uuid.New().String()},
 		Body:        []byte(uuid.New().String()),
 	}
-	assert.Nil(uut.Put(msg2, time.Second))
+	assert.Nil(uut.Write(msg2, time.Second))
 	// Reference index
 	minIdx2, maxIdx2, err := uutCase.IndexRange(testTopic0, time.Second)
 	assert.Nil(err)
@@ -75,7 +83,7 @@ func TestEtcdDriverBasic(t *testing.T) {
 		Tags:        map[string]string{"flag 0": uuid.New().String()},
 		Body:        []byte(uuid.New().String()),
 	}
-	assert.Nil(uut.Put(msg3, time.Second))
+	assert.Nil(uut.Write(msg3, time.Second))
 	// Reference index
 	minIdx3, maxIdx3, err := uutCase.IndexRange(testTopic0, time.Second)
 	assert.Nil(err)
@@ -83,23 +91,23 @@ func TestEtcdDriverBasic(t *testing.T) {
 	assert.Greater(maxIdx3, maxIdx2)
 
 	// Case 4: reference old version
-	readMsg1, err := uut.Get(testTopic0, maxIdx1, time.Second)
+	readMsg1, err := uut.Read(testTopic0, maxIdx1, time.Second)
 	assert.Nil(err)
 	assert.EqualValues(msg1, readMsg1)
-	readMsg2, err := uut.Get(testTopic0, maxIdx2, time.Second)
+	readMsg2, err := uut.Read(testTopic0, maxIdx2, time.Second)
 	assert.Nil(err)
 	assert.EqualValues(msg2, readMsg2)
-	readMsg3, err := uut.Get(testTopic0, maxIdx3, time.Second)
+	readMsg3, err := uut.Read(testTopic0, maxIdx3, time.Second)
 	assert.Nil(err)
 	assert.EqualValues(msg3, readMsg3)
 
 	// Case 5: check newest version
-	readMsg, err := uut.GetNewest(testTopic0, time.Second)
+	readMsg, err := uut.ReadNewest(testTopic0, time.Second)
 	assert.Nil(err)
 	assert.EqualValues(msg3, readMsg)
 
 	// Case 6: check oldest version
-	readMsg, err = uut.GetOldest(testTopic0, time.Second)
+	readMsg, err = uut.ReadOldest(testTopic0, time.Second)
 	assert.Nil(err)
 	assert.EqualValues(msg1, readMsg)
 
@@ -115,7 +123,7 @@ func TestEtcdDriverBasic(t *testing.T) {
 		Tags:        map[string]string{"flag 0": uuid.New().String()},
 		Body:        []byte(uuid.New().String()),
 	}
-	assert.Nil(uut.Put(msg7B, time.Second))
+	assert.Nil(uut.Write(msg7B, time.Second))
 	// Reference index
 	minIdx7A, maxIdx7A, err := uutCase.IndexRange(testTopic0, time.Second)
 	assert.Nil(err)
@@ -135,7 +143,7 @@ func TestEtcdDriverBasic(t *testing.T) {
 		Tags:        map[string]string{"flag 0": uuid.New().String()},
 		Body:        []byte(uuid.New().String()),
 	}
-	assert.Nil(uut.Put(msg8B, time.Second))
+	assert.Nil(uut.Write(msg8B, time.Second))
 	// Reference index
 	minIdx8A, maxIdx8A, err := uutCase.IndexRange(testTopic0, time.Second)
 	assert.Nil(err)
@@ -153,7 +161,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
 
-	uut, err := CreateEtcdDriver([]string{"localhost:2379"}, time.Second*5)
+	uut, _, err := CreateEtcdBackedStorage([]string{"localhost:2379"}, time.Second*5)
 	assert.Nil(err)
 
 	stopSignal1 := make(chan bool, 1)
@@ -216,7 +224,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		go func() {
 			for idx, msg := range testMsgs {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Put(msg, time.Second))
+				assert.Nil(uut.Write(msg, time.Second))
 			}
 		}()
 		// Start the watching
@@ -263,7 +271,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		go func() {
 			for idx, msg := range testMsgs {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Put(msg, time.Second))
+				assert.Nil(uut.Write(msg, time.Second))
 			}
 		}()
 		// Start the watching
@@ -310,7 +318,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		go func() {
 			for idx, msg := range testMsgs {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Put(msg, time.Second))
+				assert.Nil(uut.Write(msg, time.Second))
 			}
 		}()
 		// Start the watching
@@ -381,13 +389,13 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		go func() {
 			for idx, msg := range testMsgs1 {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Put(msg, time.Second))
+				assert.Nil(uut.Write(msg, time.Second))
 			}
 		}()
 		go func() {
 			for idx, msg := range testMsgs2 {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Put(msg, time.Second))
+				assert.Nil(uut.Write(msg, time.Second))
 			}
 		}()
 		// Start the watching
@@ -459,13 +467,13 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		go func() {
 			for idx, msg := range testMsgs1 {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Put(msg, time.Second))
+				assert.Nil(uut.Write(msg, time.Second))
 			}
 		}()
 		go func() {
 			for idx, msg := range testMsgs2 {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Put(msg, time.Second))
+				assert.Nil(uut.Write(msg, time.Second))
 			}
 		}()
 		// Start the watching
@@ -501,13 +509,13 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		}
 		for itr := 0; itr < 2; itr++ {
 			log.Debugf("Sending test message %d", itr)
-			assert.Nil(uut.Put(testMsgs[itr], time.Second))
+			assert.Nil(uut.Write(testMsgs[itr], time.Second))
 		}
 		_, maxIdx, err := uut.IndexRange(topic, time.Second)
 		assert.Nil(err)
 		for itr := 2; itr < 5; itr++ {
 			log.Debugf("Sending test message %d", itr)
-			assert.Nil(uut.Put(testMsgs[itr], time.Second))
+			assert.Nil(uut.Write(testMsgs[itr], time.Second))
 		}
 		watchTargets := []ReadStreamParam{
 			{
@@ -548,7 +556,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		}
 		for itr := 0; itr < 2; itr++ {
 			log.Debugf("Sending test message %d", itr)
-			assert.Nil(uut.Put(testMsgs[itr], time.Second))
+			assert.Nil(uut.Write(testMsgs[itr], time.Second))
 		}
 		watchTargets := []ReadStreamParam{
 			{
@@ -560,7 +568,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		go func() {
 			for itr := 2; itr < 5; itr++ {
 				log.Debugf("Sending test message %d", itr)
-				assert.Nil(uut.Put(testMsgs[itr], time.Second))
+				assert.Nil(uut.Write(testMsgs[itr], time.Second))
 			}
 		}()
 		// Start the watching
@@ -573,9 +581,11 @@ func TestEtcdDriverBasicAfterCompaction(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
 
-	uut, err := CreateEtcdDriver([]string{"localhost:2379"}, time.Second*5)
+	skipCompactionTest(t)
+
+	uut, _, err := CreateEtcdBackedStorage([]string{"localhost:2379"}, time.Second*5)
 	assert.Nil(err)
-	uutCase, ok := uut.(*etcdDriver)
+	uutCase, ok := uut.(*etcdBackedStorage)
 	assert.True(ok)
 
 	// Case 1: create messages
@@ -598,7 +608,7 @@ func TestEtcdDriverBasicAfterCompaction(t *testing.T) {
 		}
 		for idx, msg := range testMsgs1 {
 			log.Debugf("Sending test message %d", idx)
-			assert.Nil(uut.Put(msg, time.Second))
+			assert.Nil(uut.Write(msg, time.Second))
 		}
 	}
 
@@ -611,15 +621,15 @@ func TestEtcdDriverBasicAfterCompaction(t *testing.T) {
 
 	// Case 3: verify compaction occurred
 	{
-		_, err := uut.Get(topic1, minIdx2, time.Second)
+		_, err := uut.Read(topic1, minIdx2, time.Second)
 		assert.NotNil(err)
 	}
 	{
-		_, err := uut.Get(topic1, maxIdx2-1, time.Second)
+		_, err := uut.Read(topic1, maxIdx2-1, time.Second)
 		assert.NotNil(err)
 	}
 	{
-		val, err := uut.Get(topic1, maxIdx2, time.Second)
+		val, err := uut.Read(topic1, maxIdx2, time.Second)
 		assert.Nil(err)
 		assert.EqualValues(testMsgs1[4], val)
 	}
@@ -643,7 +653,7 @@ func TestEtcdDriverBasicAfterCompaction(t *testing.T) {
 		}
 		for idx, msg := range testMsgs4 {
 			log.Debugf("Sending test message %d", idx)
-			assert.Nil(uut.Put(msg, time.Second))
+			assert.Nil(uut.Write(msg, time.Second))
 		}
 	}
 
@@ -657,11 +667,11 @@ func TestEtcdDriverBasicAfterCompaction(t *testing.T) {
 
 	// Case 6: verify compaction occurred
 	{
-		_, err := uut.Get(topic1, maxIdx2, time.Second)
+		_, err := uut.Read(topic1, maxIdx2, time.Second)
 		assert.NotNil(err)
 	}
 	{
-		val, err := uut.Get(topic1, maxIdx5, time.Second)
+		val, err := uut.Read(topic1, maxIdx5, time.Second)
 		assert.Nil(err)
 		assert.EqualValues(testMsgs4[2], val)
 	}
@@ -671,9 +681,11 @@ func TestEtcdDriverStreamingAfterCompaction(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
 
-	uut, err := CreateEtcdDriver([]string{"localhost:2379"}, time.Second*5)
+	skipCompactionTest(t)
+
+	uut, _, err := CreateEtcdBackedStorage([]string{"localhost:2379"}, time.Second*5)
 	assert.Nil(err)
-	uutCase, ok := uut.(*etcdDriver)
+	uutCase, ok := uut.(*etcdBackedStorage)
 	assert.True(ok)
 
 	stopSignal := make(chan bool, 1)
@@ -698,7 +710,7 @@ func TestEtcdDriverStreamingAfterCompaction(t *testing.T) {
 		}
 		for idx, msg := range testMsgs1 {
 			log.Debugf("Sending test message %d", idx)
-			assert.Nil(uut.Put(msg, time.Second))
+			assert.Nil(uut.Write(msg, time.Second))
 		}
 	}
 	minIdx1, maxIdx1, err := uut.IndexRange(topic, time.Second)
@@ -754,10 +766,10 @@ func TestEtcdDriverMutex(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
 
-	uut, err := CreateEtcdDriver([]string{"localhost:2379"}, time.Second*5)
+	uut, _, err := CreateEtcdBackedStorage([]string{"localhost:2379"}, time.Second*5)
 	assert.Nil(err)
 
-	uut2, err := CreateEtcdDriver([]string{"localhost:2379"}, time.Second*5)
+	uut2, _, err := CreateEtcdBackedStorage([]string{"localhost:2379"}, time.Second*5)
 	assert.Nil(err)
 
 	// Case 0: Unlock an unknown mutex
@@ -774,4 +786,55 @@ func TestEtcdDriverMutex(t *testing.T) {
 	// Case 3: Unlock and try again
 	assert.Nil(uut.Unlock(mutex1, time.Second))
 	assert.Nil(uut2.Lock(mutex1, time.Millisecond*10))
+}
+
+func TestEtcdDriverKeyValue(t *testing.T) {
+	assert := assert.New(t)
+	log.SetLevel(log.DebugLevel)
+
+	_, uut, err := CreateEtcdBackedStorage([]string{"localhost:2379"}, time.Second*5)
+	assert.Nil(err)
+
+	// Case 0: Get key which does not exist
+	{
+		_, err := uut.Get(uuid.New().String(), time.Second)
+		assert.NotNil(err)
+	}
+
+	// Case 1: set a new key
+	key1 := uuid.New().String()
+	val1 := uuid.New().String()
+	assert.Nil(uut.Set(key1, val1, time.Second))
+	{
+		read, err := uut.Get(key1, time.Second)
+		assert.Nil(err)
+		assert.Equal(val1, read)
+	}
+
+	// Case 2: set a new key
+	type dummyVal1 struct {
+		Val1 string
+		Val2 int
+	}
+	key2 := uuid.New().String()
+	val2 := dummyVal1{Val1: uuid.New().String(), Val2: 5123}
+	{
+		t, err := json.Marshal(&val2)
+		assert.Nil(err)
+		assert.Nil(uut.Set(key2, string(t), time.Second))
+	}
+	{
+		read, err := uut.Get(key2, time.Second)
+		assert.Nil(err)
+		var parsed dummyVal1
+		assert.Nil(json.Unmarshal([]byte(read), &parsed))
+		assert.EqualValues(val2, parsed)
+	}
+
+	// Case 3: delete a key
+	assert.Nil(uut.Delete(key1, time.Second))
+	{
+		_, err := uut.Get(key1, time.Second)
+		assert.NotNil(err)
+	}
 }

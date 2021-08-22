@@ -14,8 +14,8 @@ import (
 	"go.etcd.io/etcd/client/v3/concurrency"
 )
 
-// etcdDriver storage driver interacting with ETCD
-type etcdDriver struct {
+// etcdBackedStorage driver for interacting with ETCD as message queues
+type etcdBackedStorage struct {
 	common.Component
 	client       *clientv3.Client
 	session      *concurrency.Session
@@ -23,33 +23,39 @@ type etcdDriver struct {
 	lclMutex     sync.Mutex
 }
 
-// CreateEtcdDriver define an etcd storage driver
-func CreateEtcdDriver(servers []string, timeout time.Duration) (Driver, error) {
+// CreateEtcdBackedStorage define an etcd backed storage driver
+func CreateEtcdBackedStorage(servers []string, timeout time.Duration) (
+	MessageQueues, KeyValueStore, error,
+) {
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   servers,
 		DialTimeout: timeout,
 	})
 	if err != nil {
 		log.WithError(err).Errorf("Unable to connect with etcd servers %s", servers)
-		return nil, err
+		return nil, nil, err
 	}
 	session, err := concurrency.NewSession(client)
 	if err != nil {
 		log.WithError(err).Errorf("Unable to create concurrency session")
-		return nil, err
+		return nil, nil, err
 	}
-	logTags := log.Fields{"module": "storage", "component": "etcd-storage"}
+	logTags := log.Fields{"module": "storage", "component": "etcd-backed"}
 	log.WithFields(logTags).Infof("Connected with etcd servers %s", servers)
-	return &etcdDriver{
+	instance := &etcdBackedStorage{
 		client:       client,
 		Component:    common.Component{LogTags: logTags},
 		session:      session,
 		knownMutexes: make(map[string]*concurrency.Mutex),
-	}, nil
+	}
+	return instance, instance, nil
 }
 
-// Put record a new message
-func (d *etcdDriver) Put(message common.Message, timeout time.Duration) error {
+// ================================================================
+// Message queue related operations
+
+// Write record a new message
+func (d *etcdBackedStorage) Write(message common.Message, timeout time.Duration) error {
 	// the message is stored as serialized JSON
 	toStore, err := json.Marshal(&message)
 	if err != nil {
@@ -63,18 +69,18 @@ func (d *etcdDriver) Put(message common.Message, timeout time.Duration) error {
 	cancel()
 	if err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf(
-			"Failed to PUT %s <== %s", message.Destination.TargetQueue, string(toStore),
+			"Failed to WRITE %s <== %s", message.Destination.TargetQueue, string(toStore),
 		)
 		return err
 	}
 	log.WithFields(d.LogTags).Debugf(
-		"PUT into %s@%d", message.Destination.TargetQueue, resp.Header.Revision,
+		"WRITE into %s@%d", message.Destination.TargetQueue, resp.Header.Revision,
 	)
 	return nil
 }
 
-// Get fetch message from target queue based on index
-func (d *etcdDriver) Get(
+// Read fetch message from target queue based on index
+func (d *etcdBackedStorage) Read(
 	targetQueue string, index int64, timeout time.Duration,
 ) (common.Message, error) {
 	useContext, cancel := context.WithTimeout(context.Background(), timeout)
@@ -82,17 +88,17 @@ func (d *etcdDriver) Get(
 	cancel()
 	if err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf(
-			"Failed to GET %s@%d", targetQueue, index,
+			"Failed to READ %s@%d", targetQueue, index,
 		)
 		return common.Message{}, err
 	}
 	// Parse the message to get the structure
 	if len(resp.Kvs) != 1 {
 		log.WithFields(d.LogTags).Errorf(
-			"GET %s@%d did not return one entry %d", targetQueue, index, len(resp.Kvs),
+			"READ %s@%d did not return one entry %d", targetQueue, index, len(resp.Kvs),
 		)
 		return common.Message{}, fmt.Errorf(
-			"[ETCD Storage Driver] GET %s@%d did not return one entry %d",
+			"[ETCD Storage Driver] READ %s@%d did not return one entry %d",
 			targetQueue,
 			index,
 			len(resp.Kvs),
@@ -109,15 +115,15 @@ func (d *etcdDriver) Get(
 	return message, nil
 }
 
-// GetNewest fetch the newest message from target queue
-func (d *etcdDriver) GetNewest(
+// ReadNewest fetch the newest message from target queue
+func (d *etcdBackedStorage) ReadNewest(
 	targetQueue string, timeout time.Duration,
 ) (common.Message, error) {
-	return d.Get(targetQueue, 0, timeout)
+	return d.Read(targetQueue, 0, timeout)
 }
 
-// GetOldest fetch oldest available message from target queue
-func (d *etcdDriver) GetOldest(
+// ReadOldest fetch oldest available message from target queue
+func (d *etcdBackedStorage) ReadOldest(
 	targetQueue string, timeout time.Duration,
 ) (common.Message, error) {
 	oldest, _, err := d.IndexRange(targetQueue, timeout)
@@ -127,11 +133,11 @@ func (d *etcdDriver) GetOldest(
 		)
 		return common.Message{}, err
 	}
-	return d.Get(targetQueue, oldest, timeout)
+	return d.Read(targetQueue, oldest, timeout)
 }
 
 // IndexRange get the oldest, and newest available index on a target queue
-func (d *etcdDriver) IndexRange(
+func (d *etcdBackedStorage) IndexRange(
 	targetQueue string, timeout time.Duration,
 ) (int64, int64, error) {
 	useContext, cancel := context.WithTimeout(context.Background(), timeout)
@@ -148,7 +154,7 @@ func (d *etcdDriver) IndexRange(
 }
 
 // ReadStream read data stream from set of queues, and process messages from each
-func (d *etcdDriver) ReadStream(targets []ReadStreamParam, stopFlag chan bool) error {
+func (d *etcdBackedStorage) ReadStream(targets []ReadStreamParam, stopFlag chan bool) error {
 	readSelects := make([]reflect.SelectCase, len(targets)+1)
 	dataStreams := make([]clientv3.WatchChan, len(targets))
 	activeChannels := make([]bool, len(targets))
@@ -239,7 +245,7 @@ func (d *etcdDriver) ReadStream(targets []ReadStreamParam, stopFlag chan bool) e
 	return nil
 }
 
-func (d *etcdDriver) runMessageHandler(
+func (d *etcdBackedStorage) runMessageHandler(
 	targetQueue string, msg clientv3.WatchResponse, handler MessageProcessor,
 ) (bool, error) {
 	// Process potentially multiple events
@@ -268,7 +274,7 @@ func (d *etcdDriver) runMessageHandler(
 	return true, nil
 }
 
-func (d *etcdDriver) getMutex(lockName string) *concurrency.Mutex {
+func (d *etcdBackedStorage) getMutex(lockName string) *concurrency.Mutex {
 	d.lclMutex.Lock()
 	defer d.lclMutex.Unlock()
 	theMutex, ok := d.knownMutexes[lockName]
@@ -280,7 +286,7 @@ func (d *etcdDriver) getMutex(lockName string) *concurrency.Mutex {
 }
 
 // Lock acquire a named lock given a timeout
-func (d *etcdDriver) Lock(lockName string, timeout time.Duration) error {
+func (d *etcdBackedStorage) Lock(lockName string, timeout time.Duration) error {
 	theMutex := d.getMutex(lockName)
 	useContext, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -292,7 +298,7 @@ func (d *etcdDriver) Lock(lockName string, timeout time.Duration) error {
 }
 
 // Unlock release a named lock given a timeout
-func (d *etcdDriver) Unlock(lockName string, timeout time.Duration) error {
+func (d *etcdBackedStorage) Unlock(lockName string, timeout time.Duration) error {
 	theMutex := d.getMutex(lockName)
 	useContext, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -304,7 +310,7 @@ func (d *etcdDriver) Unlock(lockName string, timeout time.Duration) error {
 }
 
 // Close close etcd storage driver
-func (d *etcdDriver) Close() error {
+func (d *etcdBackedStorage) Close() error {
 	if err := d.session.Close(); err != nil {
 		log.WithError(err).WithFields(d.LogTags).Error("Failed to close session")
 	}
@@ -312,5 +318,57 @@ func (d *etcdDriver) Close() error {
 		log.WithError(err).WithFields(d.LogTags).Error("Failed to close driver")
 		return err
 	}
+	return nil
+}
+
+// ================================================================
+// Key-Value store related operations
+
+// Set record a K/V pair in etcd
+func (d *etcdBackedStorage) Set(key string, value string, timeout time.Duration) error {
+	useContext, cancel := context.WithTimeout(context.Background(), timeout)
+	resp, err := d.client.Put(useContext, key, value)
+	cancel()
+	if err != nil {
+		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to SET %s <== %s", key, value)
+		return err
+	}
+	log.WithFields(d.LogTags).Debugf(
+		"SET %s@%d <== %s", key, resp.Header.Revision, value,
+	)
+	return nil
+}
+
+// Get read a K/V pair from etcd
+func (d *etcdBackedStorage) Get(key string, timeout time.Duration) (string, error) {
+	useContext, cancel := context.WithTimeout(context.Background(), timeout)
+	resp, err := d.client.Get(useContext, key, clientv3.WithRev(int64(0)))
+	cancel()
+	if err != nil {
+		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to GET %s@0", key)
+		return "", err
+	}
+	// Parse the message to get the structure
+	if len(resp.Kvs) != 1 {
+		log.WithFields(d.LogTags).Errorf(
+			"GET %s@0 did not return one entry %d", key, len(resp.Kvs),
+		)
+		return "", fmt.Errorf(
+			"[ETCD Storage Driver] READ %s@0 did not return one entry %d", key, len(resp.Kvs),
+		)
+	}
+	return string(resp.Kvs[0].Value), nil
+}
+
+// Delete delete a key from ETCD
+func (d *etcdBackedStorage) Delete(key string, timeout time.Duration) error {
+	useContext, cancel := context.WithTimeout(context.Background(), timeout)
+	resp, err := d.client.Delete(useContext, key, clientv3.WithPrefix())
+	cancel()
+	if err != nil {
+		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to DELETE %s", key)
+		return err
+	}
+	log.WithFields(d.LogTags).Infof("Deleted %d instances of %s", resp.Deleted, key)
 	return nil
 }

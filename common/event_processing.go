@@ -33,7 +33,7 @@ type taskProcessorImpl struct {
 // GetNewTaskProcessorInstance get instance of TaskProcessor
 func GetNewTaskProcessorInstance(name string, taskBuffer int) (TaskProcessor, error) {
 	logTags := log.Fields{
-		"module": "common", "component": fmt.Sprintf("task-processor/%s", name),
+		"module": "common", "component": "task-processor", "instance": name,
 	}
 	return &taskProcessorImpl{
 		Component:    Component{LogTags: logTags},
@@ -151,7 +151,7 @@ func GetNewTaskDemuxProcessorInstance(
 		workers[itr] = workerTP
 	}
 	logTags := log.Fields{
-		"module": "common", "component": fmt.Sprintf("task-demux-processor/%s", name),
+		"module": "common", "component": "task-demux-processor/%s", "instance": name,
 	}
 	return &taskDemuxProcessorImpl{
 		name:      name,

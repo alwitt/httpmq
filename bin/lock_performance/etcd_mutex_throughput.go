@@ -133,9 +133,9 @@ func startServer(c *cli.Context) error {
 	}
 
 	// Define the test connections
-	connections := make([]storage.Driver, args.Threads)
+	connections := make([]storage.MessageQueues, args.Threads)
 	for itr := 0; itr < args.Threads; itr++ {
-		driver, err := storage.CreateEtcdDriver([]string{args.EtcdHost}, time.Second)
+		driver, _, err := storage.CreateEtcdBackedStorage([]string{args.EtcdHost}, time.Second)
 		if err != nil {
 			log.WithError(err).Errorf("Failed to create ETCD driver for %s", args.EtcdHost)
 			return err
