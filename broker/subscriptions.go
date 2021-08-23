@@ -34,6 +34,7 @@ type SubscriptionRecorder interface {
 	LogClientSession(clientName string, node string, timestamp time.Time) (ClientSubscription, error)
 	RefreshClientSession(clientName string, node string, timestamp time.Time) error
 	ClearClientSession(clientName string, node string, timestamp time.Time) error
+	ClearInactiveSessions(maxInactivePeriod time.Duration, timestamp time.Time) error
 }
 
 // subscriptionRecorderImpl implements
@@ -86,6 +87,12 @@ func DefineSubscriptionRecorder(
 	if err := tp.AddToTaskExecutionMap(
 		reflect.TypeOf(subRecorderReadyRecordReq{}),
 		instance.processReadySessionRecordsRequest,
+	); err != nil {
+		return nil, err
+	}
+	if err := tp.AddToTaskExecutionMap(
+		reflect.TypeOf(subRecorderClearInactiveReq{}),
+		instance.processClearInactiveRequest,
 	); err != nil {
 		return nil, err
 	}
@@ -527,6 +534,109 @@ func (r *subscriptionRecorderImpl) ProcessClearClientSessRequest(
 		node,
 		timestamp.Format(time.RFC3339),
 		r.storeKey,
+	)
+	return nil
+}
+
+// ----------------------------------------------------------------------------------------
+
+type subRecorderClearInactiveReq struct {
+	timestamp   time.Time
+	inactiveFor time.Duration
+	resultCB    func(error)
+}
+
+// ClearInactiveSessions clear out inactive sessions which have not been refreshed with
+// in the max allowed inactive period.
+func (r *subscriptionRecorderImpl) ClearInactiveSessions(
+	maxInactivePeriod time.Duration, timestamp time.Time,
+) error {
+	complete := make(chan bool, 1)
+	var processError error
+	// Handler core processing result
+	handler := func(err error) {
+		processError = err
+		complete <- true
+	}
+
+	// Make the request
+	request := subRecorderClearInactiveReq{
+		timestamp: timestamp, inactiveFor: maxInactivePeriod, resultCB: handler,
+	}
+
+	if err := r.tp.Submit(request); err != nil {
+		log.WithError(err).WithFields(r.LogTags).Errorf(
+			"Failed to submit clear-inactive-sessions request",
+		)
+		return err
+	}
+
+	// Wait for completion
+	<-complete
+
+	return processError
+}
+
+func (r *subscriptionRecorderImpl) processClearInactiveRequest(param interface{}) error {
+	request, ok := param.(subRecorderClearInactiveReq)
+	if !ok {
+		return fmt.Errorf(
+			"can not process unknown type %s for clear inactive sessions",
+			reflect.TypeOf(param),
+		)
+	}
+	err := r.ProcessClearInactiveRequest(request.inactiveFor, request.timestamp)
+	request.resultCB(err)
+	return err
+}
+
+// ProcessClearInactiveRequest clear out inactive sessions which have not been refreshed with
+// in the max allowed inactive period.
+func (r *subscriptionRecorderImpl) ProcessClearInactiveRequest(
+	maxInactivePeriod time.Duration, timestamp time.Time,
+) error {
+	// Fetch the current active session records
+	records, err := r.readCurrentActiveSessions()
+	if err != nil {
+		log.WithError(err).WithFields(r.LogTags).Error("Unable to fetch active session records")
+		return err
+	}
+
+	// Filter out the sessions which have not been refreshed
+	removeSessions := []string{}
+	for client, session := range records.ActiveSessions {
+		timePassed := timestamp.Sub(session.StatusUpdateAt)
+		if timePassed > maxInactivePeriod {
+			removeSessions = append(removeSessions, client)
+			log.WithFields(r.LogTags).Infof(
+				"Client %s session lasted refreshed at %s. Timeout @ %s",
+				client,
+				session.StatusUpdateAt.Format(time.RFC3339),
+				timePassed,
+			)
+		}
+	}
+
+	log.WithFields(r.LogTags).Infof(
+		"Following client subscription sessions have become inactive %v", removeSessions,
+	)
+
+	// Remove them from record
+	for _, client := range removeSessions {
+		delete(records.ActiveSessions, client)
+	}
+
+	// Store the updated version
+	if err := r.storeActiveSessionRecords(records); err != nil {
+		log.WithError(err).WithFields(r.LogTags).Errorf(
+			"Failed to update active session records %s",
+			r.storeKey,
+		)
+		return err
+	}
+
+	log.WithFields(r.LogTags).Infof(
+		"Following client subscription sessions are removed from record %v", removeSessions,
 	)
 	return nil
 }

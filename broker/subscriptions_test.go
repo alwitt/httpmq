@@ -102,3 +102,70 @@ func TestSubscriptionRecorderBasic(t *testing.T) {
 	assert.Nil(tp.StopEventLoop())
 	wg.Wait()
 }
+
+func TestSubscriptionRecorderTimeout(t *testing.T) {
+	assert := assert.New(t)
+	log.SetLevel(log.DebugLevel)
+
+	_, testKV, err := storage.CreateEtcdBackedStorage([]string{"localhost:2379"}, time.Second*5)
+	assert.Nil(err)
+
+	tp, err := common.GetNewTaskProcessorInstance("unit-test", 4)
+	assert.Nil(err)
+
+	testRecordPrefix := uuid.New().String()
+	sessionRecords := fmt.Sprintf("%s/active-sessions", testRecordPrefix)
+	uut, err := DefineSubscriptionRecorder(testKV, tp, testRecordPrefix, time.Second)
+	assert.Nil(err)
+
+	// Start the task processor
+	wg := sync.WaitGroup{}
+	assert.Nil(tp.StartEventLoop(&wg))
+
+	assert.Nil(uut.ReadySessionRecords())
+
+	// Case 0: run inactive check with no sessions
+	assert.Nil(uut.ClearInactiveSessions(time.Second, time.Now()))
+
+	startTime := time.Now()
+
+	// Case 1: create new client record
+	client1 := uuid.New().String()
+	node1 := uuid.New().String()
+	{
+		record, err := uut.LogClientSession(client1, node1, startTime)
+		assert.Nil(err)
+		assert.Equal(client1, record.ClientName)
+		assert.Equal(node1, record.ServingNode)
+	}
+
+	// Case 2: run inactive check
+	assert.Nil(uut.ClearInactiveSessions(time.Second*10, startTime.Add(time.Second*5)))
+	assert.Nil(uut.RefreshClientSession(client1, node1, startTime.Add(time.Second*6)))
+
+	// Case 3: create new client record
+	client3 := uuid.New().String()
+	node3 := uuid.New().String()
+	{
+		record, err := uut.LogClientSession(client3, node3, startTime.Add(time.Second*3))
+		assert.Nil(err)
+		assert.Equal(client3, record.ClientName)
+		assert.Equal(node3, record.ServingNode)
+	}
+
+	// Case 4: run inactive check
+	assert.Nil(uut.ClearInactiveSessions(time.Second*3, startTime.Add(time.Second*7)))
+	assert.NotNil(uut.RefreshClientSession(client3, node3, startTime.Add(time.Second*8)))
+	assert.Nil(uut.RefreshClientSession(client1, node1, startTime.Add(time.Second*8)))
+	{
+		entry, err := testKV.Get(sessionRecords, time.Second)
+		assert.Nil(err)
+		var t SubscriptionRecords
+		assert.Nil(json.Unmarshal([]byte(entry), &t))
+		_, ok := t.ActiveSessions[client3]
+		assert.False(ok)
+	}
+
+	assert.Nil(tp.StopEventLoop())
+	wg.Wait()
+}
