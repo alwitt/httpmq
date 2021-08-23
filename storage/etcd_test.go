@@ -443,7 +443,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		handler1 := func(msg common.Message, index int64) (bool, error) {
 			assert.EqualValues(testMsgs1[msgItr1], msg)
 			msgItr1 += 1
-			return false, fmt.Errorf("dummy error")
+			return false, nil
 		}
 		msgItr2 := 0
 		handler2 := func(msg common.Message, index int64) (bool, error) {
@@ -477,9 +477,9 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			}
 		}()
 		// Start the watching
-		assert.NotNil(uut.ReadStream(watchTargets, stopSignal1))
+		assert.Nil(uut.ReadStream(watchTargets, stopSignal1))
 		assert.Equal(1, msgItr1)
-		assert.LessOrEqual(1, msgItr2)
+		assert.LessOrEqual(2, msgItr2)
 	}
 
 	// Case 6: watch from the middle of the stream of data
