@@ -71,6 +71,7 @@ func TestSubscriptionRecorderBasic(t *testing.T) {
 	}
 
 	// Case 5: refresh the client record
+	assert.Nil(uut.ReadySessionRecords())
 	assert.Nil(uut.RefreshClientSession(client3, node3, time.Now()))
 
 	// Case 6: refresh the client from a different node
@@ -90,6 +91,7 @@ func TestSubscriptionRecorderBasic(t *testing.T) {
 	assert.NotNil(uut.ClearClientSession(client3, uuid.New().String(), time.Now()))
 
 	// Case 9: clear a client
+	assert.Nil(uut.ReadySessionRecords())
 	assert.Nil(uut.ClearClientSession(client3, node3, time.Now()))
 
 	// Case 10: refresh client
