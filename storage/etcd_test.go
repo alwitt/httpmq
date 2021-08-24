@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -788,6 +789,39 @@ func TestEtcdDriverMutex(t *testing.T) {
 	assert.Nil(uut2.Lock(mutex1, time.Millisecond*10))
 }
 
+type utDummyVal1 struct {
+	Val1 string
+}
+
+func (v *utDummyVal1) Scan(src interface{}) error {
+	bytes, ok := src.([]byte)
+	if !ok {
+		return fmt.Errorf("src is not []byte")
+	}
+	return json.Unmarshal(bytes, v)
+}
+
+func (v *utDummyVal1) Value() (driver.Value, error) {
+	return json.Marshal(v)
+}
+
+type utDummyVal2 struct {
+	Val1 string
+	Val2 int
+}
+
+func (v *utDummyVal2) Scan(src interface{}) error {
+	bytes, ok := src.([]byte)
+	if !ok {
+		return fmt.Errorf("src is not []byte")
+	}
+	return json.Unmarshal(bytes, v)
+}
+
+func (v *utDummyVal2) Value() (driver.Value, error) {
+	return json.Marshal(v)
+}
+
 func TestEtcdDriverKeyValue(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
@@ -797,44 +831,40 @@ func TestEtcdDriverKeyValue(t *testing.T) {
 
 	// Case 0: Get key which does not exist
 	{
-		_, err := uut.Get(uuid.New().String(), time.Second)
+		var result utDummyVal1
+		err := uut.Get(uuid.New().String(), &result, time.Second)
 		assert.NotNil(err)
 	}
 
 	// Case 1: set a new key
 	key1 := uuid.New().String()
-	val1 := uuid.New().String()
-	assert.Nil(uut.Set(key1, val1, time.Second))
+	val1 := utDummyVal1{Val1: uuid.New().String()}
+	assert.Nil(uut.Set(key1, &val1, time.Second))
 	{
-		read, err := uut.Get(key1, time.Second)
+		var result utDummyVal1
+		err := uut.Get(key1, &result, time.Second)
 		assert.Nil(err)
-		assert.Equal(val1, read)
+		assert.EqualValues(val1, result)
 	}
 
 	// Case 2: set a new key
-	type dummyVal1 struct {
-		Val1 string
-		Val2 int
-	}
 	key2 := uuid.New().String()
-	val2 := dummyVal1{Val1: uuid.New().String(), Val2: 5123}
+	val2 := utDummyVal2{Val1: uuid.New().String(), Val2: 5123}
 	{
-		t, err := json.Marshal(&val2)
-		assert.Nil(err)
-		assert.Nil(uut.Set(key2, string(t), time.Second))
+		assert.Nil(uut.Set(key2, &val2, time.Second))
 	}
 	{
-		read, err := uut.Get(key2, time.Second)
+		var result utDummyVal2
+		err := uut.Get(key2, &result, time.Second)
 		assert.Nil(err)
-		var parsed dummyVal1
-		assert.Nil(json.Unmarshal([]byte(read), &parsed))
-		assert.EqualValues(val2, parsed)
+		assert.EqualValues(val2, result)
 	}
 
 	// Case 3: delete a key
 	assert.Nil(uut.Delete(key1, time.Second))
 	{
-		_, err := uut.Get(key1, time.Second)
+		var result utDummyVal1
+		err := uut.Get(key1, &result, time.Second)
 		assert.NotNil(err)
 	}
 }

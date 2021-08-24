@@ -2,6 +2,8 @@ package storage
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -324,40 +326,58 @@ func (d *etcdBackedStorage) Close() error {
 // ================================================================
 // Key-Value store related operations
 
-// Set record a K/V pair in etcd
-func (d *etcdBackedStorage) Set(key string, value string, timeout time.Duration) error {
+// Set2 record a K/V pair in etcd
+func (d *etcdBackedStorage) Set(key string, value driver.Valuer, timeout time.Duration) error {
+	serialized, err := value.Value()
+	if err != nil {
+		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to SET %s", key)
+		return err
+	}
+	// Convert to byte
+	asBytes, ok := serialized.([]byte)
+	if !ok {
+		err := fmt.Errorf("unable to convert value output to []byte for storage")
+		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to SET %s", key)
+		return err
+	}
+	// Insert into ETCD
 	useContext, cancel := context.WithTimeout(context.Background(), timeout)
-	resp, err := d.client.Put(useContext, key, value)
+	resp, err := d.client.Put(useContext, key, string(asBytes))
 	cancel()
 	if err != nil {
-		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to SET %s <== %s", key, value)
+		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to SET %s <== %s", key, asBytes)
 		return err
 	}
 	log.WithFields(d.LogTags).Debugf(
-		"SET %s@%d <== %s", key, resp.Header.Revision, value,
+		"SET %s@%d <== %s", key, resp.Header.Revision, asBytes,
 	)
 	return nil
 }
 
-// Get read a K/V pair from etcd
-func (d *etcdBackedStorage) Get(key string, timeout time.Duration) (string, error) {
+// Get2 read a K/V pair from etcd
+func (d *etcdBackedStorage) Get(key string, result sql.Scanner, timeout time.Duration) error {
 	useContext, cancel := context.WithTimeout(context.Background(), timeout)
 	resp, err := d.client.Get(useContext, key, clientv3.WithRev(int64(0)))
 	cancel()
 	if err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to GET %s@0", key)
-		return "", err
+		return err
 	}
 	// Parse the message to get the structure
 	if len(resp.Kvs) != 1 {
 		log.WithFields(d.LogTags).Errorf(
 			"GET %s@0 did not return one entry %d", key, len(resp.Kvs),
 		)
-		return "", fmt.Errorf(
+		return fmt.Errorf(
 			"[ETCD Storage Driver] READ %s@0 did not return one entry %d", key, len(resp.Kvs),
 		)
 	}
-	return string(resp.Kvs[0].Value), nil
+	// Give input to scanner for parsing
+	if err := result.Scan(resp.Kvs[0].Value); err != nil {
+		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to GET %s@0", key)
+		return err
+	}
+	return nil
 }
 
 // Delete delete a key from ETCD

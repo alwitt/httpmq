@@ -3,6 +3,9 @@ package storage
 import (
 	"time"
 
+	"database/sql"
+	"database/sql/driver"
+
 	"gitlab.com/project-nan/httpmq/common"
 )
 
@@ -34,8 +37,8 @@ type MessageQueues interface {
 // KeyValueStore key-value store operator
 type KeyValueStore interface {
 	// Key-Value store related operations
-	Set(key string, value string, timeout time.Duration) error
-	Get(key string, timeout time.Duration) (string, error)
+	Set(key string, value driver.Valuer, timeout time.Duration) error
+	Get(key string, result sql.Scanner, timeout time.Duration) error
 	Delete(key string, timeout time.Duration) error
 	// Mutex related operations
 	Lock(lockName string, timeout time.Duration) error

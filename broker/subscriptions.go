@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -23,6 +24,20 @@ type ClientSubscription struct {
 // SubscriptionRecords record of subscriptions active at the moment
 type SubscriptionRecords struct {
 	ActiveSessions map[string]ClientSubscription `json:"active_sessions" validate:"required,dive"`
+}
+
+// Scan implements the sql.Scanner interface
+func (r *SubscriptionRecords) Scan(src interface{}) error {
+	bytes, ok := src.([]byte)
+	if !ok {
+		return fmt.Errorf("src is not []byte")
+	}
+	return json.Unmarshal(bytes, r)
+}
+
+// Value implements the sql/driver.Valuer interface
+func (r SubscriptionRecords) Value() (driver.Value, error) {
+	return json.Marshal(&r)
 }
 
 // ========================================================================================
@@ -100,17 +115,11 @@ func DefineSubscriptionRecorder(
 }
 
 func (r *subscriptionRecorderImpl) readCurrentActiveSessions() (SubscriptionRecords, error) {
-	value, err := r.store.Get(r.storeKey, r.kvStoreCallTimeout)
+	var records SubscriptionRecords
+	err := r.store.Get(r.storeKey, &records, r.kvStoreCallTimeout)
 	if err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Unable to fetch active session records %s", r.storeKey,
-		)
-		return SubscriptionRecords{}, err
-	}
-	records := SubscriptionRecords{ActiveSessions: make(map[string]ClientSubscription)}
-	if err := json.Unmarshal([]byte(value), &records); err != nil {
-		log.WithError(err).WithFields(r.LogTags).Errorf(
-			"Unable to parse active session records %s", r.storeKey,
 		)
 		return SubscriptionRecords{}, err
 	}
@@ -125,15 +134,8 @@ func (r *subscriptionRecorderImpl) readCurrentActiveSessions() (SubscriptionReco
 }
 
 func (r *subscriptionRecorderImpl) storeActiveSessionRecords(records SubscriptionRecords) error {
-	serialized, err := json.Marshal(&records)
-	if err != nil {
-		log.WithError(err).WithFields(r.LogTags).Errorf(
-			"Failed to serialize active session records %s", r.storeKey,
-		)
-		return err
-	}
 	if err := r.store.Set(
-		r.storeKey, string(serialized), r.kvStoreCallTimeout,
+		r.storeKey, records, r.kvStoreCallTimeout,
 	); err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to update active session records %s", r.storeKey,

@@ -1,7 +1,6 @@
 package broker
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
@@ -35,16 +34,16 @@ func TestSubscriptionRecorderBasic(t *testing.T) {
 
 	// Case 0: initialize session record tracking
 	{
-		_, err := testKV.Get(sessionRecords, time.Second)
+		var r SubscriptionRecords
+		err := testKV.Get(sessionRecords, &r, time.Second)
 		assert.NotNil(err)
 	}
 	assert.Nil(uut.ReadySessionRecords())
 	{
-		entry, err := testKV.Get(sessionRecords, time.Second)
+		var entry SubscriptionRecords
+		err := testKV.Get(sessionRecords, &entry, time.Second)
 		assert.Nil(err)
-		var t SubscriptionRecords
-		assert.Nil(json.Unmarshal([]byte(entry), &t))
-		assert.EqualValues(SubscriptionRecords{ActiveSessions: map[string]ClientSubscription{}}, t)
+		assert.EqualValues(SubscriptionRecords{ActiveSessions: map[string]ClientSubscription{}}, entry)
 	}
 
 	// Case 1: refresh an unknown client
@@ -158,11 +157,10 @@ func TestSubscriptionRecorderTimeout(t *testing.T) {
 	assert.NotNil(uut.RefreshClientSession(client3, node3, startTime.Add(time.Second*8)))
 	assert.Nil(uut.RefreshClientSession(client1, node1, startTime.Add(time.Second*8)))
 	{
-		entry, err := testKV.Get(sessionRecords, time.Second)
+		var entry SubscriptionRecords
+		err := testKV.Get(sessionRecords, &entry, time.Second)
 		assert.Nil(err)
-		var t SubscriptionRecords
-		assert.Nil(json.Unmarshal([]byte(entry), &t))
-		_, ok := t.ActiveSessions[client3]
+		_, ok := entry.ActiveSessions[client3]
 		assert.False(ok)
 	}
 
