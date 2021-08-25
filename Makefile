@@ -18,6 +18,7 @@ test: .prepare ## Run unittests
 .PHONY: build
 build: lint ## Build project binaries
 	@go build -o etcd_mutex_throughput bin/lock_performance/*
+	@go build -o subscription_controller bin/subscription_controller/*
 
 .prepare: ## Prepare the project for local development
 	@pip3 install --user pre-commit

@@ -70,7 +70,7 @@ func DefineSubscriptionRecorder(
 	timeout time.Duration,
 ) (SubscriptionRecorder, error) {
 	logTags := log.Fields{
-		"module": "broker", "component": "subscription-recorder",
+		"module": "subscription", "component": "manager",
 	}
 	instance := subscriptionRecorderImpl{
 		Component:          common.Component{LogTags: logTags},
