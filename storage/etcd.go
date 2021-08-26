@@ -155,7 +155,53 @@ func (d *etcdBackedStorage) IndexRange(
 	return -1, 0, nil
 }
 
-// ReadStream read data stream from set of queues, and process messages from each
+// ReadStream read data stream from queue, and process message
+func (d *etcdBackedStorage) ReadStream(target ReadStreamParam, stopFlag chan bool) error {
+	dataStream := d.client.Watch(
+		context.Background(),
+		target.TargetQueue,
+		clientv3.WithRev(int64(target.StartIndex)),
+	)
+
+	// Start stream processing
+	for {
+		select {
+		case message, ok := <-dataStream:
+			if !ok {
+				log.WithFields(d.LogTags).Infof("Watch channel for %s closed", target.TargetQueue)
+				return nil
+			}
+			log.WithFields(d.LogTags).Debugf(
+				"Process message from channel %s", target.TargetQueue,
+			)
+			handlerActive, err := d.runMessageHandler(
+				target.TargetQueue, message, target.Handler,
+			)
+			if err != nil {
+				log.WithError(err).WithFields(d.LogTags).Errorf(
+					"Channel %s handler failed", target.TargetQueue,
+				)
+				return err
+			}
+			if !handlerActive {
+				log.WithFields(d.LogTags).Infof("Channel %s handler inactive", target.TargetQueue)
+				return nil
+			}
+		case done, ok := <-stopFlag:
+			if !ok {
+				log.WithFields(d.LogTags).Errorf("stopFlag channel did not return valid signal")
+				return nil
+			}
+			if done {
+				// Received stop signal
+				log.WithFields(d.LogTags).Info("Received stop signal. Exiting watch")
+				return nil
+			}
+		}
+	}
+}
+
+// ReadStreams read data stream from set of queues, and process messages from each
 func (d *etcdBackedStorage) ReadStreams(targets []ReadStreamParam, stopFlag chan bool) error {
 	readSelects := make([]reflect.SelectCase, len(targets)+1)
 	dataStreams := make([]clientv3.WatchChan, len(targets))

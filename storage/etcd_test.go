@@ -170,6 +170,258 @@ func TestEtcdDriverStreaming(t *testing.T) {
 	// Case 0: watch for data on non-existing topic
 	{
 		topic := uuid.New().String()
+		watchTarget := ReadStreamParam{
+			TargetQueue: topic,
+			StartIndex:  1,
+			Handler: func(msg common.Message, index int64) (bool, error) {
+				assert.Falsef(true, "This should not be occuring")
+				return false, nil
+			},
+		}
+		// Fire the stop signal after 100 ms
+		go func() {
+			time.Sleep(time.Millisecond * 100)
+			stopSignal1 <- true
+		}()
+		// Start the watching
+		assert.Nil(uut.ReadStream(watchTarget, stopSignal1))
+	}
+
+	// Case 1: watch for three messages on topic
+	{
+		topic := uuid.New().String()
+		msgItr := 0
+		testMsgs := make([]common.Message, 3)
+		for itr := 0; itr < 3; itr++ {
+			testMsgs[itr] = common.Message{
+				Source: common.MessageSource{
+					Sender: uuid.New().String(),
+					SentAt: time.Now().UTC(),
+				},
+				Destination: common.MessageDestination{
+					TargetQueue: topic,
+				},
+				Tags:       map[string]string{uuid.New().String(): uuid.New().String()},
+				ReceivedAt: time.Now().UTC(),
+				Body:       []byte(uuid.New().String()),
+			}
+		}
+		// Watch handler
+		handler := func(msg common.Message, index int64) (bool, error) {
+			assert.EqualValues(testMsgs[msgItr], msg)
+			msgItr += 1
+			return msgItr < 3, nil
+		}
+		watchTarget := ReadStreamParam{
+			TargetQueue: topic,
+			StartIndex:  1,
+			Handler:     handler,
+		}
+		// Transmit the three messages
+		go func() {
+			for idx, msg := range testMsgs {
+				log.Debugf("Sending test message %d", idx)
+				assert.Nil(uut.Write(msg, time.Second))
+			}
+		}()
+		// Start the watching
+		assert.Nil(uut.ReadStream(watchTarget, stopSignal1))
+		assert.Equal(3, msgItr)
+	}
+
+	// Case 2: send three messages but fails after two messages
+	{
+		topic := uuid.New().String()
+		msgItr := 0
+		testMsgs := make([]common.Message, 3)
+		for itr := 0; itr < 3; itr++ {
+			testMsgs[itr] = common.Message{
+				Source: common.MessageSource{
+					Sender: uuid.New().String(),
+					SentAt: time.Now().UTC(),
+				},
+				Destination: common.MessageDestination{
+					TargetQueue: topic,
+				},
+				Tags:       map[string]string{uuid.New().String(): uuid.New().String()},
+				ReceivedAt: time.Now().UTC(),
+				Body:       []byte(uuid.New().String()),
+			}
+		}
+		// Watch handler
+		handler := func(msg common.Message, index int64) (bool, error) {
+			assert.EqualValues(testMsgs[msgItr], msg)
+			msgItr += 1
+			if msgItr == 3 {
+				return false, fmt.Errorf("dummy error")
+			}
+			return true, nil
+		}
+		watchTarget := ReadStreamParam{
+			TargetQueue: topic,
+			StartIndex:  1,
+			Handler:     handler,
+		}
+		// Transmit the three messages
+		go func() {
+			for idx, msg := range testMsgs {
+				log.Debugf("Sending test message %d", idx)
+				assert.Nil(uut.Write(msg, time.Second))
+			}
+		}()
+		// Start the watching
+		assert.NotNil(uut.ReadStream(watchTarget, stopSignal1))
+		assert.Equal(3, msgItr)
+	}
+
+	// Case 3: send three messages but handler become inactive on second message
+	{
+		topic := uuid.New().String()
+		msgItr := 0
+		testMsgs := make([]common.Message, 3)
+		for itr := 0; itr < 3; itr++ {
+			testMsgs[itr] = common.Message{
+				Source: common.MessageSource{
+					Sender: uuid.New().String(),
+					SentAt: time.Now().UTC(),
+				},
+				Destination: common.MessageDestination{
+					TargetQueue: topic,
+				},
+				Tags:       map[string]string{uuid.New().String(): uuid.New().String()},
+				ReceivedAt: time.Now().UTC(),
+				Body:       []byte(uuid.New().String()),
+			}
+		}
+		// Watch handler
+		handler := func(msg common.Message, index int64) (bool, error) {
+			assert.EqualValues(testMsgs[msgItr], msg)
+			msgItr += 1
+			if msgItr == 2 {
+				return false, nil
+			}
+			return true, nil
+		}
+		watchTarget := ReadStreamParam{
+			TargetQueue: topic,
+			StartIndex:  1,
+			Handler:     handler,
+		}
+		// Transmit the three messages
+		go func() {
+			for idx, msg := range testMsgs {
+				log.Debugf("Sending test message %d", idx)
+				assert.Nil(uut.Write(msg, time.Second))
+			}
+		}()
+		// Start the watching
+		assert.Nil(uut.ReadStream(watchTarget, stopSignal1))
+		assert.Equal(2, msgItr)
+	}
+
+	// Case 4: watch from the middle of the stream of data
+	{
+		topic := uuid.New().String()
+		testMsgs := make([]common.Message, 5)
+		for itr := 0; itr < 5; itr++ {
+			testMsgs[itr] = common.Message{
+				Source: common.MessageSource{
+					Sender: uuid.New().String(),
+					SentAt: time.Now().UTC(),
+				},
+				Destination: common.MessageDestination{
+					TargetQueue: topic,
+				},
+				Tags:       map[string]string{uuid.New().String(): uuid.New().String()},
+				ReceivedAt: time.Now().UTC(),
+				Body:       []byte(uuid.New().String()),
+			}
+		}
+		// Watch handler
+		msgItr := 2
+		handler := func(msg common.Message, index int64) (bool, error) {
+			assert.EqualValues(testMsgs[msgItr], msg)
+			msgItr += 1
+			return msgItr < 5, nil
+		}
+		for itr := 0; itr < 2; itr++ {
+			log.Debugf("Sending test message %d", itr)
+			assert.Nil(uut.Write(testMsgs[itr], time.Second))
+		}
+		_, maxIdx, err := uut.IndexRange(topic, time.Second)
+		assert.Nil(err)
+		for itr := 2; itr < 5; itr++ {
+			log.Debugf("Sending test message %d", itr)
+			assert.Nil(uut.Write(testMsgs[itr], time.Second))
+		}
+		watchTarget := ReadStreamParam{
+			TargetQueue: topic,
+			StartIndex:  maxIdx + 1,
+			Handler:     handler,
+		}
+		// Start the watching
+		assert.Nil(uut.ReadStream(watchTarget, stopSignal1))
+		assert.Equal(5, msgItr)
+	}
+
+	// Case 5: watch from REV 0 in middle of seq of messages
+	{
+		topic := uuid.New().String()
+		testMsgs := make([]common.Message, 5)
+		for itr := 0; itr < 5; itr++ {
+			testMsgs[itr] = common.Message{
+				Source: common.MessageSource{
+					Sender: uuid.New().String(),
+					SentAt: time.Now().UTC(),
+				},
+				Destination: common.MessageDestination{
+					TargetQueue: topic,
+				},
+				Tags:       map[string]string{uuid.New().String(): uuid.New().String()},
+				ReceivedAt: time.Now().UTC(),
+				Body:       []byte(uuid.New().String()),
+			}
+		}
+		// Watch handler
+		msgItr := 2
+		handler := func(msg common.Message, index int64) (bool, error) {
+			assert.EqualValues(testMsgs[msgItr], msg)
+			msgItr += 1
+			return msgItr < 5, nil
+		}
+		for itr := 0; itr < 2; itr++ {
+			log.Debugf("Sending test message %d", itr)
+			assert.Nil(uut.Write(testMsgs[itr], time.Second))
+		}
+		watchTarget := ReadStreamParam{
+			TargetQueue: topic,
+			StartIndex:  0,
+			Handler:     handler,
+		}
+		go func() {
+			for itr := 2; itr < 5; itr++ {
+				log.Debugf("Sending test message %d", itr)
+				assert.Nil(uut.Write(testMsgs[itr], time.Second))
+			}
+		}()
+		// Start the watching
+		assert.Nil(uut.ReadStream(watchTarget, stopSignal1))
+		assert.Equal(5, msgItr)
+	}
+}
+
+func TestEtcdDriverMultiQueueStreaming(t *testing.T) {
+	assert := assert.New(t)
+	log.SetLevel(log.DebugLevel)
+
+	uut, _, err := CreateEtcdBackedStorage([]string{"localhost:2379"}, time.Second*5)
+	assert.Nil(err)
+
+	stopSignal1 := make(chan bool, 1)
+
+	// Case 0: watch for data on non-existing topic
+	{
+		topic := uuid.New().String()
 		watchTargets := []ReadStreamParam{
 			{
 				TargetQueue: topic,
@@ -678,7 +930,7 @@ func TestEtcdDriverBasicAfterCompaction(t *testing.T) {
 	}
 }
 
-func TestEtcdDriverStreamingAfterCompaction(t *testing.T) {
+func TestEtcdDriverMultiQueueStreamingAfterCompaction(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
 

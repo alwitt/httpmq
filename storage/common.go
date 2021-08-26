@@ -27,6 +27,7 @@ type MessageQueues interface {
 	ReadNewest(targetQueue string, timeout time.Duration) (common.Message, error)
 	ReadOldest(targetQueue string, timeout time.Duration) (common.Message, error)
 	IndexRange(targetQueue string, timeout time.Duration) (int64, int64, error)
+	ReadStream(target ReadStreamParam, stopFlag chan bool) error
 	ReadStreams(targets []ReadStreamParam, stopFlag chan bool) error
 	// Mutex related operations
 	Lock(lockName string, timeout time.Duration) error
