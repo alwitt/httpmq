@@ -186,7 +186,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			stopSignal1 <- true
 		}()
 		// Start the watching
-		assert.Nil(uut.ReadStream(watchTargets, stopSignal1))
+		assert.Nil(uut.ReadStreams(watchTargets, stopSignal1))
 	}
 
 	// Case 1: watch for three messages on topic
@@ -229,7 +229,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			}
 		}()
 		// Start the watching
-		assert.Nil(uut.ReadStream(watchTargets, stopSignal1))
+		assert.Nil(uut.ReadStreams(watchTargets, stopSignal1))
 		assert.Equal(3, msgItr)
 	}
 
@@ -276,7 +276,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			}
 		}()
 		// Start the watching
-		assert.NotNil(uut.ReadStream(watchTargets, stopSignal1))
+		assert.NotNil(uut.ReadStreams(watchTargets, stopSignal1))
 		assert.Equal(3, msgItr)
 	}
 
@@ -323,7 +323,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			}
 		}()
 		// Start the watching
-		assert.Nil(uut.ReadStream(watchTargets, stopSignal1))
+		assert.Nil(uut.ReadStreams(watchTargets, stopSignal1))
 		assert.Equal(2, msgItr)
 	}
 
@@ -400,7 +400,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			}
 		}()
 		// Start the watching
-		assert.Nil(uut.ReadStream(watchTargets, stopSignal1))
+		assert.Nil(uut.ReadStreams(watchTargets, stopSignal1))
 		assert.Equal(3, msgItr1)
 		assert.Equal(2, msgItr2)
 	}
@@ -478,7 +478,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			}
 		}()
 		// Start the watching
-		assert.Nil(uut.ReadStream(watchTargets, stopSignal1))
+		assert.Nil(uut.ReadStreams(watchTargets, stopSignal1))
 		assert.Equal(1, msgItr1)
 		assert.LessOrEqual(2, msgItr2)
 	}
@@ -526,7 +526,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			},
 		}
 		// Start the watching
-		assert.Nil(uut.ReadStream(watchTargets, stopSignal1))
+		assert.Nil(uut.ReadStreams(watchTargets, stopSignal1))
 		assert.Equal(5, msgItr)
 	}
 
@@ -573,7 +573,7 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			}
 		}()
 		// Start the watching
-		assert.Nil(uut.ReadStream(watchTargets, stopSignal1))
+		assert.Nil(uut.ReadStreams(watchTargets, stopSignal1))
 		assert.Equal(5, msgItr)
 	}
 }
@@ -738,7 +738,7 @@ func TestEtcdDriverStreamingAfterCompaction(t *testing.T) {
 			},
 		}
 		// Start the watching
-		assert.Nil(uut.ReadStream(watchTargets, stopSignal))
+		assert.Nil(uut.ReadStreams(watchTargets, stopSignal))
 		assert.Equal(0, msgItr)
 	}
 
@@ -758,7 +758,7 @@ func TestEtcdDriverStreamingAfterCompaction(t *testing.T) {
 			},
 		}
 		// Start the watching
-		assert.Nil(uut.ReadStream(watchTargets, stopSignal))
+		assert.Nil(uut.ReadStreams(watchTargets, stopSignal))
 		assert.Equal(5, msgItr)
 	}
 }

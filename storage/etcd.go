@@ -156,7 +156,7 @@ func (d *etcdBackedStorage) IndexRange(
 }
 
 // ReadStream read data stream from set of queues, and process messages from each
-func (d *etcdBackedStorage) ReadStream(targets []ReadStreamParam, stopFlag chan bool) error {
+func (d *etcdBackedStorage) ReadStreams(targets []ReadStreamParam, stopFlag chan bool) error {
 	readSelects := make([]reflect.SelectCase, len(targets)+1)
 	dataStreams := make([]clientv3.WatchChan, len(targets))
 	activeChannels := make([]bool, len(targets))
