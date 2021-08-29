@@ -9,6 +9,10 @@ lint: .prepare ## Lint the files
 compose: clean .prepare ## Run docker-compose to create the DEV ENV
 	@docker-compose -f docker/docker-compose.yaml up -d
 
+.PHONY: generate
+generate: .prepare ## Generate test mock interfaces
+	@mockery --all
+
 .PHONY: test
 test: .prepare ## Run unittests
 	@go clean -testcache
