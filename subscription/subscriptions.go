@@ -52,7 +52,7 @@ type SubscriptionRecorder interface {
 	ClearInactiveSessions(maxInactivePeriod time.Duration, timestamp time.Time) error
 }
 
-// subscriptionRecorderImpl implements
+// subscriptionRecorderImpl implements SubscriptionRecorder
 type subscriptionRecorderImpl struct {
 	common.Component
 	store              storage.KeyValueStore
