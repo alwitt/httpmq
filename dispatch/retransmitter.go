@@ -14,6 +14,7 @@ import (
 // ========================================================================================
 // MessageRetransmit retransmit older messages from a queue
 type MessageRetransmit interface {
+	StopOperation() error
 	RetransmitMessages(msgIndexes []int64, ctxt context.Context) error
 	ReceivedACKs(msgIndexes []int64, ctxt context.Context) error
 }
@@ -21,13 +22,14 @@ type MessageRetransmit interface {
 // messageRetransmitImpl implements MessageRetransmit
 type messageRetransmitImpl struct {
 	common.Component
-	queueName      string
-	tp             common.TaskProcessor
-	storage        storage.MessageQueues
-	readTimeout    time.Duration
-	forwardMsg     SubmitMessage
-	forwardTimeout time.Duration
-	msgCache       map[int64]MessageInFlight
+	queueName        string
+	tp               common.TaskProcessor
+	storage          storage.MessageQueues
+	readTimeout      time.Duration
+	forwardMsg       SubmitMessage
+	operationContext context.Context
+	contextCancel    context.CancelFunc
+	msgCache         map[int64]MessageInFlight
 }
 
 // DefineMessageRetransmit create new message retransmit module
@@ -37,20 +39,21 @@ func DefineMessageRetransmit(
 	storage storage.MessageQueues,
 	storeReadTO time.Duration,
 	forwardCB SubmitMessage,
-	forwardTO time.Duration,
 ) (MessageRetransmit, error) {
 	logTags := log.Fields{
 		"module": "dispatch", "component": "message-retransmit", "instance": queueName,
 	}
+	ctxt, cancel := context.WithCancel(context.Background())
 	instance := messageRetransmitImpl{
-		Component:      common.Component{LogTags: logTags},
-		queueName:      queueName,
-		tp:             tp,
-		storage:        storage,
-		readTimeout:    storeReadTO,
-		forwardMsg:     forwardCB,
-		forwardTimeout: forwardTO,
-		msgCache:       make(map[int64]MessageInFlight),
+		Component:        common.Component{LogTags: logTags},
+		queueName:        queueName,
+		tp:               tp,
+		storage:          storage,
+		readTimeout:      storeReadTO,
+		forwardMsg:       forwardCB,
+		operationContext: ctxt,
+		contextCancel:    cancel,
+		msgCache:         make(map[int64]MessageInFlight),
 	}
 	// Add handlers
 	if err := tp.AddToTaskExecutionMap(
@@ -66,6 +69,12 @@ func DefineMessageRetransmit(
 		return nil, err
 	}
 	return &instance, nil
+}
+
+// StopOperation stop forwarding message
+func (d *messageRetransmitImpl) StopOperation() error {
+	d.contextCancel()
+	return nil
 }
 
 // ----------------------------------------------------------------------------------------
@@ -155,12 +164,11 @@ func (r *messageRetransmitImpl) ProcessRetransmitRequest(msgIndexes []int64) err
 				"Read %s@%d for retransmit", r.queueName, msgIndex,
 			)
 		}
-		useContext, cancel := context.WithTimeout(context.Background(), r.forwardTimeout)
-		defer cancel()
-		if err := r.forwardMsg(msg, useContext); err != nil {
+		if err := r.forwardMsg(msg, r.operationContext); err != nil {
 			log.WithError(err).WithFields(r.LogTags).Errorf(
 				"Failed to submit %s@%d for retransmit", r.queueName, msgIndex,
 			)
+			return err
 		} else {
 			log.WithFields(r.LogTags).Infof("Retransmitted %s@%d", r.queueName, msgIndex)
 		}

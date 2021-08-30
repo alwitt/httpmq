@@ -19,7 +19,11 @@ func TestMessageDispatch(t *testing.T) {
 
 	maxInflight := 3
 
-	tp, err := common.GetNewTaskProcessorInstance("unit-test", maxInflight*2)
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
+	ctxt, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tp, err := common.GetNewTaskProcessorInstance("unit-test", maxInflight*2, ctxt)
 	assert.Nil(err)
 
 	testMsgs := make(chan MessageInFlight, maxInflight*2)
@@ -48,13 +52,11 @@ func TestMessageDispatch(t *testing.T) {
 		0,
 		maxInflight,
 		testMsgRecv,
-		time.Second,
 		msgTxRegisterRecv,
 	)
 	assert.Nil(err)
 
 	// Start the task processor
-	wg := sync.WaitGroup{}
 	assert.Nil(tp.StartEventLoop(&wg))
 
 	// Case 0: nothing happening
@@ -229,8 +231,7 @@ func TestMessageDispatch(t *testing.T) {
 	assert.Empty(testMsgs)
 	assert.Empty(msgTxRegister)
 
-	assert.Nil(tp.StopEventLoop())
-	wg.Wait()
+	assert.Nil(uut.StopOperation())
 }
 
 func TestMessageDispatchStartWithInflight(t *testing.T) {
@@ -239,7 +240,11 @@ func TestMessageDispatchStartWithInflight(t *testing.T) {
 
 	maxInflight := 3
 
-	tp, err := common.GetNewTaskProcessorInstance("unit-test", maxInflight*2)
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
+	ctxt, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tp, err := common.GetNewTaskProcessorInstance("unit-test", maxInflight*2, ctxt)
 	assert.Nil(err)
 
 	testMsgs := make(chan MessageInFlight, maxInflight*2)
@@ -269,13 +274,11 @@ func TestMessageDispatchStartWithInflight(t *testing.T) {
 		startingInflight,
 		maxInflight,
 		testMsgRecv,
-		time.Second,
 		msgTxRegisterRecv,
 	)
 	assert.Nil(err)
 
 	// Start the task processor
-	wg := sync.WaitGroup{}
 	assert.Nil(tp.StartEventLoop(&wg))
 
 	// Case 0: nothing happening
@@ -395,6 +398,5 @@ func TestMessageDispatchStartWithInflight(t *testing.T) {
 	assert.Empty(testMsgs)
 	assert.Empty(msgTxRegister)
 
-	assert.Nil(tp.StopEventLoop())
-	wg.Wait()
+	assert.Nil(uut.StopOperation())
 }

@@ -46,11 +46,19 @@ func (r SubscriptionRecords) Value() (driver.Value, error) {
 
 // SubscriptionRecorder manage the active subscription records
 type SubscriptionRecorder interface {
-	ReadySessionRecords() error
-	LogClientSession(clientName string, node string, timestamp time.Time) (ClientSubscription, error)
-	RefreshClientSession(clientName string, node string, timestamp time.Time) error
-	ClearClientSession(clientName string, node string, timestamp time.Time) error
-	ClearInactiveSessions(maxInactivePeriod time.Duration, timestamp time.Time) error
+	ReadySessionRecords(ctxt context.Context) error
+	LogClientSession(
+		clientName string, node string, timestamp time.Time, ctxt context.Context,
+	) (ClientSubscription, error)
+	RefreshClientSession(
+		clientName string, node string, timestamp time.Time, ctxt context.Context,
+	) error
+	ClearClientSession(
+		clientName string, node string, timestamp time.Time, ctxt context.Context,
+	) error
+	ClearInactiveSessions(
+		maxInactivePeriod time.Duration, timestamp time.Time, ctxt context.Context,
+	) error
 }
 
 // subscriptionRecorderImpl implements SubscriptionRecorder
@@ -155,7 +163,7 @@ type subRecorderReadyRecordReq struct {
 }
 
 // ReadySessionRecords ready the subscription session records
-func (r *subscriptionRecorderImpl) ReadySessionRecords() error {
+func (r *subscriptionRecorderImpl) ReadySessionRecords(ctxt context.Context) error {
 	complete := make(chan bool, 1)
 	var processError error
 	// Handler core processing result
@@ -169,7 +177,7 @@ func (r *subscriptionRecorderImpl) ReadySessionRecords() error {
 		resultCB: handler,
 	}
 
-	if err := r.tp.Submit(request, context.Background()); err != nil {
+	if err := r.tp.Submit(request, ctxt); err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to submit ready-session-records request",
 		)
@@ -177,7 +185,12 @@ func (r *subscriptionRecorderImpl) ReadySessionRecords() error {
 	}
 
 	// Wait for completion
-	<-complete
+	select {
+	case <-complete:
+		break
+	case <-ctxt.Done():
+		return ctxt.Err()
+	}
 
 	return processError
 }
@@ -225,7 +238,7 @@ type subRecorderLogClientReq struct {
 
 // LogClientSession record a new client subscription session
 func (r *subscriptionRecorderImpl) LogClientSession(
-	clientName string, node string, timestamp time.Time,
+	clientName string, node string, timestamp time.Time, ctxt context.Context,
 ) (ClientSubscription, error) {
 	complete := make(chan bool, 1)
 	var sessionRecord ClientSubscription
@@ -245,7 +258,7 @@ func (r *subscriptionRecorderImpl) LogClientSession(
 		resultCB:   handler,
 	}
 
-	if err := r.tp.Submit(request, context.Background()); err != nil {
+	if err := r.tp.Submit(request, ctxt); err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to submit log-client-session request",
 		)
@@ -253,7 +266,12 @@ func (r *subscriptionRecorderImpl) LogClientSession(
 	}
 
 	// Wait for completion
-	<-complete
+	select {
+	case <-complete:
+		break
+	case <-ctxt.Done():
+		return ClientSubscription{}, ctxt.Err()
+	}
 
 	return sessionRecord, processError
 }
@@ -334,7 +352,7 @@ type subRecorderRefreshClientReq struct {
 
 // RefreshClientSession refresh an existing subscription session
 func (r *subscriptionRecorderImpl) RefreshClientSession(
-	clientName string, node string, timestamp time.Time,
+	clientName string, node string, timestamp time.Time, ctxt context.Context,
 ) error {
 	complete := make(chan bool, 1)
 	var processError error
@@ -352,7 +370,7 @@ func (r *subscriptionRecorderImpl) RefreshClientSession(
 		resultCB:   handler,
 	}
 
-	if err := r.tp.Submit(request, context.Background()); err != nil {
+	if err := r.tp.Submit(request, ctxt); err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to submit refresh-client-session request",
 		)
@@ -360,7 +378,12 @@ func (r *subscriptionRecorderImpl) RefreshClientSession(
 	}
 
 	// Wait for completion
-	<-complete
+	select {
+	case <-complete:
+		break
+	case <-ctxt.Done():
+		return ctxt.Err()
+	}
 
 	return processError
 }
@@ -445,7 +468,7 @@ type subRecorderDeleteClientReq struct {
 
 // ClearClientSession clear a client subscription record
 func (r *subscriptionRecorderImpl) ClearClientSession(
-	clientName string, node string, timestamp time.Time,
+	clientName string, node string, timestamp time.Time, ctxt context.Context,
 ) error {
 	complete := make(chan bool, 1)
 	var processError error
@@ -463,7 +486,7 @@ func (r *subscriptionRecorderImpl) ClearClientSession(
 		resultCB:   handler,
 	}
 
-	if err := r.tp.Submit(request, context.Background()); err != nil {
+	if err := r.tp.Submit(request, ctxt); err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to submit clear-client-session request",
 		)
@@ -471,7 +494,12 @@ func (r *subscriptionRecorderImpl) ClearClientSession(
 	}
 
 	// Wait for completion
-	<-complete
+	select {
+	case <-complete:
+		break
+	case <-ctxt.Done():
+		return ctxt.Err()
+	}
 
 	return processError
 }
@@ -554,7 +582,7 @@ type subRecorderClearInactiveReq struct {
 // ClearInactiveSessions clear out inactive sessions which have not been refreshed with
 // in the max allowed inactive period.
 func (r *subscriptionRecorderImpl) ClearInactiveSessions(
-	maxInactivePeriod time.Duration, timestamp time.Time,
+	maxInactivePeriod time.Duration, timestamp time.Time, ctxt context.Context,
 ) error {
 	complete := make(chan bool, 1)
 	var processError error
@@ -569,7 +597,7 @@ func (r *subscriptionRecorderImpl) ClearInactiveSessions(
 		timestamp: timestamp, inactiveFor: maxInactivePeriod, resultCB: handler,
 	}
 
-	if err := r.tp.Submit(request, context.Background()); err != nil {
+	if err := r.tp.Submit(request, ctxt); err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to submit clear-inactive-sessions request",
 		)
@@ -577,7 +605,12 @@ func (r *subscriptionRecorderImpl) ClearInactiveSessions(
 	}
 
 	// Wait for completion
-	<-complete
+	select {
+	case <-complete:
+		break
+	case <-ctxt.Done():
+		return ctxt.Err()
+	}
 
 	return processError
 }

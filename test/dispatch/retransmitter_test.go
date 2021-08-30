@@ -23,7 +23,11 @@ func TestMessageRetransmitter(t *testing.T) {
 	mockStorage := new(mocks.MessageQueues)
 	mockMsgDispatch := new(mocks.MessageDispatch)
 
-	tp, err := common.GetNewTaskProcessorInstance("unit-test", 4)
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
+	ctxt, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tp, err := common.GetNewTaskProcessorInstance("unit-test", 4, ctxt)
 	assert.Nil(err)
 
 	testQueue := "unit-test"
@@ -33,12 +37,10 @@ func TestMessageRetransmitter(t *testing.T) {
 		mockStorage,
 		time.Second,
 		mockMsgDispatch.SubmitRetransmit,
-		time.Second,
 	)
 	assert.Nil(err)
 
 	// Start the task processor
-	wg := sync.WaitGroup{}
 	assert.Nil(tp.StartEventLoop(&wg))
 
 	rand.Seed(time.Now().UnixNano())
@@ -72,13 +74,13 @@ func TestMessageRetransmitter(t *testing.T) {
 			"SubmitRetransmit", dispatch.MessageInFlight{
 				Message: testMsg[0], Index: msgIndexStart, Redelivery: true,
 			},
-			mock.AnythingOfType("*context.timerCtx"),
+			mock.AnythingOfType("*context.cancelCtx"),
 		).Return(nil).Once()
 		mockMsgDispatch.On(
 			"SubmitRetransmit", dispatch.MessageInFlight{
 				Message: testMsg[1], Index: msgIndexStart + 1, Redelivery: true,
 			},
-			mock.AnythingOfType("*context.timerCtx"),
+			mock.AnythingOfType("*context.cancelCtx"),
 		).Return(nil).Once()
 		assert.Nil(
 			uut.RetransmitMessages(
@@ -93,13 +95,13 @@ func TestMessageRetransmitter(t *testing.T) {
 			"SubmitRetransmit", dispatch.MessageInFlight{
 				Message: testMsg[0], Index: msgIndexStart, Redelivery: true,
 			},
-			mock.AnythingOfType("*context.timerCtx"),
+			mock.AnythingOfType("*context.cancelCtx"),
 		).Return(nil).Once()
 		mockMsgDispatch.On(
 			"SubmitRetransmit", dispatch.MessageInFlight{
 				Message: testMsg[1], Index: msgIndexStart + 1, Redelivery: true,
 			},
-			mock.AnythingOfType("*context.timerCtx"),
+			mock.AnythingOfType("*context.cancelCtx"),
 		).Return(nil).Once()
 		assert.Nil(
 			uut.RetransmitMessages(
@@ -120,13 +122,13 @@ func TestMessageRetransmitter(t *testing.T) {
 			"SubmitRetransmit", dispatch.MessageInFlight{
 				Message: testMsg[2], Index: msgIndexStart + 2, Redelivery: true,
 			},
-			mock.AnythingOfType("*context.timerCtx"),
+			mock.AnythingOfType("*context.cancelCtx"),
 		).Return(nil).Once()
 		mockMsgDispatch.On(
 			"SubmitRetransmit", dispatch.MessageInFlight{
 				Message: testMsg[3], Index: msgIndexStart + 3, Redelivery: true,
 			},
-			mock.AnythingOfType("*context.timerCtx"),
+			mock.AnythingOfType("*context.cancelCtx"),
 		).Return(nil).Once()
 		assert.Nil(
 			uut.RetransmitMessages(
@@ -149,13 +151,13 @@ func TestMessageRetransmitter(t *testing.T) {
 			"SubmitRetransmit", dispatch.MessageInFlight{
 				Message: testMsg[0], Index: msgIndexStart, Redelivery: true,
 			},
-			mock.AnythingOfType("*context.timerCtx"),
+			mock.AnythingOfType("*context.cancelCtx"),
 		).Return(nil).Once()
 		mockMsgDispatch.On(
 			"SubmitRetransmit", dispatch.MessageInFlight{
 				Message: testMsg[1], Index: msgIndexStart + 1, Redelivery: true,
 			},
-			mock.AnythingOfType("*context.timerCtx"),
+			mock.AnythingOfType("*context.cancelCtx"),
 		).Return(nil).Once()
 		assert.Nil(
 			uut.RetransmitMessages(
@@ -164,6 +166,5 @@ func TestMessageRetransmitter(t *testing.T) {
 		)
 	}
 
-	assert.Nil(tp.StopEventLoop())
-	wg.Wait()
+	assert.Nil(uut.StopOperation())
 }

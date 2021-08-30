@@ -15,7 +15,9 @@ import (
 func TestTaskParamProcessing(t *testing.T) {
 	assert := assert.New(t)
 
-	uut, err := GetNewTaskProcessorInstance("testing", 4)
+	ctxt, cancel := context.WithCancel(context.Background())
+	uut, err := GetNewTaskProcessorInstance("testing", 4, ctxt)
+	defer cancel()
 	assert.Nil(err)
 
 	// Case 1: no executor map
@@ -69,7 +71,11 @@ func TestTaskDemuxProcessing(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
 
-	uut, err := GetNewTaskDemuxProcessorInstance("testing", 4, 3, time.Second)
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
+	ctxt, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	uut, err := GetNewTaskDemuxProcessorInstance("testing", 4, 3, time.Second, ctxt)
 	assert.Nil(err)
 
 	// recast to source
@@ -77,7 +83,6 @@ func TestTaskDemuxProcessing(t *testing.T) {
 	assert.Equal(0, uutc.routeIdx)
 
 	// start the built in processes
-	wg := sync.WaitGroup{}
 	assert.Nil(uut.StartEventLoop(&wg))
 
 	path1 := 0
@@ -149,7 +154,4 @@ func TestTaskDemuxProcessing(t *testing.T) {
 		assert.Equal(1, path3)
 		assert.Equal(1, uutc.routeIdx)
 	}
-
-	assert.Nil(uut.StopEventLoop())
-	wg.Wait()
 }

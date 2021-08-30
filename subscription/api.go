@@ -94,7 +94,7 @@ func (h *APIHandlerSubscriptionController) NewClientSession(w http.ResponseWrite
 	}
 
 	// Register the client subscription session
-	_, err = h.controller.LogClientSession(clientID, nodeID, timestamp)
+	_, err = h.controller.LogClientSession(clientID, nodeID, timestamp, r.Context())
 	if err != nil {
 		msg := fmt.Sprintf("Failed to register new client session: %s", err)
 		response := rest.GetStdRESTErrorMsg(ErrorSessionRegFailed, &msg)
@@ -143,7 +143,7 @@ func (h *APIHandlerSubscriptionController) RenewClientSession(
 	}
 
 	// Refresh the client subscription session
-	err = h.controller.RefreshClientSession(clientID, nodeID, timestamp)
+	err = h.controller.RefreshClientSession(clientID, nodeID, timestamp, r.Context())
 	if err != nil {
 		msg := fmt.Sprintf("Failed to refresh client session: %s", err)
 		response := rest.GetStdRESTErrorMsg(ErrorSessionRegFailed, &msg)
@@ -192,7 +192,7 @@ func (h *APIHandlerSubscriptionController) DeleteClientSession(
 	}
 
 	// Delete client subscription session
-	err = h.controller.ClearClientSession(clientID, nodeID, timestamp)
+	err = h.controller.ClearClientSession(clientID, nodeID, timestamp, r.Context())
 	if err != nil {
 		msg := fmt.Sprintf("Failed to delete client session: %s", err)
 		response := rest.GetStdRESTErrorMsg(ErrorSessionRegFailed, &msg)
@@ -249,7 +249,7 @@ func (h *APIHandlerSubscriptionController) AliveHandler() http.HandlerFunc {
 // @Failure 500 {string} string "error"
 // @Router /ready [get]
 func (h *APIHandlerSubscriptionController) Ready(w http.ResponseWriter, r *http.Request) {
-	if h.controller.ReadySessionRecords() == nil {
+	if h.controller.ReadySessionRecords(r.Context()) == nil {
 		w.WriteHeader(200)
 	} else {
 		w.WriteHeader(404)

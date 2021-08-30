@@ -20,29 +20,30 @@ type TaskProcessor interface {
 	SetTaskExecutionMap(newMap map[reflect.Type]TaskHandler) error
 	AddToTaskExecutionMap(theType reflect.Type, handler TaskHandler) error
 	StartEventLoop(wg *sync.WaitGroup) error
-	StopEventLoop() error
 }
 
 // taskProcessorImpl implement TaskProcessor
 type taskProcessorImpl struct {
 	Component
-	name         string
-	done         chan bool
-	newTasks     chan interface{}
-	executionMap map[reflect.Type]TaskHandler
+	name             string
+	operationContext context.Context
+	newTasks         chan interface{}
+	executionMap     map[reflect.Type]TaskHandler
 }
 
 // GetNewTaskProcessorInstance get instance of TaskProcessor
-func GetNewTaskProcessorInstance(name string, taskBuffer int) (TaskProcessor, error) {
+func GetNewTaskProcessorInstance(
+	name string, taskBuffer int, ctxt context.Context,
+) (TaskProcessor, error) {
 	logTags := log.Fields{
 		"module": "common", "component": "task-processor", "instance": name,
 	}
 	return &taskProcessorImpl{
-		Component:    Component{LogTags: logTags},
-		name:         name,
-		done:         make(chan bool),
-		newTasks:     make(chan interface{}, taskBuffer),
-		executionMap: make(map[reflect.Type]TaskHandler),
+		Component:        Component{LogTags: logTags},
+		name:             name,
+		operationContext: ctxt,
+		newTasks:         make(chan interface{}, taskBuffer),
+		executionMap:     make(map[reflect.Type]TaskHandler),
 	}, nil
 }
 
@@ -53,6 +54,8 @@ func (p *taskProcessorImpl) Submit(newTaskParam interface{}, ctx context.Context
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-p.operationContext.Done():
+		return p.operationContext.Err()
 	}
 }
 
@@ -67,13 +70,6 @@ func (p *taskProcessorImpl) SetTaskExecutionMap(newMap map[reflect.Type]TaskHand
 func (p *taskProcessorImpl) AddToTaskExecutionMap(theType reflect.Type, handler TaskHandler) error {
 	log.WithFields(p.LogTags).Debugf("Appending to task execution mapping for %s", theType)
 	p.executionMap[theType] = handler
-	return nil
-}
-
-// StopEventLoop stop the task param processing event loop
-func (p *taskProcessorImpl) StopEventLoop() error {
-	log.WithFields(p.LogTags).Info("Stopping event loop")
-	p.done <- true
 	return nil
 }
 
@@ -102,14 +98,8 @@ func (p *taskProcessorImpl) StartEventLoop(wg *sync.WaitGroup) error {
 		finished := false
 		for !finished {
 			select {
-			case complete, ok := <-p.done:
-				if !ok {
-					log.WithFields(p.LogTags).Error(
-						"Event loop terminating. Failed to read done flag",
-					)
-					return
-				}
-				finished = complete
+			case <-p.operationContext.Done():
+				finished = true
 			case newTaskParam, ok := <-p.newTasks:
 				if !ok {
 					log.WithFields(p.LogTags).Error(
@@ -131,25 +121,31 @@ func (p *taskProcessorImpl) StartEventLoop(wg *sync.WaitGroup) error {
 // taskDemuxProcessorImpl implement TaskProcessor but support multiple parallel workers
 type taskDemuxProcessorImpl struct {
 	Component
-	name               string
-	input              TaskProcessor
-	workers            []TaskProcessor
-	routeIdx           int
-	frontToBackTimeout time.Duration
+	name             string
+	input            TaskProcessor
+	workers          []TaskProcessor
+	routeIdx         int
+	operationContext context.Context
 }
 
 // GetNewTaskDemuxProcessorInstance get instance of TaskDemuxProcessor
 func GetNewTaskDemuxProcessorInstance(
-	name string, taskBuffer int, workerNum int, passTimeout time.Duration,
+	name string,
+	taskBuffer int,
+	workerNum int,
+	passTimeout time.Duration,
+	ctxt context.Context,
 ) (TaskProcessor, error) {
-	inputTP, err := GetNewTaskProcessorInstance(fmt.Sprintf("%s.input", name), taskBuffer)
+	inputTP, err := GetNewTaskProcessorInstance(
+		fmt.Sprintf("%s.input", name), taskBuffer, ctxt,
+	)
 	if err != nil {
 		return nil, err
 	}
 	workers := make([]TaskProcessor, workerNum)
 	for itr := 0; itr < workerNum; itr++ {
 		workerTP, err := GetNewTaskProcessorInstance(
-			fmt.Sprintf("%s.worker.%d", name, itr), taskBuffer,
+			fmt.Sprintf("%s.worker.%d", name, itr), taskBuffer, ctxt,
 		)
 		if err != nil {
 			return nil, err
@@ -160,12 +156,12 @@ func GetNewTaskDemuxProcessorInstance(
 		"module": "common", "component": "task-demux-processor/%s", "instance": name,
 	}
 	return &taskDemuxProcessorImpl{
-		name:               name,
-		input:              inputTP,
-		workers:            workers,
-		routeIdx:           0,
-		frontToBackTimeout: passTimeout,
-		Component:          Component{LogTags: logTags},
+		name:             name,
+		input:            inputTP,
+		workers:          workers,
+		routeIdx:         0,
+		operationContext: ctxt,
+		Component:        Component{LogTags: logTags},
 	}, nil
 }
 
@@ -179,9 +175,7 @@ func (p *taskDemuxProcessorImpl) ProcessNewTaskParam(newTaskParam interface{}) e
 	if p.workers != nil && len(p.workers) > 0 {
 		log.WithFields(p.LogTags).Debugf("Processing new %s", reflect.TypeOf(newTaskParam))
 		defer func() { p.routeIdx = (p.routeIdx + 1) % len(p.workers) }()
-		useContext, cancel := context.WithTimeout(context.Background(), p.frontToBackTimeout)
-		defer cancel()
-		return p.workers[p.routeIdx].Submit(newTaskParam, useContext)
+		return p.workers[p.routeIdx].Submit(newTaskParam, p.operationContext)
 	}
 	return fmt.Errorf("[TDP %s] No workers defined", p.name)
 }
@@ -219,16 +213,4 @@ func (p *taskDemuxProcessorImpl) StartEventLoop(wg *sync.WaitGroup) error {
 	}
 	// Start the input loop
 	return p.input.StartEventLoop(wg)
-}
-
-// StopEventLoop stop the task param processing event loop
-func (p *taskDemuxProcessorImpl) StopEventLoop() error {
-	log.WithFields(p.LogTags).Info("Stopping event loop")
-	// Stop the input loop
-	_ = p.input.StopEventLoop()
-	// Stop the worker loops
-	for _, worker := range p.workers {
-		_ = worker.StopEventLoop()
-	}
-	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	"github.com/apex/log"
 	"gitlab.com/project-nan/httpmq/common"
@@ -14,7 +13,7 @@ import (
 // MessageDispatch dispatch messages from back-end store while accounting for flow control
 type MessageDispatch interface {
 	ProcessMessages(useContext context.Context) error
-	StopForward() error
+	StopOperation() error
 	SubmitMessageACK(ackIndexes []int64, useContext context.Context) error
 	SubmitRetransmit(msg MessageInFlight, useContext context.Context) error
 	SubmitMessageToDeliver(msg MessageInFlight, useContext context.Context) error
@@ -31,8 +30,9 @@ type messageDispatchImpl struct {
 	inflightMsgs     int
 	maxInflight      int
 	forwardMsg       SubmitMessage
-	forwardTimeout   time.Duration
-	stopForward      bool
+	stopOperation    bool
+	operationContext context.Context
+	contextCancel    context.CancelFunc
 	registerInflight registerInflightMessage
 }
 
@@ -46,7 +46,6 @@ func DefineMessageDispatch(
 	alreadyInflightMsgs int,
 	maxInflightMsgs int,
 	forwardCB SubmitMessage,
-	forwardTO time.Duration,
 	registerMsgCB registerInflightMessage,
 ) (MessageDispatch, error) {
 	logTags := log.Fields{
@@ -56,6 +55,7 @@ func DefineMessageDispatch(
 	if alreadyInflightMsgs > 0 {
 		initialInflight = alreadyInflightMsgs
 	}
+	ctxt, cancel := context.WithCancel(context.Background())
 	instance := messageDispatchImpl{
 		Component:        common.Component{LogTags: logTags},
 		queueName:        queueName,
@@ -66,8 +66,9 @@ func DefineMessageDispatch(
 		inflightMsgs:     initialInflight,
 		maxInflight:      maxInflightMsgs,
 		forwardMsg:       forwardCB,
-		forwardTimeout:   forwardTO,
-		stopForward:      false,
+		stopOperation:    false,
+		operationContext: ctxt,
+		contextCancel:    cancel,
 		registerInflight: registerMsgCB,
 	}
 	// Add handlers
@@ -79,9 +80,10 @@ func DefineMessageDispatch(
 	return &instance, nil
 }
 
-// StopForward stop forwarding message
-func (d *messageDispatchImpl) StopForward() error {
-	d.stopForward = true
+// StopOperation stop forwarding message
+func (d *messageDispatchImpl) StopOperation() error {
+	d.stopOperation = true
+	d.contextCancel()
 	return nil
 }
 
@@ -140,19 +142,13 @@ func (d *messageDispatchImpl) ProcessProcessRequest() error {
 		for !readAll {
 			select {
 			case msg := <-d.retry:
-				for !d.stopForward {
-					useContext, cancel := context.WithTimeout(context.Background(), d.forwardTimeout)
-					defer cancel()
-					if err := d.forwardMsg(msg, useContext); err != nil {
-						log.WithError(err).WithFields(d.LogTags).Errorf(
-							"Failed to re-transmit %s@%d", d.queueName, msg.Index,
-						)
-						if d.stopForward {
-							log.WithFields(d.LogTags).Infof("Stopping all message forwarding")
-							return err
-						}
-					} else {
-						break
+				if err := d.forwardMsg(msg, d.operationContext); err != nil {
+					log.WithError(err).WithFields(d.LogTags).Errorf(
+						"Failed to re-transmit %s@%d", d.queueName, msg.Index,
+					)
+					if d.stopOperation {
+						log.WithFields(d.LogTags).Info("Stopping all message forwarding")
+						return err
 					}
 				}
 				log.WithFields(d.LogTags).Debugf("Re-transmitted %s@%d", d.queueName, msg.Index)
@@ -168,32 +164,24 @@ func (d *messageDispatchImpl) ProcessProcessRequest() error {
 		for !readAll && d.inflightMsgs < d.maxInflight {
 			select {
 			case msg := <-d.deliver:
-				for !d.stopForward {
-					useContext, cancel := context.WithTimeout(context.Background(), d.forwardTimeout)
-					defer cancel()
-					if err := d.forwardMsg(msg, useContext); err != nil {
-						log.WithError(err).WithFields(d.LogTags).Errorf(
-							"Failed to send %s@%d", d.queueName, msg.Index,
-						)
-						if d.stopForward {
-							log.WithFields(d.LogTags).Infof("Stopping all message forwarding")
-							return err
-						}
-					} else {
-						break
+				if err := d.forwardMsg(msg, d.operationContext); err != nil {
+					log.WithError(err).WithFields(d.LogTags).Errorf(
+						"Failed to send %s@%d", d.queueName, msg.Index,
+					)
+					if d.stopOperation {
+						log.WithFields(d.LogTags).Info("Stopping all message forwarding")
+						return err
 					}
 				}
 				log.WithFields(d.LogTags).Debugf("Sent %s@%d", d.queueName, msg.Index)
 				d.inflightMsgs += 1
-				for !d.stopForward {
-					useContext, cancel := context.WithTimeout(context.Background(), d.forwardTimeout)
-					defer cancel()
-					if err := d.registerInflight(msg.Index, useContext); err != nil {
-						log.WithError(err).WithFields(d.LogTags).Errorf(
-							"Unable to register transmit of %s@%d", d.queueName, msg.Index,
-						)
-					} else {
-						break
+				if err := d.registerInflight(msg.Index, d.operationContext); err != nil {
+					log.WithError(err).WithFields(d.LogTags).Errorf(
+						"Unable to register transmit of %s@%d", d.queueName, msg.Index,
+					)
+					if d.stopOperation {
+						log.WithFields(d.LogTags).Info("Stopping all message forwarding")
+						return err
 					}
 				}
 			default:
