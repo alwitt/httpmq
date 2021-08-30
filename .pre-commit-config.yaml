@@ -2,7 +2,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
   - repo: git://github.com/dnephin/pre-commit-golang
-    rev: master
+    rev: v0.4.0
     hooks:
       - id: go-fmt
       # - id: go-vet
@@ -19,7 +19,7 @@ repos:
       # - id: go-build
       - id: go-mod-tidy
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v2.4.0
+    rev: v4.0.1
     hooks:
       - id: check-byte-order-marker
       - id: check-case-conflict
