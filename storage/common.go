@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"time"
+	"context"
 
 	"database/sql"
 	"database/sql/driver"
@@ -22,27 +22,27 @@ type ReadStreamParam struct {
 // MessageQueues message queue operator
 type MessageQueues interface {
 	// Queue related operations
-	Write(message common.Message, timeout time.Duration) error
-	Read(targetQueue string, index int64, timeout time.Duration) (common.Message, error)
-	ReadNewest(targetQueue string, timeout time.Duration) (common.Message, error)
-	ReadOldest(targetQueue string, timeout time.Duration) (common.Message, error)
-	IndexRange(targetQueue string, timeout time.Duration) (int64, int64, error)
+	Write(message common.Message, ctxt context.Context) error
+	Read(targetQueue string, index int64, ctxt context.Context) (common.Message, error)
+	ReadNewest(targetQueue string, ctxt context.Context) (common.Message, error)
+	ReadOldest(targetQueue string, ctxt context.Context) (common.Message, error)
+	IndexRange(targetQueue string, ctxt context.Context) (int64, int64, error)
 	ReadStream(target ReadStreamParam, stopFlag chan bool) error
 	ReadStreams(targets []ReadStreamParam, stopFlag chan bool) error
 	// Mutex related operations
-	Lock(lockName string, timeout time.Duration) error
-	Unlock(lockName string, timeout time.Duration) error
+	Lock(lockName string, ctxt context.Context) error
+	Unlock(lockName string, ctxt context.Context) error
 	Close() error
 }
 
 // KeyValueStore key-value store operator
 type KeyValueStore interface {
 	// Key-Value store related operations
-	Set(key string, value driver.Valuer, timeout time.Duration) error
-	Get(key string, result sql.Scanner, timeout time.Duration) error
-	Delete(key string, timeout time.Duration) error
+	Set(key string, value driver.Valuer, ctxt context.Context) error
+	Get(key string, result sql.Scanner, ctxt context.Context) error
+	Delete(key string, ctxt context.Context) error
 	// Mutex related operations
-	Lock(lockName string, timeout time.Duration) error
-	Unlock(lockName string, timeout time.Duration) error
+	Lock(lockName string, ctxt context.Context) error
+	Unlock(lockName string, ctxt context.Context) error
 	Close() error
 }

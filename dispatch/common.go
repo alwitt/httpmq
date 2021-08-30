@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"context"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -61,7 +62,7 @@ func (r MessageInFlight) Value() (driver.Value, error) {
 // ========================================================================================
 
 // SubmitMessage function signature for sending a message
-type SubmitMessage func(msg MessageInFlight) error
+type SubmitMessage func(msg MessageInFlight, useContext context.Context) error
 
 // registerInflightMessage function signature for registering a new message is inflight
-type registerInflightMessage func(msgIdx int64) error
+type registerInflightMessage func(msgIdx int64, useContext context.Context) error

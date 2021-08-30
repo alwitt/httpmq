@@ -1,6 +1,7 @@
 package subscription
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -35,13 +36,17 @@ func TestSubscriptionRecorderBasic(t *testing.T) {
 	// Case 0: initialize session record tracking
 	{
 		var r SubscriptionRecords
-		err := testKV.Get(sessionRecords, &r, time.Second)
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		err := testKV.Get(sessionRecords, &r, ctxt)
+		cancel()
 		assert.NotNil(err)
 	}
 	assert.Nil(uut.ReadySessionRecords())
 	{
 		var entry SubscriptionRecords
-		err := testKV.Get(sessionRecords, &entry, time.Second)
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		err := testKV.Get(sessionRecords, &entry, ctxt)
+		cancel()
 		assert.Nil(err)
 		assert.EqualValues(SubscriptionRecords{ActiveSessions: map[string]ClientSubscription{}}, entry)
 	}
@@ -160,7 +165,9 @@ func TestSubscriptionRecorderTimeout(t *testing.T) {
 	assert.Nil(uut.RefreshClientSession(client1, node1, startTime.Add(time.Second*8)))
 	{
 		var entry SubscriptionRecords
-		err := testKV.Get(sessionRecords, &entry, time.Second)
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		err := testKV.Get(sessionRecords, &entry, ctxt)
+		cancel()
 		assert.Nil(err)
 		_, ok := entry.ActiveSessions[client3]
 		assert.False(ok)

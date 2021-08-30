@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -149,12 +150,14 @@ func startServer(c *cli.Context) error {
 	testFunction := func(index int) {
 		startTime := time.Now()
 		for itr := 0; itr < args.Iterations; itr++ {
-			if err := connections[index].Lock(args.LockName, time.Second*10); err != nil {
+			ctxt, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			if err := connections[index].Lock(args.LockName, ctxt); err != nil {
 				log.WithError(err).Errorf("Lock %s failed", args.LockName)
 			}
-			if err := connections[index].Unlock(args.LockName, time.Second*10); err != nil {
+			if err := connections[index].Unlock(args.LockName, ctxt); err != nil {
 				log.WithError(err).Errorf("Unlock %s failed", args.LockName)
 			}
+			cancel()
 		}
 		endTime := time.Now()
 		testDurations[index] = endTime.Sub(startTime)

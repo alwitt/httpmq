@@ -1,8 +1,10 @@
 package dispatch
 
 import (
+	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/apex/log"
 	"gitlab.com/project-nan/httpmq/common"
@@ -11,10 +13,11 @@ import (
 // ========================================================================================
 // MessageDispatch dispatch messages from back-end store while accounting for flow control
 type MessageDispatch interface {
-	ProcessMessages() error
-	SubmitMessageACK(ackNum int64) error
-	SubmitRetransmit(msg MessageInFlight) error
-	SubmitMessageToDeliver(msg MessageInFlight) error
+	ProcessMessages(useContext context.Context) error
+	StopForward() error
+	SubmitMessageACK(ackIndexes []int64, useContext context.Context) error
+	SubmitRetransmit(msg MessageInFlight, useContext context.Context) error
+	SubmitMessageToDeliver(msg MessageInFlight, useContext context.Context) error
 }
 
 // messageDispatchImpl implements MessageDispatch
@@ -22,12 +25,14 @@ type messageDispatchImpl struct {
 	common.Component
 	queueName        string
 	tp               common.TaskProcessor
-	ackQueue         chan int64
+	ackQueue         chan []int64
 	retry            chan MessageInFlight
 	deliver          chan MessageInFlight
 	inflightMsgs     int
 	maxInflight      int
 	forwardMsg       SubmitMessage
+	forwardTimeout   time.Duration
+	stopForward      bool
 	registerInflight registerInflightMessage
 }
 
@@ -35,12 +40,13 @@ type messageDispatchImpl struct {
 func DefineMessageDispatch(
 	queueName string,
 	tp common.TaskProcessor,
-	ack chan int64,
+	ack chan []int64,
 	retry chan MessageInFlight,
 	deliver chan MessageInFlight,
 	alreadyInflightMsgs int,
 	maxInflightMsgs int,
 	forwardCB SubmitMessage,
+	forwardTO time.Duration,
 	registerMsgCB registerInflightMessage,
 ) (MessageDispatch, error) {
 	logTags := log.Fields{
@@ -60,6 +66,8 @@ func DefineMessageDispatch(
 		inflightMsgs:     initialInflight,
 		maxInflight:      maxInflightMsgs,
 		forwardMsg:       forwardCB,
+		forwardTimeout:   forwardTO,
+		stopForward:      false,
 		registerInflight: registerMsgCB,
 	}
 	// Add handlers
@@ -71,13 +79,19 @@ func DefineMessageDispatch(
 	return &instance, nil
 }
 
+// StopForward stop forwarding message
+func (d *messageDispatchImpl) StopForward() error {
+	d.stopForward = true
+	return nil
+}
+
 // ----------------------------------------------------------------------------------------
 
 type msgDispatcherProcessReq struct{}
 
 // ProcessMessages trigger the event processing loop for the dispatch
-func (d *messageDispatchImpl) ProcessMessages() error {
-	if err := d.tp.Submit(msgDispatcherProcessReq{}); err != nil {
+func (d *messageDispatchImpl) ProcessMessages(useContext context.Context) error {
+	if err := d.tp.Submit(msgDispatcherProcessReq{}, useContext); err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to submit process request")
 		return err
 	}
@@ -109,18 +123,16 @@ func (d *messageDispatchImpl) ProcessProcessRequest() error {
 		for !readAll {
 			select {
 			case ackMsg := <-d.ackQueue:
-				if d.inflightMsgs > 0 {
-					d.inflightMsgs -= 1
+				d.inflightMsgs -= len(ackMsg)
+				if d.inflightMsgs < 0 {
+					d.inflightMsgs = 0
 				}
-				log.WithFields(d.LogTags).Debugf("Message %d is ACKed", ackMsg)
+				log.WithFields(d.LogTags).Debugf("Message %s@%v is ACKed", d.queueName, ackMsg)
 			default:
 				readAll = true
 			}
 		}
-		log.WithFields(d.LogTags).Debugf("Processed all available ACK messages")
 	}
-
-	log.WithFields(d.LogTags).Debugf("Messages inflight for %s: %d", d.queueName, d.inflightMsgs)
 
 	// Process retransmission if possible
 	{
@@ -128,21 +140,27 @@ func (d *messageDispatchImpl) ProcessProcessRequest() error {
 		for !readAll {
 			select {
 			case msg := <-d.retry:
-				if err := d.forwardMsg(msg); err != nil {
-					log.WithError(err).WithFields(d.LogTags).Errorf(
-						"Failed to re-transmit %s@%d", d.queueName, msg.Index,
-					)
-				} else {
-					log.WithFields(d.LogTags).Debugf("Re-transmitted %s@%d", d.queueName, msg.Index)
+				for !d.stopForward {
+					useContext, cancel := context.WithTimeout(context.Background(), d.forwardTimeout)
+					defer cancel()
+					if err := d.forwardMsg(msg, useContext); err != nil {
+						log.WithError(err).WithFields(d.LogTags).Errorf(
+							"Failed to re-transmit %s@%d", d.queueName, msg.Index,
+						)
+						if d.stopForward {
+							log.WithFields(d.LogTags).Infof("Stopping all message forwarding")
+							return err
+						}
+					} else {
+						break
+					}
 				}
+				log.WithFields(d.LogTags).Debugf("Re-transmitted %s@%d", d.queueName, msg.Index)
 			default:
 				readAll = true
 			}
 		}
-		log.WithFields(d.LogTags).Debug("Handled re-transmit messages")
 	}
-
-	log.WithFields(d.LogTags).Debugf("Messages inflight for %s: %d", d.queueName, d.inflightMsgs)
 
 	// Process new message delivery if possible
 	{
@@ -150,28 +168,39 @@ func (d *messageDispatchImpl) ProcessProcessRequest() error {
 		for !readAll && d.inflightMsgs < d.maxInflight {
 			select {
 			case msg := <-d.deliver:
-				if err := d.forwardMsg(msg); err != nil {
-					log.WithError(err).WithFields(d.LogTags).Errorf(
-						"Failed to send %s@%d", d.queueName, msg.Index,
-					)
-				} else {
-					log.WithFields(d.LogTags).Debugf("Sent %s@%d", d.queueName, msg.Index)
+				for !d.stopForward {
+					useContext, cancel := context.WithTimeout(context.Background(), d.forwardTimeout)
+					defer cancel()
+					if err := d.forwardMsg(msg, useContext); err != nil {
+						log.WithError(err).WithFields(d.LogTags).Errorf(
+							"Failed to send %s@%d", d.queueName, msg.Index,
+						)
+						if d.stopForward {
+							log.WithFields(d.LogTags).Infof("Stopping all message forwarding")
+							return err
+						}
+					} else {
+						break
+					}
 				}
+				log.WithFields(d.LogTags).Debugf("Sent %s@%d", d.queueName, msg.Index)
 				d.inflightMsgs += 1
-				if err := d.registerInflight(msg.Index); err != nil {
-					log.WithError(err).WithFields(d.LogTags).Errorf(
-						"Unable to register transmit of %s@%d", d.queueName, msg.Index,
-					)
-					return err
+				for !d.stopForward {
+					useContext, cancel := context.WithTimeout(context.Background(), d.forwardTimeout)
+					defer cancel()
+					if err := d.registerInflight(msg.Index, useContext); err != nil {
+						log.WithError(err).WithFields(d.LogTags).Errorf(
+							"Unable to register transmit of %s@%d", d.queueName, msg.Index,
+						)
+					} else {
+						break
+					}
 				}
 			default:
 				readAll = true
 			}
 		}
-		log.WithFields(d.LogTags).Debug("Handled new messages")
 	}
-
-	log.WithFields(d.LogTags).Debugf("Messages inflight for %s: %d", d.queueName, d.inflightMsgs)
 
 	return nil
 }
@@ -179,25 +208,46 @@ func (d *messageDispatchImpl) ProcessProcessRequest() error {
 // ----------------------------------------------------------------------------------------
 
 // SubmitMessageACK submit a message ID which was just ACKed
-func (d *messageDispatchImpl) SubmitMessageACK(ackNum int64) error {
-	d.ackQueue <- ackNum
-	return d.ProcessMessages()
+func (d *messageDispatchImpl) SubmitMessageACK(
+	ackNum []int64, useContext context.Context,
+) error {
+	select {
+	case d.ackQueue <- ackNum:
+		break
+	case <-useContext.Done():
+		return useContext.Err()
+	}
+	return d.ProcessMessages(useContext)
 }
 
 // ----------------------------------------------------------------------------------------
 
 // SubmitRetransmit submit a message for retransmission
-func (d *messageDispatchImpl) SubmitRetransmit(msg MessageInFlight) error {
+func (d *messageDispatchImpl) SubmitRetransmit(
+	msg MessageInFlight, useContext context.Context,
+) error {
 	msg.Redelivery = true
-	d.retry <- msg
-	return d.ProcessMessages()
+	select {
+	case d.retry <- msg:
+		break
+	case <-useContext.Done():
+		return useContext.Err()
+	}
+	return d.ProcessMessages(useContext)
 }
 
 // ----------------------------------------------------------------------------------------
 
 // SubmitMessageToDeliver submit a message for delivery
-func (d *messageDispatchImpl) SubmitMessageToDeliver(msg MessageInFlight) error {
+func (d *messageDispatchImpl) SubmitMessageToDeliver(
+	msg MessageInFlight, useContext context.Context,
+) error {
 	msg.Redelivery = false
-	d.deliver <- msg
-	return d.ProcessMessages()
+	select {
+	case d.deliver <- msg:
+		break
+	case <-useContext.Done():
+		return useContext.Err()
+	}
+	return d.ProcessMessages(useContext)
 }

@@ -57,18 +57,16 @@ func CreateEtcdBackedStorage(servers []string, timeout time.Duration) (
 // Message queue related operations
 
 // Write record a new message
-func (d *etcdBackedStorage) Write(message common.Message, timeout time.Duration) error {
+func (d *etcdBackedStorage) Write(message common.Message, ctxt context.Context) error {
 	// the message is stored as serialized JSON
 	toStore, err := json.Marshal(&message)
 	if err != nil {
 		log.WithError(err).WithFields(d.LogTags).Error("Unable to serialize message for storage")
 		return err
 	}
-	useContext, cancel := context.WithTimeout(context.Background(), timeout)
 	resp, err := d.client.Put(
-		useContext, message.Destination.TargetQueue, string(toStore),
+		ctxt, message.Destination.TargetQueue, string(toStore),
 	)
-	cancel()
 	if err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf(
 			"Failed to WRITE %s <== %s", message.Destination.TargetQueue, string(toStore),
@@ -83,11 +81,9 @@ func (d *etcdBackedStorage) Write(message common.Message, timeout time.Duration)
 
 // Read fetch message from target queue based on index
 func (d *etcdBackedStorage) Read(
-	targetQueue string, index int64, timeout time.Duration,
+	targetQueue string, index int64, ctxt context.Context,
 ) (common.Message, error) {
-	useContext, cancel := context.WithTimeout(context.Background(), timeout)
-	resp, err := d.client.Get(useContext, targetQueue, clientv3.WithRev(int64(index)))
-	cancel()
+	resp, err := d.client.Get(ctxt, targetQueue, clientv3.WithRev(int64(index)))
 	if err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf(
 			"Failed to READ %s@%d", targetQueue, index,
@@ -119,32 +115,30 @@ func (d *etcdBackedStorage) Read(
 
 // ReadNewest fetch the newest message from target queue
 func (d *etcdBackedStorage) ReadNewest(
-	targetQueue string, timeout time.Duration,
+	targetQueue string, ctxt context.Context,
 ) (common.Message, error) {
-	return d.Read(targetQueue, 0, timeout)
+	return d.Read(targetQueue, 0, ctxt)
 }
 
 // ReadOldest fetch oldest available message from target queue
 func (d *etcdBackedStorage) ReadOldest(
-	targetQueue string, timeout time.Duration,
+	targetQueue string, ctxt context.Context,
 ) (common.Message, error) {
-	oldest, _, err := d.IndexRange(targetQueue, timeout)
+	oldest, _, err := d.IndexRange(targetQueue, ctxt)
 	if err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf(
 			"Can't fetch oldest message on %s", targetQueue,
 		)
 		return common.Message{}, err
 	}
-	return d.Read(targetQueue, oldest, timeout)
+	return d.Read(targetQueue, oldest, ctxt)
 }
 
 // IndexRange get the oldest, and newest available index on a target queue
 func (d *etcdBackedStorage) IndexRange(
-	targetQueue string, timeout time.Duration,
+	targetQueue string, ctxt context.Context,
 ) (int64, int64, error) {
-	useContext, cancel := context.WithTimeout(context.Background(), timeout)
-	resp, err := d.client.Get(useContext, targetQueue, clientv3.WithRev(0))
-	cancel()
+	resp, err := d.client.Get(ctxt, targetQueue, clientv3.WithRev(0))
 	if err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to GET %s@0", targetQueue)
 		return 0, 0, err
@@ -334,11 +328,9 @@ func (d *etcdBackedStorage) getMutex(lockName string) *concurrency.Mutex {
 }
 
 // Lock acquire a named lock given a timeout
-func (d *etcdBackedStorage) Lock(lockName string, timeout time.Duration) error {
+func (d *etcdBackedStorage) Lock(lockName string, ctxt context.Context) error {
 	theMutex := d.getMutex(lockName)
-	useContext, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	if err := theMutex.Lock(useContext); err != nil {
+	if err := theMutex.Lock(ctxt); err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf("Unable to lock %s", lockName)
 		return err
 	}
@@ -346,11 +338,9 @@ func (d *etcdBackedStorage) Lock(lockName string, timeout time.Duration) error {
 }
 
 // Unlock release a named lock given a timeout
-func (d *etcdBackedStorage) Unlock(lockName string, timeout time.Duration) error {
+func (d *etcdBackedStorage) Unlock(lockName string, ctxt context.Context) error {
 	theMutex := d.getMutex(lockName)
-	useContext, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	if err := theMutex.Unlock(useContext); err != nil {
+	if err := theMutex.Unlock(ctxt); err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf("Unable to unlock %s", lockName)
 		return err
 	}
@@ -373,7 +363,7 @@ func (d *etcdBackedStorage) Close() error {
 // Key-Value store related operations
 
 // Set2 record a K/V pair in etcd
-func (d *etcdBackedStorage) Set(key string, value driver.Valuer, timeout time.Duration) error {
+func (d *etcdBackedStorage) Set(key string, value driver.Valuer, ctxt context.Context) error {
 	serialized, err := value.Value()
 	if err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to SET %s", key)
@@ -387,9 +377,7 @@ func (d *etcdBackedStorage) Set(key string, value driver.Valuer, timeout time.Du
 		return err
 	}
 	// Insert into ETCD
-	useContext, cancel := context.WithTimeout(context.Background(), timeout)
-	resp, err := d.client.Put(useContext, key, string(asBytes))
-	cancel()
+	resp, err := d.client.Put(ctxt, key, string(asBytes))
 	if err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to SET %s <== %s", key, asBytes)
 		return err
@@ -401,10 +389,8 @@ func (d *etcdBackedStorage) Set(key string, value driver.Valuer, timeout time.Du
 }
 
 // Get2 read a K/V pair from etcd
-func (d *etcdBackedStorage) Get(key string, result sql.Scanner, timeout time.Duration) error {
-	useContext, cancel := context.WithTimeout(context.Background(), timeout)
-	resp, err := d.client.Get(useContext, key, clientv3.WithRev(int64(0)))
-	cancel()
+func (d *etcdBackedStorage) Get(key string, result sql.Scanner, ctxt context.Context) error {
+	resp, err := d.client.Get(ctxt, key, clientv3.WithRev(int64(0)))
 	if err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to GET %s@0", key)
 		return err
@@ -427,10 +413,8 @@ func (d *etcdBackedStorage) Get(key string, result sql.Scanner, timeout time.Dur
 }
 
 // Delete delete a key from ETCD
-func (d *etcdBackedStorage) Delete(key string, timeout time.Duration) error {
-	useContext, cancel := context.WithTimeout(context.Background(), timeout)
-	resp, err := d.client.Delete(useContext, key, clientv3.WithPrefix())
-	cancel()
+func (d *etcdBackedStorage) Delete(key string, ctxt context.Context) error {
+	resp, err := d.client.Delete(ctxt, key, clientv3.WithPrefix())
 	if err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to DELETE %s", key)
 		return err

@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"context"
 	"math/rand"
 	"sync"
 	"testing"
@@ -22,17 +23,17 @@ func TestMessageDispatch(t *testing.T) {
 	assert.Nil(err)
 
 	testMsgs := make(chan MessageInFlight, maxInflight*2)
-	testMsgRecv := func(msg MessageInFlight) error {
+	testMsgRecv := func(msg MessageInFlight, ctxt context.Context) error {
 		testMsgs <- msg
 		return nil
 	}
 
-	testACKs := make(chan int64, maxInflight*2)
+	testACKs := make(chan []int64, maxInflight*2)
 	testRetries := make(chan MessageInFlight, maxInflight*2)
 	testTransmits := make(chan MessageInFlight, maxInflight*2)
 
 	msgTxRegister := make(chan int64, maxInflight)
-	msgTxRegisterRecv := func(msgIdx int64) error {
+	msgTxRegisterRecv := func(msgIdx int64, ctxt context.Context) error {
 		msgTxRegister <- msgIdx
 		return nil
 	}
@@ -47,6 +48,7 @@ func TestMessageDispatch(t *testing.T) {
 		0,
 		maxInflight,
 		testMsgRecv,
+		time.Second,
 		msgTxRegisterRecv,
 	)
 	assert.Nil(err)
@@ -56,9 +58,13 @@ func TestMessageDispatch(t *testing.T) {
 	assert.Nil(tp.StartEventLoop(&wg))
 
 	// Case 0: nothing happening
-	assert.Nil(uut.ProcessMessages())
-	assert.Empty(testMsgs)
-	assert.Empty(msgTxRegister)
+	{
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.ProcessMessages(ctxt))
+		cancel()
+		assert.Empty(testMsgs)
+		assert.Empty(msgTxRegister)
+	}
 
 	rand.Seed(time.Now().UnixNano())
 	msgIndexStart := rand.Intn(100000)
@@ -86,20 +92,22 @@ func TestMessageDispatch(t *testing.T) {
 		msgIndex += 1
 	}
 	for itr := 0; itr < 2; itr++ {
-		assert.Nil(uut.SubmitMessageToDeliver(testMsgs1[itr]))
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.SubmitMessageToDeliver(testMsgs1[itr], ctxt))
+		cancel()
 	}
 	// Verify transmission
 	for itr := 0; itr < 2; itr++ {
 		select {
 		case msg := <-testMsgs:
 			assert.EqualValues(testMsgs1[itr], msg)
-		case <-time.After(time.Second):
+		case <-time.After(time.Second * 2):
 			assert.True(false)
 		}
 		select {
 		case sent := <-msgTxRegister:
 			assert.EqualValues(testMsgs1[itr].Index, sent)
-		case <-time.After(time.Second):
+		case <-time.After(time.Second * 2):
 			assert.True(false)
 		}
 	}
@@ -128,7 +136,9 @@ func TestMessageDispatch(t *testing.T) {
 		msgIndex += 1
 	}
 	for itr := 0; itr < 2; itr++ {
-		assert.Nil(uut.SubmitMessageToDeliver(testMsgs2[itr]))
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.SubmitMessageToDeliver(testMsgs2[itr], ctxt))
+		cancel()
 	}
 	// Verify transmission
 	{
@@ -149,9 +159,11 @@ func TestMessageDispatch(t *testing.T) {
 	assert.Empty(msgTxRegister)
 
 	// Case 3: ACK a message
-	assert.Nil(uut.SubmitMessageACK(int64(msgIndexStart) + 1))
-	// Verify transmission
 	{
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.SubmitMessageACK([]int64{int64(msgIndexStart) + 1}, ctxt))
+		cancel()
+		// Verify transmission
 		select {
 		case msg := <-testMsgs:
 			assert.EqualValues(testMsgs2[1], msg)
@@ -169,13 +181,19 @@ func TestMessageDispatch(t *testing.T) {
 	assert.Empty(msgTxRegister)
 
 	// Case 4: ACK more messages
-	assert.Nil(uut.SubmitMessageACK(int64(msgIndexStart) + 0))
-	assert.Empty(testMsgs)
-	assert.Empty(msgTxRegister)
+	{
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.SubmitMessageACK([]int64{int64(msgIndexStart) + 0}, ctxt))
+		cancel()
+		assert.Empty(testMsgs)
+		assert.Empty(msgTxRegister)
+	}
 
 	// Case 5: Re-transmit first batch of messages
 	for itr := 0; itr < 2; itr++ {
-		assert.Nil(uut.SubmitRetransmit(testMsgs1[itr]))
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.SubmitRetransmit(testMsgs1[itr], ctxt))
+		cancel()
 	}
 	// Verify transmission
 	for itr := 0; itr < 2; itr++ {
@@ -193,7 +211,9 @@ func TestMessageDispatch(t *testing.T) {
 
 	// Case 6: Re-transmit second batch of messages
 	for itr := 0; itr < 2; itr++ {
-		assert.Nil(uut.SubmitRetransmit(testMsgs2[itr]))
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.SubmitRetransmit(testMsgs2[itr], ctxt))
+		cancel()
 	}
 	// Verify transmission
 	for itr := 0; itr < 2; itr++ {
@@ -223,17 +243,17 @@ func TestMessageDispatchStartWithInflight(t *testing.T) {
 	assert.Nil(err)
 
 	testMsgs := make(chan MessageInFlight, maxInflight*2)
-	testMsgRecv := func(msg MessageInFlight) error {
+	testMsgRecv := func(msg MessageInFlight, ctxt context.Context) error {
 		testMsgs <- msg
 		return nil
 	}
 
-	testACKs := make(chan int64, maxInflight*2)
+	testACKs := make(chan []int64, maxInflight*2)
 	testRetries := make(chan MessageInFlight, maxInflight*2)
 	testTransmits := make(chan MessageInFlight, maxInflight*2)
 
 	msgTxRegister := make(chan int64, maxInflight)
-	msgTxRegisterRecv := func(msgIdx int64) error {
+	msgTxRegisterRecv := func(msgIdx int64, ctxt context.Context) error {
 		msgTxRegister <- msgIdx
 		return nil
 	}
@@ -249,6 +269,7 @@ func TestMessageDispatchStartWithInflight(t *testing.T) {
 		startingInflight,
 		maxInflight,
 		testMsgRecv,
+		time.Second,
 		msgTxRegisterRecv,
 	)
 	assert.Nil(err)
@@ -258,9 +279,13 @@ func TestMessageDispatchStartWithInflight(t *testing.T) {
 	assert.Nil(tp.StartEventLoop(&wg))
 
 	// Case 0: nothing happening
-	assert.Nil(uut.ProcessMessages())
-	assert.Empty(testMsgs)
-	assert.Empty(msgTxRegister)
+	{
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.ProcessMessages(ctxt))
+		cancel()
+		assert.Empty(testMsgs)
+		assert.Empty(msgTxRegister)
+	}
 
 	rand.Seed(time.Now().UnixNano())
 	msgIndexStart := rand.Intn(100000)
@@ -288,7 +313,9 @@ func TestMessageDispatchStartWithInflight(t *testing.T) {
 		msgIndex += 1
 	}
 	for itr := 0; itr < 2; itr++ {
-		assert.Nil(uut.SubmitMessageToDeliver(testMsgs1[itr]))
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.SubmitMessageToDeliver(testMsgs1[itr], ctxt))
+		cancel()
 	}
 	// Verify transmission
 	{
@@ -330,7 +357,9 @@ func TestMessageDispatchStartWithInflight(t *testing.T) {
 		msgIndex += 1
 	}
 	for itr := 0; itr < 2; itr++ {
-		assert.Nil(uut.SubmitRetransmit(testMsgs2[itr]))
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.SubmitRetransmit(testMsgs2[itr], ctxt))
+		cancel()
 	}
 	// Verify transmission
 	for itr := 0; itr < 2; itr++ {
@@ -345,9 +374,11 @@ func TestMessageDispatchStartWithInflight(t *testing.T) {
 	assert.Empty(msgTxRegister)
 
 	// Case 3: ACK a message
-	assert.Nil(uut.SubmitMessageACK(int64(rand.Intn(100000))))
-	// Verify transmission
 	{
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.SubmitMessageACK([]int64{int64(rand.Intn(100000))}, ctxt))
+		cancel()
+		// Verify transmission
 		select {
 		case msg := <-testMsgs:
 			assert.EqualValues(testMsgs1[1], msg)

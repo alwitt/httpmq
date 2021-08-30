@@ -1,10 +1,12 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/stretchr/testify/assert"
@@ -67,7 +69,7 @@ func TestTaskDemuxProcessing(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
 
-	uut, err := GetNewTaskDemuxProcessorInstance("testing", 4, 3)
+	uut, err := GetNewTaskDemuxProcessorInstance("testing", 4, 3, time.Second)
 	assert.Nil(err)
 
 	// recast to source
@@ -114,7 +116,9 @@ func TestTaskDemuxProcessing(t *testing.T) {
 	// Case 1: trigger
 	{
 		testWG.Add(1)
-		assert.Nil(uut.Submit(testStruct1{}))
+		useContext, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.Submit(testStruct1{}, useContext))
+		cancel()
 		testWG.Wait()
 		assert.Equal(1, path1)
 		assert.Equal(1, uutc.routeIdx)
@@ -123,7 +127,9 @@ func TestTaskDemuxProcessing(t *testing.T) {
 	// Case 2: trigger
 	{
 		testWG.Add(1)
-		assert.Nil(uut.Submit(testStruct1{}))
+		useContext, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.Submit(testStruct1{}, useContext))
+		cancel()
 		testWG.Wait()
 		assert.Equal(2, path1)
 		assert.Equal(2, uutc.routeIdx)
@@ -132,8 +138,12 @@ func TestTaskDemuxProcessing(t *testing.T) {
 	// Case 3: trigger back to back
 	{
 		testWG.Add(2)
-		assert.Nil(uut.Submit(testStruct2{}))
-		assert.Nil(uut.Submit(testStruct3{}))
+		useContext, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.Submit(testStruct2{}, useContext))
+		cancel()
+		useContext, cancel = context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.Submit(testStruct3{}, useContext))
+		cancel()
 		testWG.Wait()
 		assert.Equal(1, path2)
 		assert.Equal(1, path3)

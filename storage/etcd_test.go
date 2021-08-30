@@ -33,7 +33,9 @@ func TestEtcdDriverBasic(t *testing.T) {
 	// Case 0: fetch on unknown topic
 	testTopic0 := uuid.New().String()
 	log.Debugf("Test Topic 0 %s", testTopic0)
-	minIdx, maxIdx, err := uutCase.IndexRange(testTopic0, time.Second)
+	ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+	minIdx, maxIdx, err := uutCase.IndexRange(testTopic0, ctxt)
+	cancel()
 	assert.Nil(err)
 	assert.Equal(int64(-1), minIdx)
 	assert.Equal(int64(0), maxIdx)
@@ -49,9 +51,13 @@ func TestEtcdDriverBasic(t *testing.T) {
 		Tags:        map[string]string{"flag 0": uuid.New().String()},
 		Body:        []byte(uuid.New().String()),
 	}
-	assert.Nil(uut.Write(msg1, time.Second))
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
+	assert.Nil(uut.Write(msg1, ctxt))
+	cancel()
 	// Reference index
-	minIdx1, maxIdx1, err := uutCase.IndexRange(testTopic0, time.Second)
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
+	minIdx1, maxIdx1, err := uutCase.IndexRange(testTopic0, ctxt)
+	cancel()
 	assert.Nil(err)
 	assert.Greater(minIdx1, int64(0))
 
@@ -66,9 +72,11 @@ func TestEtcdDriverBasic(t *testing.T) {
 		Tags:        map[string]string{"flag 0": uuid.New().String()},
 		Body:        []byte(uuid.New().String()),
 	}
-	assert.Nil(uut.Write(msg2, time.Second))
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
+	assert.Nil(uut.Write(msg2, ctxt))
 	// Reference index
-	minIdx2, maxIdx2, err := uutCase.IndexRange(testTopic0, time.Second)
+	minIdx2, maxIdx2, err := uutCase.IndexRange(testTopic0, ctxt)
+	cancel()
 	assert.Nil(err)
 	assert.Equal(minIdx1, minIdx2)
 	assert.Greater(maxIdx2, maxIdx1)
@@ -84,31 +92,39 @@ func TestEtcdDriverBasic(t *testing.T) {
 		Tags:        map[string]string{"flag 0": uuid.New().String()},
 		Body:        []byte(uuid.New().String()),
 	}
-	assert.Nil(uut.Write(msg3, time.Second))
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
+	assert.Nil(uut.Write(msg3, ctxt))
 	// Reference index
-	minIdx3, maxIdx3, err := uutCase.IndexRange(testTopic0, time.Second)
+	minIdx3, maxIdx3, err := uutCase.IndexRange(testTopic0, ctxt)
+	cancel()
 	assert.Nil(err)
 	assert.Equal(minIdx1, minIdx3)
 	assert.Greater(maxIdx3, maxIdx2)
 
 	// Case 4: reference old version
-	readMsg1, err := uut.Read(testTopic0, maxIdx1, time.Second)
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
+	readMsg1, err := uut.Read(testTopic0, maxIdx1, ctxt)
 	assert.Nil(err)
 	assert.EqualValues(msg1, readMsg1)
-	readMsg2, err := uut.Read(testTopic0, maxIdx2, time.Second)
+	readMsg2, err := uut.Read(testTopic0, maxIdx2, ctxt)
 	assert.Nil(err)
 	assert.EqualValues(msg2, readMsg2)
-	readMsg3, err := uut.Read(testTopic0, maxIdx3, time.Second)
+	readMsg3, err := uut.Read(testTopic0, maxIdx3, ctxt)
 	assert.Nil(err)
 	assert.EqualValues(msg3, readMsg3)
+	cancel()
 
 	// Case 5: check newest version
-	readMsg, err := uut.ReadNewest(testTopic0, time.Second)
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
+	readMsg, err := uut.ReadNewest(testTopic0, ctxt)
+	cancel()
 	assert.Nil(err)
 	assert.EqualValues(msg3, readMsg)
 
 	// Case 6: check oldest version
-	readMsg, err = uut.ReadOldest(testTopic0, time.Second)
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
+	readMsg, err = uut.ReadOldest(testTopic0, ctxt)
+	cancel()
 	assert.Nil(err)
 	assert.EqualValues(msg1, readMsg)
 
@@ -124,14 +140,16 @@ func TestEtcdDriverBasic(t *testing.T) {
 		Tags:        map[string]string{"flag 0": uuid.New().String()},
 		Body:        []byte(uuid.New().String()),
 	}
-	assert.Nil(uut.Write(msg7B, time.Second))
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
+	assert.Nil(uut.Write(msg7B, ctxt))
 	// Reference index
-	minIdx7A, maxIdx7A, err := uutCase.IndexRange(testTopic0, time.Second)
+	minIdx7A, maxIdx7A, err := uutCase.IndexRange(testTopic0, ctxt)
 	assert.Nil(err)
 	assert.Equal(minIdx1, minIdx7A)
 	assert.Equal(maxIdx3, maxIdx7A)
-	minIdx7B, maxIdx7B, err := uutCase.IndexRange(testTopic7, time.Second)
+	minIdx7B, maxIdx7B, err := uutCase.IndexRange(testTopic7, ctxt)
 	assert.Nil(err)
+	cancel()
 
 	// Case 8: update topic
 	msg8B := common.Message{
@@ -144,16 +162,18 @@ func TestEtcdDriverBasic(t *testing.T) {
 		Tags:        map[string]string{"flag 0": uuid.New().String()},
 		Body:        []byte(uuid.New().String()),
 	}
-	assert.Nil(uut.Write(msg8B, time.Second))
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
+	assert.Nil(uut.Write(msg8B, ctxt))
 	// Reference index
-	minIdx8A, maxIdx8A, err := uutCase.IndexRange(testTopic0, time.Second)
+	minIdx8A, maxIdx8A, err := uutCase.IndexRange(testTopic0, ctxt)
 	assert.Nil(err)
 	assert.Equal(minIdx1, minIdx8A)
 	assert.Equal(maxIdx3, maxIdx8A)
-	minIdx8B, maxIdx8B, err := uutCase.IndexRange(testTopic7, time.Second)
+	minIdx8B, maxIdx8B, err := uutCase.IndexRange(testTopic7, ctxt)
 	assert.Nil(err)
 	assert.Equal(minIdx7B, minIdx8B)
 	assert.Greater(maxIdx8B, maxIdx7B)
+	cancel()
 
 	assert.Nil(uut.Close())
 }
@@ -221,7 +241,9 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		go func() {
 			for idx, msg := range testMsgs {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Write(msg, time.Second))
+				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+				assert.Nil(uut.Write(msg, ctxt))
+				cancel()
 			}
 		}()
 		// Start the watching
@@ -266,7 +288,9 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		go func() {
 			for idx, msg := range testMsgs {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Write(msg, time.Second))
+				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+				assert.Nil(uut.Write(msg, ctxt))
+				cancel()
 			}
 		}()
 		// Start the watching
@@ -311,7 +335,9 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		go func() {
 			for idx, msg := range testMsgs {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Write(msg, time.Second))
+				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+				assert.Nil(uut.Write(msg, ctxt))
+				cancel()
 			}
 		}()
 		// Start the watching
@@ -346,13 +372,19 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		}
 		for itr := 0; itr < 2; itr++ {
 			log.Debugf("Sending test message %d", itr)
-			assert.Nil(uut.Write(testMsgs[itr], time.Second))
+			ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+			assert.Nil(uut.Write(testMsgs[itr], ctxt))
+			cancel()
 		}
-		_, maxIdx, err := uut.IndexRange(topic, time.Second)
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		_, maxIdx, err := uut.IndexRange(topic, ctxt)
+		cancel()
 		assert.Nil(err)
 		for itr := 2; itr < 5; itr++ {
 			log.Debugf("Sending test message %d", itr)
-			assert.Nil(uut.Write(testMsgs[itr], time.Second))
+			ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+			assert.Nil(uut.Write(testMsgs[itr], ctxt))
+			cancel()
 		}
 		watchTarget := ReadStreamParam{
 			TargetQueue: topic,
@@ -391,7 +423,9 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		}
 		for itr := 0; itr < 2; itr++ {
 			log.Debugf("Sending test message %d", itr)
-			assert.Nil(uut.Write(testMsgs[itr], time.Second))
+			ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+			assert.Nil(uut.Write(testMsgs[itr], ctxt))
+			cancel()
 		}
 		watchTarget := ReadStreamParam{
 			TargetQueue: topic,
@@ -401,7 +435,9 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		go func() {
 			for itr := 2; itr < 5; itr++ {
 				log.Debugf("Sending test message %d", itr)
-				assert.Nil(uut.Write(testMsgs[itr], time.Second))
+				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+				assert.Nil(uut.Write(testMsgs[itr], ctxt))
+				cancel()
 			}
 		}()
 		// Start the watching
@@ -477,7 +513,9 @@ func TestEtcdDriverMultiQueueStreaming(t *testing.T) {
 		go func() {
 			for idx, msg := range testMsgs {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Write(msg, time.Second))
+				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+				assert.Nil(uut.Write(msg, ctxt))
+				cancel()
 			}
 		}()
 		// Start the watching
@@ -524,7 +562,9 @@ func TestEtcdDriverMultiQueueStreaming(t *testing.T) {
 		go func() {
 			for idx, msg := range testMsgs {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Write(msg, time.Second))
+				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+				assert.Nil(uut.Write(msg, ctxt))
+				cancel()
 			}
 		}()
 		// Start the watching
@@ -571,7 +611,9 @@ func TestEtcdDriverMultiQueueStreaming(t *testing.T) {
 		go func() {
 			for idx, msg := range testMsgs {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Write(msg, time.Second))
+				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+				assert.Nil(uut.Write(msg, ctxt))
+				cancel()
 			}
 		}()
 		// Start the watching
@@ -642,13 +684,17 @@ func TestEtcdDriverMultiQueueStreaming(t *testing.T) {
 		go func() {
 			for idx, msg := range testMsgs1 {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Write(msg, time.Second))
+				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+				assert.Nil(uut.Write(msg, ctxt))
+				cancel()
 			}
 		}()
 		go func() {
 			for idx, msg := range testMsgs2 {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Write(msg, time.Second))
+				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+				assert.Nil(uut.Write(msg, ctxt))
+				cancel()
 			}
 		}()
 		// Start the watching
@@ -720,13 +766,17 @@ func TestEtcdDriverMultiQueueStreaming(t *testing.T) {
 		go func() {
 			for idx, msg := range testMsgs1 {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Write(msg, time.Second))
+				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+				assert.Nil(uut.Write(msg, ctxt))
+				cancel()
 			}
 		}()
 		go func() {
 			for idx, msg := range testMsgs2 {
 				log.Debugf("Sending test message %d", idx)
-				assert.Nil(uut.Write(msg, time.Second))
+				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+				assert.Nil(uut.Write(msg, ctxt))
+				cancel()
 			}
 		}()
 		// Start the watching
@@ -762,13 +812,19 @@ func TestEtcdDriverMultiQueueStreaming(t *testing.T) {
 		}
 		for itr := 0; itr < 2; itr++ {
 			log.Debugf("Sending test message %d", itr)
-			assert.Nil(uut.Write(testMsgs[itr], time.Second))
+			ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+			assert.Nil(uut.Write(testMsgs[itr], ctxt))
+			cancel()
 		}
-		_, maxIdx, err := uut.IndexRange(topic, time.Second)
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		_, maxIdx, err := uut.IndexRange(topic, ctxt)
+		cancel()
 		assert.Nil(err)
 		for itr := 2; itr < 5; itr++ {
 			log.Debugf("Sending test message %d", itr)
-			assert.Nil(uut.Write(testMsgs[itr], time.Second))
+			ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+			assert.Nil(uut.Write(testMsgs[itr], ctxt))
+			cancel()
 		}
 		watchTargets := []ReadStreamParam{
 			{
@@ -809,7 +865,9 @@ func TestEtcdDriverMultiQueueStreaming(t *testing.T) {
 		}
 		for itr := 0; itr < 2; itr++ {
 			log.Debugf("Sending test message %d", itr)
-			assert.Nil(uut.Write(testMsgs[itr], time.Second))
+			ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+			assert.Nil(uut.Write(testMsgs[itr], ctxt))
+			cancel()
 		}
 		watchTargets := []ReadStreamParam{
 			{
@@ -821,7 +879,9 @@ func TestEtcdDriverMultiQueueStreaming(t *testing.T) {
 		go func() {
 			for itr := 2; itr < 5; itr++ {
 				log.Debugf("Sending test message %d", itr)
-				assert.Nil(uut.Write(testMsgs[itr], time.Second))
+				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+				assert.Nil(uut.Write(testMsgs[itr], ctxt))
+				cancel()
 			}
 		}()
 		// Start the watching
@@ -861,31 +921,37 @@ func TestEtcdDriverBasicAfterCompaction(t *testing.T) {
 		}
 		for idx, msg := range testMsgs1 {
 			log.Debugf("Sending test message %d", idx)
-			assert.Nil(uut.Write(msg, time.Second))
+			ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+			assert.Nil(uut.Write(msg, ctxt))
+			cancel()
 		}
 	}
 
 	// Case 2: Trigger compaction
-	minIdx2, maxIdx2, err := uut.IndexRange(topic1, time.Second)
+	ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+	minIdx2, maxIdx2, err := uut.IndexRange(topic1, ctxt)
+	cancel()
 	log.Debugf("MIN2 %d, MAX2 %d", minIdx2, maxIdx2)
 	assert.Nil(err)
 	_, err = uutCase.client.Compact(context.Background(), maxIdx2)
 	assert.Nil(err)
 
 	// Case 3: verify compaction occurred
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
 	{
-		_, err := uut.Read(topic1, minIdx2, time.Second)
+		_, err := uut.Read(topic1, minIdx2, ctxt)
 		assert.NotNil(err)
 	}
 	{
-		_, err := uut.Read(topic1, maxIdx2-1, time.Second)
+		_, err := uut.Read(topic1, maxIdx2-1, ctxt)
 		assert.NotNil(err)
 	}
 	{
-		val, err := uut.Read(topic1, maxIdx2, time.Second)
+		val, err := uut.Read(topic1, maxIdx2, ctxt)
 		assert.Nil(err)
 		assert.EqualValues(testMsgs1[4], val)
 	}
+	cancel()
 
 	// Case 4: create more messages
 	testMsgs4 := make([]common.Message, 3)
@@ -906,28 +972,34 @@ func TestEtcdDriverBasicAfterCompaction(t *testing.T) {
 		}
 		for idx, msg := range testMsgs4 {
 			log.Debugf("Sending test message %d", idx)
-			assert.Nil(uut.Write(msg, time.Second))
+			ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+			assert.Nil(uut.Write(msg, ctxt))
+			cancel()
 		}
 	}
 
 	// Case 5: Trigger compaction
-	minIdx5, maxIdx5, err := uut.IndexRange(topic1, time.Second)
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
+	minIdx5, maxIdx5, err := uut.IndexRange(topic1, ctxt)
 	log.Debugf("MIN5 %d, MAX5 %d", minIdx5, maxIdx5)
 	assert.Nil(err)
 	assert.Equal(minIdx2, minIdx5)
 	_, err = uutCase.client.Compact(context.Background(), maxIdx5)
 	assert.Nil(err)
+	cancel()
 
 	// Case 6: verify compaction occurred
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
 	{
-		_, err := uut.Read(topic1, maxIdx2, time.Second)
+		_, err := uut.Read(topic1, maxIdx2, ctxt)
 		assert.NotNil(err)
 	}
 	{
-		val, err := uut.Read(topic1, maxIdx5, time.Second)
+		val, err := uut.Read(topic1, maxIdx5, ctxt)
 		assert.Nil(err)
 		assert.EqualValues(testMsgs4[2], val)
 	}
+	cancel()
 }
 
 func TestEtcdDriverMultiQueueStreamingAfterCompaction(t *testing.T) {
@@ -963,12 +1035,16 @@ func TestEtcdDriverMultiQueueStreamingAfterCompaction(t *testing.T) {
 		}
 		for idx, msg := range testMsgs1 {
 			log.Debugf("Sending test message %d", idx)
-			assert.Nil(uut.Write(msg, time.Second))
+			ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+			assert.Nil(uut.Write(msg, ctxt))
+			cancel()
 		}
 	}
-	minIdx1, maxIdx1, err := uut.IndexRange(topic, time.Second)
+	ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+	minIdx1, maxIdx1, err := uut.IndexRange(topic, ctxt)
 	log.Debugf("MIN1 %d, MAX1 %d", minIdx1, maxIdx1)
 	assert.Nil(err)
+	cancel()
 
 	// Case 2: compaction
 	_, err = uutCase.client.Compact(context.Background(), maxIdx1-2)
@@ -1026,19 +1102,29 @@ func TestEtcdDriverMutex(t *testing.T) {
 	assert.Nil(err)
 
 	// Case 0: Unlock an unknown mutex
+	ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
 	mutex0 := fmt.Sprintf("mtx-%s", uuid.New().String())
-	assert.NotNil(uut.Unlock(mutex0, time.Second))
+	assert.NotNil(uut.Unlock(mutex0, ctxt))
+	cancel()
 
 	// Case 1: Lock a mutex
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
 	mutex1 := fmt.Sprintf("mtx-%s", uuid.New().String())
-	assert.Nil(uut.Lock(mutex1, time.Second))
+	assert.Nil(uut.Lock(mutex1, ctxt))
+	cancel()
 
 	// Case 2: Lock again and fail
-	assert.NotNil(uut2.Lock(mutex1, time.Millisecond*10))
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Millisecond*10)
+	assert.NotNil(uut2.Lock(mutex1, ctxt))
+	cancel()
 
 	// Case 3: Unlock and try again
-	assert.Nil(uut.Unlock(mutex1, time.Second))
-	assert.Nil(uut2.Lock(mutex1, time.Millisecond*10))
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
+	assert.Nil(uut.Unlock(mutex1, ctxt))
+	cancel()
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Millisecond*10)
+	assert.Nil(uut2.Lock(mutex1, ctxt))
+	cancel()
 }
 
 type utDummyVal1 struct {
@@ -1083,40 +1169,50 @@ func TestEtcdDriverKeyValue(t *testing.T) {
 
 	// Case 0: Get key which does not exist
 	{
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
 		var result utDummyVal1
-		err := uut.Get(uuid.New().String(), &result, time.Second)
+		err := uut.Get(uuid.New().String(), &result, ctxt)
 		assert.NotNil(err)
+		cancel()
 	}
 
 	// Case 1: set a new key
 	key1 := uuid.New().String()
 	val1 := utDummyVal1{Val1: uuid.New().String()}
-	assert.Nil(uut.Set(key1, &val1, time.Second))
 	{
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.Set(key1, &val1, ctxt))
 		var result utDummyVal1
-		err := uut.Get(key1, &result, time.Second)
+		err := uut.Get(key1, &result, ctxt)
 		assert.Nil(err)
 		assert.EqualValues(val1, result)
+		cancel()
 	}
 
 	// Case 2: set a new key
 	key2 := uuid.New().String()
 	val2 := utDummyVal2{Val1: uuid.New().String(), Val2: 5123}
 	{
-		assert.Nil(uut.Set(key2, &val2, time.Second))
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.Set(key2, &val2, ctxt))
+		cancel()
 	}
 	{
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
 		var result utDummyVal2
-		err := uut.Get(key2, &result, time.Second)
+		err := uut.Get(key2, &result, ctxt)
 		assert.Nil(err)
 		assert.EqualValues(val2, result)
+		cancel()
 	}
 
 	// Case 3: delete a key
-	assert.Nil(uut.Delete(key1, time.Second))
 	{
+		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+		assert.Nil(uut.Delete(key1, ctxt))
 		var result utDummyVal1
-		err := uut.Get(key1, &result, time.Second)
+		err := uut.Get(key1, &result, ctxt)
 		assert.NotNil(err)
+		cancel()
 	}
 }

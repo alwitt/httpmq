@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -13,19 +14,20 @@ import (
 // ========================================================================================
 // MessageRetransmit retransmit older messages from a queue
 type MessageRetransmit interface {
-	RetransmitMessages(msgIndexes []int64) error
-	ReceivedACKs(msgIndexes []int64) error
+	RetransmitMessages(msgIndexes []int64, ctxt context.Context) error
+	ReceivedACKs(msgIndexes []int64, ctxt context.Context) error
 }
 
 // messageRetransmitImpl implements MessageRetransmit
 type messageRetransmitImpl struct {
 	common.Component
-	queueName   string
-	tp          common.TaskProcessor
-	storage     storage.MessageQueues
-	readTimeout time.Duration
-	forwardMsg  SubmitMessage
-	msgCache    map[int64]MessageInFlight
+	queueName      string
+	tp             common.TaskProcessor
+	storage        storage.MessageQueues
+	readTimeout    time.Duration
+	forwardMsg     SubmitMessage
+	forwardTimeout time.Duration
+	msgCache       map[int64]MessageInFlight
 }
 
 // DefineMessageRetransmit create new message retransmit module
@@ -35,18 +37,20 @@ func DefineMessageRetransmit(
 	storage storage.MessageQueues,
 	storeReadTO time.Duration,
 	forwardCB SubmitMessage,
+	forwardTO time.Duration,
 ) (MessageRetransmit, error) {
 	logTags := log.Fields{
 		"module": "dispatch", "component": "message-retransmit", "instance": queueName,
 	}
 	instance := messageRetransmitImpl{
-		Component:   common.Component{LogTags: logTags},
-		queueName:   queueName,
-		tp:          tp,
-		storage:     storage,
-		readTimeout: storeReadTO,
-		forwardMsg:  forwardCB,
-		msgCache:    make(map[int64]MessageInFlight),
+		Component:      common.Component{LogTags: logTags},
+		queueName:      queueName,
+		tp:             tp,
+		storage:        storage,
+		readTimeout:    storeReadTO,
+		forwardMsg:     forwardCB,
+		forwardTimeout: forwardTO,
+		msgCache:       make(map[int64]MessageInFlight),
 	}
 	// Add handlers
 	if err := tp.AddToTaskExecutionMap(
@@ -72,7 +76,9 @@ type msgRetransmitterRetransMsgReq struct {
 }
 
 // RetransmitMessages retransmit the messages requested
-func (r *messageRetransmitImpl) RetransmitMessages(msgIndexes []int64) error {
+func (r *messageRetransmitImpl) RetransmitMessages(
+	msgIndexes []int64, ctxt context.Context,
+) error {
 	complete := make(chan bool, 1)
 	var processError error
 	handler := func(err error) {
@@ -86,7 +92,7 @@ func (r *messageRetransmitImpl) RetransmitMessages(msgIndexes []int64) error {
 		resultCB: handler,
 	}
 
-	if err := r.tp.Submit(request); err != nil {
+	if err := r.tp.Submit(request, ctxt); err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to submit retransmit-messages request",
 		)
@@ -94,7 +100,12 @@ func (r *messageRetransmitImpl) RetransmitMessages(msgIndexes []int64) error {
 	}
 
 	// Wait for completion
-	<-complete
+	select {
+	case <-complete:
+		break
+	case <-ctxt.Done():
+		return ctxt.Err()
+	}
 
 	return processError
 }
@@ -125,7 +136,9 @@ func (r *messageRetransmitImpl) ProcessRetransmitRequest(msgIndexes []int64) err
 			)
 		} else {
 			// Pull from storage
-			coreMsg, err := r.storage.Read(r.queueName, msgIndex, r.readTimeout)
+			useContext, cancel := context.WithTimeout(context.Background(), r.readTimeout)
+			defer cancel()
+			coreMsg, err := r.storage.Read(r.queueName, msgIndex, useContext)
 			if err != nil {
 				log.WithError(err).WithFields(r.LogTags).Errorf(
 					"Failed to read %s@%d from storage", r.queueName, msgIndex,
@@ -142,12 +155,15 @@ func (r *messageRetransmitImpl) ProcessRetransmitRequest(msgIndexes []int64) err
 				"Read %s@%d for retransmit", r.queueName, msgIndex,
 			)
 		}
-		if err := r.forwardMsg(msg); err != nil {
+		useContext, cancel := context.WithTimeout(context.Background(), r.forwardTimeout)
+		defer cancel()
+		if err := r.forwardMsg(msg, useContext); err != nil {
 			log.WithError(err).WithFields(r.LogTags).Errorf(
 				"Failed to submit %s@%d for retransmit", r.queueName, msgIndex,
 			)
+		} else {
+			log.WithFields(r.LogTags).Infof("Retransmitted %s@%d", r.queueName, msgIndex)
 		}
-		log.WithFields(r.LogTags).Infof("Retransmitted %s@%d", r.queueName, msgIndex)
 	}
 
 	return nil
@@ -161,7 +177,7 @@ type msgRetransmitterACKMsgReq struct {
 }
 
 // ReceivedACKs received ACK for certain messages
-func (r *messageRetransmitImpl) ReceivedACKs(msgIndexes []int64) error {
+func (r *messageRetransmitImpl) ReceivedACKs(msgIndexes []int64, ctxt context.Context) error {
 	complete := make(chan bool, 1)
 	var processError error
 	handler := func(err error) {
@@ -175,7 +191,7 @@ func (r *messageRetransmitImpl) ReceivedACKs(msgIndexes []int64) error {
 		resultCB: handler,
 	}
 
-	if err := r.tp.Submit(request); err != nil {
+	if err := r.tp.Submit(request, ctxt); err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to submit acked-messages request",
 		)
@@ -183,7 +199,12 @@ func (r *messageRetransmitImpl) ReceivedACKs(msgIndexes []int64) error {
 	}
 
 	// Wait for completion
-	<-complete
+	select {
+	case <-complete:
+		break
+	case <-ctxt.Done():
+		return ctxt.Err()
+	}
 
 	return processError
 }

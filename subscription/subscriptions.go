@@ -1,6 +1,7 @@
 package subscription
 
 import (
+	"context"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -116,7 +117,9 @@ func DefineSubscriptionRecorder(
 
 func (r *subscriptionRecorderImpl) readCurrentActiveSessions() (SubscriptionRecords, error) {
 	var records SubscriptionRecords
-	err := r.store.Get(r.storeKey, &records, r.kvStoreCallTimeout)
+	useContext, cancel := context.WithTimeout(context.Background(), r.kvStoreCallTimeout)
+	err := r.store.Get(r.storeKey, &records, useContext)
+	cancel()
 	if err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Unable to fetch active session records %s", r.storeKey,
@@ -134,9 +137,9 @@ func (r *subscriptionRecorderImpl) readCurrentActiveSessions() (SubscriptionReco
 }
 
 func (r *subscriptionRecorderImpl) storeActiveSessionRecords(records SubscriptionRecords) error {
-	if err := r.store.Set(
-		r.storeKey, records, r.kvStoreCallTimeout,
-	); err != nil {
+	useContext, cancel := context.WithTimeout(context.Background(), r.kvStoreCallTimeout)
+	defer cancel()
+	if err := r.store.Set(r.storeKey, records, useContext); err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to update active session records %s", r.storeKey,
 		)
@@ -166,7 +169,7 @@ func (r *subscriptionRecorderImpl) ReadySessionRecords() error {
 		resultCB: handler,
 	}
 
-	if err := r.tp.Submit(request); err != nil {
+	if err := r.tp.Submit(request, context.Background()); err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to submit ready-session-records request",
 		)
@@ -242,7 +245,7 @@ func (r *subscriptionRecorderImpl) LogClientSession(
 		resultCB:   handler,
 	}
 
-	if err := r.tp.Submit(request); err != nil {
+	if err := r.tp.Submit(request, context.Background()); err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to submit log-client-session request",
 		)
@@ -349,7 +352,7 @@ func (r *subscriptionRecorderImpl) RefreshClientSession(
 		resultCB:   handler,
 	}
 
-	if err := r.tp.Submit(request); err != nil {
+	if err := r.tp.Submit(request, context.Background()); err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to submit refresh-client-session request",
 		)
@@ -460,7 +463,7 @@ func (r *subscriptionRecorderImpl) ClearClientSession(
 		resultCB:   handler,
 	}
 
-	if err := r.tp.Submit(request); err != nil {
+	if err := r.tp.Submit(request, context.Background()); err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to submit clear-client-session request",
 		)
@@ -566,7 +569,7 @@ func (r *subscriptionRecorderImpl) ClearInactiveSessions(
 		timestamp: timestamp, inactiveFor: maxInactivePeriod, resultCB: handler,
 	}
 
-	if err := r.tp.Submit(request); err != nil {
+	if err := r.tp.Submit(request, context.Background()); err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to submit clear-inactive-sessions request",
 		)

@@ -1,9 +1,11 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/apex/log"
 )
@@ -13,7 +15,7 @@ type TaskHandler func(taskParam interface{}) error
 
 // TaskProcessor processing module for implementing an event loop model
 type TaskProcessor interface {
-	Submit(newTaskParam interface{}) error
+	Submit(newTaskParam interface{}, ctx context.Context) error
 	ProcessNewTaskParam(newTaskParam interface{}) error
 	SetTaskExecutionMap(newMap map[reflect.Type]TaskHandler) error
 	AddToTaskExecutionMap(theType reflect.Type, handler TaskHandler) error
@@ -45,10 +47,13 @@ func GetNewTaskProcessorInstance(name string, taskBuffer int) (TaskProcessor, er
 }
 
 // Submit submit a new task parameter for processing
-func (p *taskProcessorImpl) Submit(newTaskParam interface{}) error {
-	log.WithFields(p.LogTags).Debug("Accepting new task param")
-	p.newTasks <- newTaskParam
-	return nil
+func (p *taskProcessorImpl) Submit(newTaskParam interface{}, ctx context.Context) error {
+	select {
+	case p.newTasks <- newTaskParam:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // SetTaskExecutionMap update the task param to execution mapping
@@ -126,15 +131,16 @@ func (p *taskProcessorImpl) StartEventLoop(wg *sync.WaitGroup) error {
 // taskDemuxProcessorImpl implement TaskProcessor but support multiple parallel workers
 type taskDemuxProcessorImpl struct {
 	Component
-	name     string
-	input    TaskProcessor
-	workers  []TaskProcessor
-	routeIdx int
+	name               string
+	input              TaskProcessor
+	workers            []TaskProcessor
+	routeIdx           int
+	frontToBackTimeout time.Duration
 }
 
 // GetNewTaskDemuxProcessorInstance get instance of TaskDemuxProcessor
 func GetNewTaskDemuxProcessorInstance(
-	name string, taskBuffer int, workerNum int,
+	name string, taskBuffer int, workerNum int, passTimeout time.Duration,
 ) (TaskProcessor, error) {
 	inputTP, err := GetNewTaskProcessorInstance(fmt.Sprintf("%s.input", name), taskBuffer)
 	if err != nil {
@@ -154,18 +160,18 @@ func GetNewTaskDemuxProcessorInstance(
 		"module": "common", "component": "task-demux-processor/%s", "instance": name,
 	}
 	return &taskDemuxProcessorImpl{
-		name:      name,
-		input:     inputTP,
-		workers:   workers,
-		routeIdx:  0,
-		Component: Component{LogTags: logTags},
+		name:               name,
+		input:              inputTP,
+		workers:            workers,
+		routeIdx:           0,
+		frontToBackTimeout: passTimeout,
+		Component:          Component{LogTags: logTags},
 	}, nil
 }
 
 // Submit submit a new task parameter for processing
-func (p *taskDemuxProcessorImpl) Submit(newTaskParam interface{}) error {
-	log.WithFields(p.LogTags).Debug("Accepting new task param")
-	return p.input.Submit(newTaskParam)
+func (p *taskDemuxProcessorImpl) Submit(newTaskParam interface{}, ctx context.Context) error {
+	return p.input.Submit(newTaskParam, ctx)
 }
 
 // ProcessNewTaskParam given a new task, process task parameter
@@ -173,7 +179,9 @@ func (p *taskDemuxProcessorImpl) ProcessNewTaskParam(newTaskParam interface{}) e
 	if p.workers != nil && len(p.workers) > 0 {
 		log.WithFields(p.LogTags).Debugf("Processing new %s", reflect.TypeOf(newTaskParam))
 		defer func() { p.routeIdx = (p.routeIdx + 1) % len(p.workers) }()
-		return p.workers[p.routeIdx].Submit(newTaskParam)
+		useContext, cancel := context.WithTimeout(context.Background(), p.frontToBackTimeout)
+		defer cancel()
+		return p.workers[p.routeIdx].Submit(newTaskParam, useContext)
 	}
 	return fmt.Errorf("[TDP %s] No workers defined", p.name)
 }
