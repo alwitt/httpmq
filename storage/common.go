@@ -27,8 +27,7 @@ type MessageQueues interface {
 	ReadNewest(targetQueue string, ctxt context.Context) (common.Message, error)
 	ReadOldest(targetQueue string, ctxt context.Context) (common.Message, error)
 	IndexRange(targetQueue string, ctxt context.Context) (int64, int64, error)
-	ReadStream(target ReadStreamParam, stopFlag chan bool) error
-	ReadStreams(targets []ReadStreamParam, stopFlag chan bool) error
+	ReadStream(target ReadStreamParam, ctxt context.Context) error
 	// Mutex related operations
 	Lock(lockName string, ctxt context.Context) error
 	Unlock(lockName string, ctxt context.Context) error

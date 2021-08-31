@@ -6,7 +6,6 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"sync"
 	"time"
 
@@ -150,11 +149,9 @@ func (d *etcdBackedStorage) IndexRange(
 }
 
 // ReadStream read data stream from queue, and process message
-func (d *etcdBackedStorage) ReadStream(target ReadStreamParam, stopFlag chan bool) error {
+func (d *etcdBackedStorage) ReadStream(target ReadStreamParam, ctxt context.Context) error {
 	dataStream := d.client.Watch(
-		context.Background(),
-		target.TargetQueue,
-		clientv3.WithRev(int64(target.StartIndex)),
+		ctxt, target.TargetQueue, clientv3.WithRev(int64(target.StartIndex)),
 	)
 
 	// Start stream processing
@@ -181,110 +178,12 @@ func (d *etcdBackedStorage) ReadStream(target ReadStreamParam, stopFlag chan boo
 				log.WithFields(d.LogTags).Infof("Channel %s handler inactive", target.TargetQueue)
 				return nil
 			}
-		case done, ok := <-stopFlag:
-			if !ok {
-				log.WithFields(d.LogTags).Errorf("stopFlag channel did not return valid signal")
-				return nil
-			}
-			if done {
-				// Received stop signal
-				log.WithFields(d.LogTags).Info("Received stop signal. Exiting watch")
-				return nil
-			}
-		}
-	}
-}
-
-// ReadStreams read data stream from set of queues, and process messages from each
-func (d *etcdBackedStorage) ReadStreams(targets []ReadStreamParam, stopFlag chan bool) error {
-	readSelects := make([]reflect.SelectCase, len(targets)+1)
-	dataStreams := make([]clientv3.WatchChan, len(targets))
-	activeChannels := make([]bool, len(targets))
-	for index, oneTarget := range targets {
-		theChannel := d.client.Watch(
-			context.Background(),
-			oneTarget.TargetQueue,
-			clientv3.WithRev(int64(oneTarget.StartIndex)),
-		)
-		dataStreams[index] = theChannel
-		readSelects[index] = reflect.SelectCase{
-			Dir: reflect.SelectRecv, Chan: reflect.ValueOf(theChannel),
-		}
-		activeChannels[index] = true
-	}
-	// Add a the stop flag channel
-	readSelects[len(targets)] = reflect.SelectCase{
-		Dir: reflect.SelectRecv, Chan: reflect.ValueOf(stopFlag),
-	}
-
-	// Start stream processing
-	haveActive := false
-	var reference clientv3.WatchResponse
-	for {
-		// Check whether all streams are still functional
-		haveActive = false
-		for _, isActive := range activeChannels {
-			if isActive {
-				haveActive = true
-				break
-			}
-		}
-		// All channels are now inactive
-		if !haveActive {
-			break
-		}
-		// Wait for messages
-		chosen, received, ok := reflect.Select(readSelects)
-		if ok && chosen == len(targets) {
+		case <-ctxt.Done():
 			// Received stop signal
 			log.WithFields(d.LogTags).Info("Received stop signal. Exiting watch")
 			return nil
 		}
-		if !ok {
-			activeChannels[chosen] = false
-			log.WithFields(d.LogTags).Infof(
-				"Watch channel for %s closed", targets[chosen].TargetQueue,
-			)
-			continue
-		}
-		// Process the received message
-		if received.Type() == reflect.TypeOf(reference) {
-			converted, ok := received.Interface().(clientv3.WatchResponse)
-			if !ok {
-				err := fmt.Errorf(
-					"unable to convert message from channel %s to clientv3.WatchResponse",
-					targets[chosen].TargetQueue,
-				)
-				log.WithError(err).WithFields(d.LogTags).Errorf(
-					"Watch failure on channel %s", targets[chosen].TargetQueue,
-				)
-				return err
-			}
-			log.WithFields(d.LogTags).Debugf(
-				"Process message from channel %s", targets[chosen].TargetQueue,
-			)
-			handlerActive, err := d.runMessageHandler(
-				targets[chosen].TargetQueue, converted, targets[chosen].Handler,
-			)
-			if err != nil {
-				log.WithError(err).WithFields(d.LogTags).Errorf(
-					"Channel %s handler failed", targets[chosen].TargetQueue,
-				)
-				return err
-			}
-			if !handlerActive {
-				activeChannels[chosen] = false
-			}
-		} else {
-			log.WithFields(d.LogTags).Errorf(
-				"Watch channel for %s send unexpected message: %v",
-				targets[chosen].TargetQueue,
-				received.Type(),
-			)
-		}
 	}
-
-	return nil
 }
 
 func (d *etcdBackedStorage) runMessageHandler(
