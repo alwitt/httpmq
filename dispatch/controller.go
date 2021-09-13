@@ -261,10 +261,19 @@ func (c *controllerImpl) ProcessStartRequest() error {
 	var currentState QueueSubInfo
 	if err := c.store.Get(c.storeKey, &currentState, c.operationContext); err != nil {
 		log.WithError(err).WithFields(c.LogTags).WithField("state", c.operatingState).Errorf(
-			"Unable to process start request. Unable to read current state from %s",
-			c.storeKey,
+			"Unable to read current state from %s. Initializing with blank", c.storeKey,
 		)
-		return err
+		// Assume it is missing, and create a new blank one
+		currentState = QueueSubInfo{
+			NewestACKedIndex: -1,
+			Inflight:         make(map[int64]InfightMessageInfo),
+		}
+		if err := c.store.Set(c.storeKey, currentState, c.operationContext); err != nil {
+			log.WithError(err).WithFields(c.LogTags).WithField("state", c.operatingState).Errorf(
+				"State %s update failed", c.storeKey,
+			)
+			return err
+		}
 	}
 
 	// There are message still in flight from previous run
@@ -371,11 +380,16 @@ func (c *controllerImpl) ProcessACKMsgRequest(msgIndexes []int64) error {
 
 	// Filter out only message indexes which are actually in inflight
 	realIndexes := []int64{}
+	largestIndex := int64(-1)
 	for _, index := range msgIndexes {
 		if _, ok := currentState.Inflight[index]; ok {
 			realIndexes = append(realIndexes, index)
+			if index > largestIndex {
+				largestIndex = index
+			}
 		}
 	}
+	currentState.NewestACKedIndex = largestIndex
 
 	// Fan out the ACKs
 	if err := c.msgACKFanOut(realIndexes); err != nil {

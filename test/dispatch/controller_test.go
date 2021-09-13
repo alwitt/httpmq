@@ -279,4 +279,93 @@ func TestController(t *testing.T) {
 		assert.Equal(1, val.RetryCount)
 		assert.Equal(maxRetrans, val.MaxRetry)
 	}
+
+	// Case 8: verify the newest ACKed index is correct
+	assert.Equal(msgP1ID, newState7.NewestACKedIndex)
+
+	// Case 9: ACK a message
+	{
+		ran := false
+		mockMsgRetrans.On(
+			"ReceivedACKs",
+			[]int64{msg5ID},
+			mock.AnythingOfType("*context.cancelCtx"),
+		).Return(nil).Once()
+		mockMsgDispatch.On(
+			"SubmitMessageACK",
+			[]int64{msg5ID},
+			mock.AnythingOfType("*context.cancelCtx"),
+		).Run(func(args mock.Arguments) {
+			ran = true
+		}).Return(nil).Once()
+		assert.Nil(
+			uut.ReceivedACKs([]int64{msg5ID}, ctxt),
+		)
+		assert.True(ran)
+	}
+	// Verify change in state
+	var newState8 dispatch.QueueSubInfo
+	assert.Nil(testStore.Get(expectedStoreKey, &newState8, ctxt))
+	assert.Equal(msg5ID, newState8.NewestACKedIndex)
+	assert.Empty(newState8.Inflight)
+}
+
+func TestControllerBlankInit(t *testing.T) {
+	assert := assert.New(t)
+	log.SetLevel(log.DebugLevel)
+
+	mockMsgDispatch := new(mocks.MessageDispatch)
+	mockMsgRetrans := new(mocks.MessageRetransmit)
+	mockQueueReader := new(mocks.MessageFetch)
+
+	_, testStore, err := storage.CreateEtcdBackedStorage(
+		[]string{"localhost:2379"}, time.Second*5,
+	)
+	assert.Nil(err)
+
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
+	ctxt, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tp, err := common.GetNewTaskProcessorInstance("unit-test", 4, ctxt)
+	assert.Nil(err)
+
+	testQueue := "unit-test"
+	testClient := "unit-tester"
+	testPrefix := uuid.New().String()
+	expectedStoreKey := fmt.Sprintf(
+		"%s/client/%s/queue/%s", testPrefix, testClient, testQueue,
+	)
+	maxRetrans := 2
+
+	uut, err := dispatch.DefineController(
+		testClient,
+		testQueue,
+		testStore,
+		tp,
+		testPrefix,
+		maxRetrans,
+		ctxt,
+		mockMsgRetrans.RetransmitMessages,
+		mockMsgRetrans.ReceivedACKs,
+		mockMsgDispatch.SubmitMessageACK,
+		mockQueueReader.StartReading,
+	)
+	assert.Nil(err)
+
+	// Start the task processor
+	assert.Nil(tp.StartEventLoop(&wg))
+
+	// Case 0: start the controller
+	{
+		mockQueueReader.On(
+			"StartReading", int64(0),
+		).Return(nil).Once()
+		assert.Nil(uut.Start(ctxt))
+	}
+	// Verify change in state
+	var newState dispatch.QueueSubInfo
+	assert.Nil(testStore.Get(expectedStoreKey, &newState, ctxt))
+	assert.Empty(newState.Inflight)
+	assert.Equal(int64(-1), newState.NewestACKedIndex)
 }
