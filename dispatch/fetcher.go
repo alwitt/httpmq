@@ -21,6 +21,7 @@ type messageFetchImpl struct {
 	common.Component
 	queueName        string
 	wg               *sync.WaitGroup
+	rootContext      context.Context
 	operationContext context.Context
 	contextCancel    context.CancelFunc
 	fetchLoopRunning bool
@@ -34,6 +35,7 @@ func DefineMessageFetcher(
 	wg *sync.WaitGroup,
 	storage storage.MessageQueues,
 	forwardCB SubmitMessage,
+	rootCtxt context.Context,
 ) (MessageFetch, error) {
 	logTags := log.Fields{
 		"module": "dispatch", "component": "message-fetch", "instance": queueName,
@@ -42,6 +44,7 @@ func DefineMessageFetcher(
 		Component:        common.Component{LogTags: logTags},
 		queueName:        queueName,
 		wg:               wg,
+		rootContext:      rootCtxt,
 		fetchLoopRunning: false,
 		storage:          storage,
 		forwardMsg:       forwardCB,
@@ -56,7 +59,7 @@ func (f *messageFetchImpl) StartReading(startIndex int64) error {
 	// Start reading from the queue data stream
 	f.wg.Add(1)
 	f.fetchLoopRunning = true
-	ctxt, cancel := context.WithCancel(context.Background())
+	ctxt, cancel := context.WithCancel(f.rootContext)
 	f.operationContext = ctxt
 	f.contextCancel = cancel
 	go func() {

@@ -20,6 +20,7 @@ type TaskProcessor interface {
 	SetTaskExecutionMap(newMap map[reflect.Type]TaskHandler) error
 	AddToTaskExecutionMap(theType reflect.Type, handler TaskHandler) error
 	StartEventLoop(wg *sync.WaitGroup) error
+	StopEventLoop() error
 }
 
 // taskProcessorImpl implement TaskProcessor
@@ -27,6 +28,7 @@ type taskProcessorImpl struct {
 	Component
 	name             string
 	operationContext context.Context
+	contextCancel    context.CancelFunc
 	newTasks         chan interface{}
 	executionMap     map[reflect.Type]TaskHandler
 }
@@ -38,10 +40,12 @@ func GetNewTaskProcessorInstance(
 	logTags := log.Fields{
 		"module": "common", "component": "task-processor", "instance": name,
 	}
+	optCtxt, cancel := context.WithCancel(ctxt)
 	return &taskProcessorImpl{
 		Component:        Component{LogTags: logTags},
 		name:             name,
-		operationContext: ctxt,
+		operationContext: optCtxt,
+		contextCancel:    cancel,
 		newTasks:         make(chan interface{}, taskBuffer),
 		executionMap:     make(map[reflect.Type]TaskHandler),
 	}, nil
@@ -116,6 +120,12 @@ func (p *taskProcessorImpl) StartEventLoop(wg *sync.WaitGroup) error {
 	return nil
 }
 
+// StopEventLoop stop the event loop
+func (p *taskProcessorImpl) StopEventLoop() error {
+	p.contextCancel()
+	return nil
+}
+
 // ==============================================================================
 
 // taskDemuxProcessorImpl implement TaskProcessor but support multiple parallel workers
@@ -126,6 +136,7 @@ type taskDemuxProcessorImpl struct {
 	workers          []TaskProcessor
 	routeIdx         int
 	operationContext context.Context
+	contextCancel    context.CancelFunc
 }
 
 // GetNewTaskDemuxProcessorInstance get instance of TaskDemuxProcessor
@@ -142,12 +153,14 @@ func GetNewTaskDemuxProcessorInstance(
 	if err != nil {
 		return nil, err
 	}
+	optCtxt, cancel := context.WithCancel(ctxt)
 	workers := make([]TaskProcessor, workerNum)
 	for itr := 0; itr < workerNum; itr++ {
 		workerTP, err := GetNewTaskProcessorInstance(
-			fmt.Sprintf("%s.worker.%d", name, itr), taskBuffer, ctxt,
+			fmt.Sprintf("%s.worker.%d", name, itr), taskBuffer, optCtxt,
 		)
 		if err != nil {
+			cancel()
 			return nil, err
 		}
 		workers[itr] = workerTP
@@ -160,7 +173,8 @@ func GetNewTaskDemuxProcessorInstance(
 		input:            inputTP,
 		workers:          workers,
 		routeIdx:         0,
-		operationContext: ctxt,
+		operationContext: optCtxt,
+		contextCancel:    cancel,
 		Component:        Component{LogTags: logTags},
 	}, nil
 }
@@ -213,4 +227,10 @@ func (p *taskDemuxProcessorImpl) StartEventLoop(wg *sync.WaitGroup) error {
 	}
 	// Start the input loop
 	return p.input.StartEventLoop(wg)
+}
+
+// StopEventLoop stop the event loop
+func (p *taskDemuxProcessorImpl) StopEventLoop() error {
+	p.contextCancel()
+	return nil
 }

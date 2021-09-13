@@ -23,6 +23,8 @@ func TestMessageFetcher(t *testing.T) {
 
 	mockMsgDispatch := new(mocks.MessageDispatch)
 
+	utCtxt, utCancel := context.WithCancel(context.Background())
+	defer utCancel()
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 
@@ -33,7 +35,11 @@ func TestMessageFetcher(t *testing.T) {
 
 	testTopic := uuid.New().String()
 	uut, err := dispatch.DefineMessageFetcher(
-		testTopic, &wg, msgQueue, mockMsgDispatch.SubmitMessageToDeliver,
+		testTopic,
+		&wg,
+		msgQueue,
+		mockMsgDispatch.SubmitMessageToDeliver,
+		utCtxt,
 	)
 	assert.Nil(err)
 

@@ -16,8 +16,11 @@ func TestTaskParamProcessing(t *testing.T) {
 	assert := assert.New(t)
 
 	ctxt, cancel := context.WithCancel(context.Background())
-	uut, err := GetNewTaskProcessorInstance("testing", 4, ctxt)
 	defer cancel()
+	uut, err := GetNewTaskProcessorInstance("testing", 4, ctxt)
+	defer func() {
+		assert.Nil(uut.StopEventLoop())
+	}()
 	assert.Nil(err)
 
 	// Case 1: no executor map
@@ -76,6 +79,9 @@ func TestTaskDemuxProcessing(t *testing.T) {
 	ctxt, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	uut, err := GetNewTaskDemuxProcessorInstance("testing", 4, 3, time.Second, ctxt)
+	defer func() {
+		assert.Nil(uut.StopEventLoop())
+	}()
 	assert.Nil(err)
 
 	// recast to source

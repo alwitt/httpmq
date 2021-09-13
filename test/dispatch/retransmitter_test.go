@@ -37,6 +37,7 @@ func TestMessageRetransmitter(t *testing.T) {
 		mockStorage,
 		time.Second,
 		mockMsgDispatch.SubmitRetransmit,
+		ctxt,
 	)
 	assert.Nil(err)
 

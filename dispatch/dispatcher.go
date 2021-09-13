@@ -48,6 +48,7 @@ func DefineMessageDispatch(
 	maxInflightMsgs int,
 	forwardCB SubmitMessage,
 	registerMsgCB registerInflightMessage,
+	rootCtxt context.Context,
 ) (MessageDispatch, error) {
 	logTags := log.Fields{
 		"module": "dispatch", "component": "message-dispatch", "instance": queueName,
@@ -56,7 +57,7 @@ func DefineMessageDispatch(
 	if alreadyInflightMsgs > 0 {
 		initialInflight = alreadyInflightMsgs
 	}
-	ctxt, cancel := context.WithCancel(context.Background())
+	ctxt, cancel := context.WithCancel(rootCtxt)
 	instance := messageDispatchImpl{
 		Component:        common.Component{LogTags: logTags},
 		queueName:        queueName,

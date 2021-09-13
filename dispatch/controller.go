@@ -55,6 +55,7 @@ func DefineController(
 	tp common.TaskProcessor,
 	keyPrefix string,
 	maxRetries int,
+	rootCtxt context.Context,
 	// Callbacks
 	reqMsgReTX requestRestransmit,
 	ackToReTX indicateReceivedACKs,
@@ -64,7 +65,7 @@ func DefineController(
 	logTags := log.Fields{
 		"module": "dispatch", "component": "controller", "client": client, "queue": queue,
 	}
-	ctxt, cancel := context.WithCancel(context.Background())
+	ctxt, cancel := context.WithCancel(rootCtxt)
 	instance := controllerImpl{
 		Component:        common.Component{LogTags: logTags},
 		store:            dataStore,

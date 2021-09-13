@@ -39,11 +39,12 @@ func DefineMessageRetransmit(
 	storage storage.MessageQueues,
 	storeReadTO time.Duration,
 	forwardCB SubmitMessage,
+	rootCtxt context.Context,
 ) (MessageRetransmit, error) {
 	logTags := log.Fields{
 		"module": "dispatch", "component": "message-retransmit", "instance": queueName,
 	}
-	ctxt, cancel := context.WithCancel(context.Background())
+	ctxt, cancel := context.WithCancel(rootCtxt)
 	instance := messageRetransmitImpl{
 		Component:        common.Component{LogTags: logTags},
 		queueName:        queueName,

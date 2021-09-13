@@ -53,6 +53,7 @@ func TestMessageDispatch(t *testing.T) {
 		maxInflight,
 		testMsgRecv,
 		msgTxRegisterRecv,
+		ctxt,
 	)
 	assert.Nil(err)
 
@@ -275,6 +276,7 @@ func TestMessageDispatchStartWithInflight(t *testing.T) {
 		maxInflight,
 		testMsgRecv,
 		msgTxRegisterRecv,
+		ctxt,
 	)
 	assert.Nil(err)
 

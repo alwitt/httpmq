@@ -53,6 +53,7 @@ func TestController(t *testing.T) {
 		tp,
 		testPrefix,
 		maxRetrans,
+		ctxt,
 		mockMsgRetrans.RetransmitMessages,
 		mockMsgRetrans.ReceivedACKs,
 		mockMsgDispatch.SubmitMessageACK,
