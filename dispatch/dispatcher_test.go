@@ -37,7 +37,7 @@ func TestMessageDispatch(t *testing.T) {
 	testTransmits := make(chan MessageInFlight, maxInflight*2)
 
 	msgTxRegister := make(chan int64, maxInflight)
-	msgTxRegisterRecv := func(msgIdx int64, ctxt context.Context) error {
+	msgTxRegisterRecv := func(msgIdx int64, _ time.Time, ctxt context.Context) error {
 		msgTxRegister <- msgIdx
 		return nil
 	}
@@ -258,7 +258,7 @@ func TestMessageDispatchStartWithInflight(t *testing.T) {
 	testTransmits := make(chan MessageInFlight, maxInflight*2)
 
 	msgTxRegister := make(chan int64, maxInflight)
-	msgTxRegisterRecv := func(msgIdx int64, ctxt context.Context) error {
+	msgTxRegisterRecv := func(msgIdx int64, _ time.Time, ctxt context.Context) error {
 		msgTxRegister <- msgIdx
 		return nil
 	}

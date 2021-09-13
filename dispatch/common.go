@@ -18,6 +18,17 @@ type InfightMessageInfo struct {
 	MaxRetry    int       `json:"max_retry"`
 }
 
+// String produce ASCII repersentation
+func (m InfightMessageInfo) String() string {
+	return fmt.Sprintf(
+		"[%d](%d/%d)@%s",
+		m.Index,
+		m.RetryCount,
+		m.MaxRetry,
+		m.FirstSentAt.Format(time.RFC3339),
+	)
+}
+
 // QueueSubInfo tracks the status of a client's subscription to queue
 type QueueSubInfo struct {
 	NewestACKedIndex int64                        `json:"acked_index"`
@@ -65,4 +76,15 @@ func (r MessageInFlight) Value() (driver.Value, error) {
 type SubmitMessage func(msg MessageInFlight, useContext context.Context) error
 
 // registerInflightMessage function signature for registering a new message is inflight
-type registerInflightMessage func(msgIdx int64, useContext context.Context) error
+type registerInflightMessage func(
+	msgIdx int64, timestamp time.Time, useContext context.Context,
+) error
+
+// requestRestransmit function signature for requesting message retransmission
+type requestRestransmit func(msgIdx []int64, useContext context.Context) error
+
+// indicateReceivedACKs function signature for indicate receive of message ACK
+type indicateReceivedACKs func(msgIdx []int64, useContext context.Context) error
+
+// startQueueRead function signature for starting the queue read process
+type startQueueRead func(index int64) error

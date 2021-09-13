@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/apex/log"
 	"gitlab.com/project-nan/httpmq/common"
@@ -119,6 +120,8 @@ func (d *messageDispatchImpl) ProcessProcessRequest() error {
 	// * Process normal message if there is room left for in-flight messages
 	//   * Signal that these message were just sent
 
+	currentTime := time.Now()
+
 	// Check through all the ACKs
 	{
 		readAll := false
@@ -175,7 +178,7 @@ func (d *messageDispatchImpl) ProcessProcessRequest() error {
 				}
 				log.WithFields(d.LogTags).Debugf("Sent %s@%d", d.queueName, msg.Index)
 				d.inflightMsgs += 1
-				if err := d.registerInflight(msg.Index, d.operationContext); err != nil {
+				if err := d.registerInflight(msg.Index, currentTime, d.operationContext); err != nil {
 					log.WithError(err).WithFields(d.LogTags).Errorf(
 						"Unable to register transmit of %s@%d", d.queueName, msg.Index,
 					)
