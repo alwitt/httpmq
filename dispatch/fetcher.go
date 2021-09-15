@@ -38,7 +38,7 @@ func DefineMessageFetcher(
 	rootCtxt context.Context,
 ) (MessageFetch, error) {
 	logTags := log.Fields{
-		"module": "dispatch", "component": "message-fetch", "instance": queueName,
+		"module": "dispatch", "component": "message-fetch", "queue": queueName,
 	}
 	instance := messageFetchImpl{
 		Component:        common.Component{LogTags: logTags},

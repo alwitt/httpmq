@@ -51,7 +51,7 @@ func DefineMessageDispatch(
 	rootCtxt context.Context,
 ) (MessageDispatch, error) {
 	logTags := log.Fields{
-		"module": "dispatch", "component": "message-dispatch", "instance": queueName,
+		"module": "dispatch", "component": "message-dispatch", "queue": queueName,
 	}
 	initialInflight := 0
 	if alreadyInflightMsgs > 0 {

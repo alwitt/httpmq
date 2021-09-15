@@ -20,6 +20,12 @@ const (
 // ========================================================================================
 // Controller controls the operation of the message dispatcher
 type Controller interface {
+	SetCallbacks(
+		reqMsgReTX requestRestransmit,
+		ackToReTX indicateReceivedACKs,
+		ackToDisp indicateReceivedACKs,
+		startReader startQueueRead,
+	)
 	Start(ctxt context.Context) error
 	ReceivedACKs(msgIndexes []int64, ctxt context.Context) error
 	RegisterInflight(index int64, timestamp time.Time, ctxt context.Context, blocking bool) error
@@ -103,6 +109,19 @@ func DefineController(
 		return nil, err
 	}
 	return &instance, nil
+}
+
+// SetCallbacks install callback functions
+func (c *controllerImpl) SetCallbacks(
+	reqMsgReTX requestRestransmit,
+	ackToReTX indicateReceivedACKs,
+	ackToDisp indicateReceivedACKs,
+	startReader startQueueRead,
+) {
+	c.requestMsgReTX = reqMsgReTX
+	c.sendACKToReTX = ackToReTX
+	c.sendACKToDisp = ackToDisp
+	c.startReader = startReader
 }
 
 func (c *controllerImpl) msgACKFanOut(indexes []int64) error {

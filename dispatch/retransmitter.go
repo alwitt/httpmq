@@ -42,7 +42,7 @@ func DefineMessageRetransmit(
 	rootCtxt context.Context,
 ) (MessageRetransmit, error) {
 	logTags := log.Fields{
-		"module": "dispatch", "component": "message-retransmit", "instance": queueName,
+		"module": "dispatch", "component": "message-retransmit", "queue": queueName,
 	}
 	ctxt, cancel := context.WithCancel(rootCtxt)
 	instance := messageRetransmitImpl{
