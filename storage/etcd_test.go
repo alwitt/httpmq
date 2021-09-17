@@ -601,7 +601,7 @@ func TestEtcdDriverMutex(t *testing.T) {
 	cancel()
 
 	// Case 2: Lock again and fail
-	ctxt, cancel = context.WithTimeout(context.Background(), time.Millisecond*10)
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Millisecond*50)
 	assert.NotNil(uut2.Lock(mutex1, ctxt))
 	cancel()
 
@@ -609,7 +609,7 @@ func TestEtcdDriverMutex(t *testing.T) {
 	ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
 	assert.Nil(uut.Unlock(mutex1, ctxt))
 	cancel()
-	ctxt, cancel = context.WithTimeout(context.Background(), time.Millisecond*10)
+	ctxt, cancel = context.WithTimeout(context.Background(), time.Millisecond*50)
 	assert.Nil(uut2.Lock(mutex1, ctxt))
 	cancel()
 }

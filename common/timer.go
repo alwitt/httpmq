@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -80,4 +81,33 @@ func (t *intervalTimerImpl) Stop() error {
 		t.contextCancel()
 	}
 	return nil
+}
+
+// ========================================================================================
+// Sequencer helper object to return a sequence of numbers
+type Sequencer interface {
+	NextValue() float64
+}
+
+// exponentialSequence a helper function for get an exponential sequence from a
+// starting value
+type exponentialSequence struct {
+	current    float64
+	growthRate float64
+}
+
+func (s exponentialSequence) NextValue() float64 {
+	nextValue := s.current * s.growthRate
+	defer func() {
+		s.current = nextValue
+	}()
+	return nextValue
+}
+
+// GetExponentialSeq define an exponential sequencer
+func GetExponentialSeq(initial float64, growthRate float64) (Sequencer, error) {
+	if growthRate < 1.0 {
+		return nil, fmt.Errorf("growth rate of exponential sequence must be > 1.0")
+	}
+	return exponentialSequence{current: initial}, nil
 }

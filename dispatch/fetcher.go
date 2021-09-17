@@ -68,6 +68,8 @@ func (f *messageFetchImpl) StartReading(startIndex int64, maxRetries int) error 
 		log.WithFields(f.LogTags).Infof(
 			"Start fetching messages from queue %s@%d", f.queueName, startIndex,
 		)
+		// EXP sequence of controlling the retry rate for reading from queue
+		expSeq, _ := common.GetExponentialSeq(50, 1.1)
 		// Keep trying to read from stream unless context is cancelled
 		readFromIndex := startIndex
 		for itr := 0; itr < maxRetries && f.operationContext.Err() == nil; itr++ {
@@ -82,7 +84,7 @@ func (f *messageFetchImpl) StartReading(startIndex int64, maxRetries int) error 
 				break
 			}
 			readFromIndex = nextIdx
-			time.Sleep(time.Millisecond * 50)
+			time.Sleep(time.Millisecond * time.Duration(expSeq.NextValue()))
 		}
 		log.WithFields(f.LogTags).Infof("Stop fetching messages from queue %s", f.queueName)
 	}()
