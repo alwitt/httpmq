@@ -36,10 +36,14 @@ func TestMessageFetcher(t *testing.T) {
 	assert.Nil(err)
 
 	testTopic := uuid.New().String()
+	retrySeq, err := common.GetExponentialSeq(float64(time.Millisecond)*100, 1.25)
+	assert.Nil(err)
 	uut, err := dispatch.DefineMessageFetcher(
 		testTopic,
 		&wg,
 		msgQueue,
+		4,
+		retrySeq,
 		mockMsgDispatch.SubmitMessageToDeliver,
 		utCtxt,
 	)
@@ -106,7 +110,7 @@ func TestMessageFetcher(t *testing.T) {
 			rxACK <- 1
 		}).Return(nil).Once()
 		log.Debug("----------------------------------------------------------")
-		assert.Nil(uut.StartReading(maxIdx01+1, 4))
+		assert.Nil(uut.StartReading(maxIdx01 + 1))
 		readCtxt, readCancel := context.WithTimeout(utCtxt, time.Second)
 		defer readCancel()
 		for i := 0; i < 2; i++ {
@@ -177,7 +181,7 @@ func TestMessageFetcher(t *testing.T) {
 			rxACK <- 1
 		}).Return(nil).Once()
 		log.Debug("----------------------------------------------------------")
-		assert.Nil(uut.StartReading(maxIdx03+1, 4))
+		assert.Nil(uut.StartReading(maxIdx03 + 1))
 		readCtxt, readCancel := context.WithTimeout(utCtxt, time.Second*2)
 		defer readCancel()
 		for i := 0; i < 2; i++ {

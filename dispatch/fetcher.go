@@ -13,11 +13,12 @@ import (
 // ========================================================================================
 // MessageFetch process message from queue
 type MessageFetch interface {
-	StartReading(startIndex int64, maxRetries int) error
+	StartReading(startIndex int64) error
 	StopOperation() error
 }
 
 // messageFetchImpl implements MessageFetcher
+// TODO: Clean up the names
 type messageFetchImpl struct {
 	common.Component
 	queueName        string
@@ -27,6 +28,8 @@ type messageFetchImpl struct {
 	contextCancel    context.CancelFunc
 	fetchLoopRunning bool
 	storage          storage.MessageQueues
+	readMaxRetry     int
+	retryIntSeq      common.Sequencer
 	forwardMsg       SubmitMessage
 }
 
@@ -35,6 +38,8 @@ func DefineMessageFetcher(
 	queueName string,
 	wg *sync.WaitGroup,
 	storage storage.MessageQueues,
+	storageReadMaxRetry int,
+	storageReadRetryIntSeq common.Sequencer,
 	forwardCB SubmitMessage,
 	rootCtxt context.Context,
 ) (MessageFetch, error) {
@@ -48,6 +53,8 @@ func DefineMessageFetcher(
 		rootContext:      rootCtxt,
 		fetchLoopRunning: false,
 		storage:          storage,
+		readMaxRetry:     storageReadMaxRetry,
+		retryIntSeq:      storageReadRetryIntSeq,
 		forwardMsg:       forwardCB,
 	}
 	return &instance, nil
@@ -56,7 +63,7 @@ func DefineMessageFetcher(
 // ----------------------------------------------------------------------------------------
 
 // StartReading starts the background queue reading loop
-func (f *messageFetchImpl) StartReading(startIndex int64, maxRetries int) error {
+func (f *messageFetchImpl) StartReading(startIndex int64) error {
 	// Start reading from the queue data stream
 	f.wg.Add(1)
 	f.fetchLoopRunning = true
@@ -64,29 +71,35 @@ func (f *messageFetchImpl) StartReading(startIndex int64, maxRetries int) error 
 	f.operationContext = ctxt
 	f.contextCancel = cancel
 	go func() {
+		log.WithFields(f.LogTags).Infof("Start fetching messages at %d", startIndex)
 		defer f.wg.Done()
-		log.WithFields(f.LogTags).Infof(
-			"Start fetching messages from queue %s@%d", f.queueName, startIndex,
-		)
-		// EXP sequence of controlling the retry rate for reading from queue
-		expSeq, _ := common.GetExponentialSeq(50, 1.1)
+		defer log.WithFields(f.LogTags).Info("Stop fetching messages")
 		// Keep trying to read from stream unless context is cancelled
 		readFromIndex := startIndex
-		for itr := 0; itr < maxRetries && f.operationContext.Err() == nil; itr++ {
+		var itr int
+		for itr = 0; itr < f.readMaxRetry && f.operationContext.Err() == nil; itr++ {
 			readParam := storage.ReadStreamParam{
 				TargetQueue: f.queueName, StartIndex: readFromIndex, Handler: f.processMessage,
 			}
-			log.WithFields(f.LogTags).Debugf("Calling ReadStream")
+			// Perform read
+			log.WithFields(f.LogTags).Debug("Calling ReadStream")
 			nextIdx, err := f.storage.ReadStream(readParam, f.operationContext)
 			log.WithFields(f.LogTags).Debugf("Reading queue ended before processing %d", nextIdx)
 			if err != nil {
 				log.WithError(err).WithFields(f.LogTags).Errorf("Reading queue %s failed", f.queueName)
-				break
 			}
 			readFromIndex = nextIdx
-			time.Sleep(time.Millisecond * time.Duration(expSeq.NextValue()))
+			// Unexpected termination of queue read
+			if f.operationContext.Err() == nil {
+				timeout := time.Duration(f.retryIntSeq.NextValue())
+				log.WithFields(f.LogTags).Errorf(
+					"Read ended unexpectedly. Will attempt read again from %d after %s.",
+					nextIdx,
+					timeout.String(),
+				)
+				time.Sleep(timeout)
+			}
 		}
-		log.WithFields(f.LogTags).Infof("Stop fetching messages from queue %s", f.queueName)
 	}()
 	return nil
 }

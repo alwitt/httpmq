@@ -38,15 +38,14 @@ type Controller interface {
 // controllerImpl implements Controller
 type controllerImpl struct {
 	common.Component
-	store               storage.KeyValueStore
-	storeReadMaxRetries int
-	tp                  common.TaskProcessor
-	storeKey            string
-	maxRetries          int
-	validate            *validator.Validate
-	operatingState      int
-	operationContext    context.Context
-	contextCancel       context.CancelFunc
+	store            storage.KeyValueStore
+	tp               common.TaskProcessor
+	storeKey         string
+	maxRetries       int
+	validate         *validator.Validate
+	operatingState   int
+	operationContext context.Context
+	contextCancel    context.CancelFunc
 	// Callbacks to hook into other components
 	requestMsgReTX RequestRestransmit
 	sendACKToReTX  IndicateReceivedACKs
@@ -59,7 +58,6 @@ func DefineController(
 	client string,
 	queue string,
 	dataStore storage.KeyValueStore,
-	dataStoreReadMaxRetries int,
 	tp common.TaskProcessor,
 	keyPrefix string,
 	maxRetries int,
@@ -75,20 +73,19 @@ func DefineController(
 	}
 	ctxt, cancel := context.WithCancel(rootCtxt)
 	instance := controllerImpl{
-		Component:           common.Component{LogTags: logTags},
-		store:               dataStore,
-		storeReadMaxRetries: dataStoreReadMaxRetries,
-		tp:                  tp,
-		storeKey:            fmt.Sprintf("%s/client/%s/queue/%s", keyPrefix, client, queue),
-		maxRetries:          maxRetries,
-		validate:            validator.New(),
-		operatingState:      STATE_INIT,
-		operationContext:    ctxt,
-		contextCancel:       cancel,
-		requestMsgReTX:      reqMsgReTX,
-		sendACKToReTX:       ackToReTX,
-		sendACKToDisp:       ackToDisp,
-		startReader:         startReader,
+		Component:        common.Component{LogTags: logTags},
+		store:            dataStore,
+		tp:               tp,
+		storeKey:         fmt.Sprintf("%s/client/%s/queue/%s", keyPrefix, client, queue),
+		maxRetries:       maxRetries,
+		validate:         validator.New(),
+		operatingState:   STATE_INIT,
+		operationContext: ctxt,
+		contextCancel:    cancel,
+		requestMsgReTX:   reqMsgReTX,
+		sendACKToReTX:    ackToReTX,
+		sendACKToDisp:    ackToDisp,
+		startReader:      startReader,
 	}
 	// Add handlers
 	if err := tp.AddToTaskExecutionMap(
@@ -309,7 +306,7 @@ func (c *controllerImpl) ProcessStartRequest() error {
 	}
 
 	// Start the queue data fetcher
-	if err := c.startReader(currentState.NewestACKedIndex+1, c.storeReadMaxRetries); err != nil {
+	if err := c.startReader(currentState.NewestACKedIndex + 1); err != nil {
 		log.WithError(err).WithFields(c.LogTags).WithField("state", c.operatingState).Error(
 			"Unable to process start request. Starting queue reader failed",
 		)

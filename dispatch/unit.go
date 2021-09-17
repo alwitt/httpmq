@@ -39,6 +39,7 @@ type dispatcherImpl struct {
 }
 
 // DispatcherInitParam package up parameters needed to initialize a dispatcher
+// TODO: Clean up the names
 type DispatcherInitParam struct {
 	// Info regarding connection
 	Client      string `validate:"required"`
@@ -57,6 +58,7 @@ type DispatcherInitParam struct {
 	RootContext                context.Context
 	QueueInterface             storage.MessageQueues
 	QueueReadFailureMaxRetries int
+	QueryReadRetryIntSeq       common.Sequencer
 	StoreInterface             storage.KeyValueStore
 }
 
@@ -93,7 +95,6 @@ func DefineDispatcher(param DispatcherInitParam) (Dispatcher, error) {
 		param.Client,
 		param.Queue,
 		param.StoreInterface,
-		param.QueueReadFailureMaxRetries,
 		ctrlTP,
 		param.KeyPrefix,
 		param.MaxRetry,
@@ -175,7 +176,13 @@ func DefineDispatcher(param DispatcherInitParam) (Dispatcher, error) {
 
 	// Define message fetch
 	fetch, err := DefineMessageFetcher(
-		param.Queue, param.WG, param.QueueInterface, dispatch.SubmitMessageToDeliver, ctxt,
+		param.Queue,
+		param.WG,
+		param.QueueInterface,
+		param.QueueReadFailureMaxRetries,
+		param.QueryReadRetryIntSeq,
+		dispatch.SubmitMessageToDeliver,
+		ctxt,
 	)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Error("Failed to define fetch")
