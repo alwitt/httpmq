@@ -56,6 +56,7 @@ func TestFullUnit(t *testing.T) {
 		WG:                          &wg,
 		RootContext:                 ctxt,
 		QueueInterface:              testQueue,
+		QueueReadFailureMaxRetries:  4,
 		StoreInterface:              testStore,
 	}
 

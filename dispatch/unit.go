@@ -53,10 +53,11 @@ type DispatcherInitParam struct {
 	MaxRetry           int
 	RetryCheckInterval time.Duration
 	// Operations
-	WG             *sync.WaitGroup
-	RootContext    context.Context
-	QueueInterface storage.MessageQueues
-	StoreInterface storage.KeyValueStore
+	WG                         *sync.WaitGroup
+	RootContext                context.Context
+	QueueInterface             storage.MessageQueues
+	QueueReadFailureMaxRetries int
+	StoreInterface             storage.KeyValueStore
 }
 
 // DefineDispatcher create new dispatcher unit
@@ -92,6 +93,7 @@ func DefineDispatcher(param DispatcherInitParam) (Dispatcher, error) {
 		param.Client,
 		param.Queue,
 		param.StoreInterface,
+		param.QueueReadFailureMaxRetries,
 		ctrlTP,
 		param.KeyPrefix,
 		param.MaxRetry,

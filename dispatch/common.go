@@ -92,4 +92,4 @@ type RequestRestransmit func(msgIdx []int64, useContext context.Context) error
 type IndicateReceivedACKs func(msgIdx []int64, useContext context.Context) error
 
 // StartQueueRead function signature for starting the queue read process
-type StartQueueRead func(index int64) error
+type StartQueueRead func(index int64, maxRetries int) error

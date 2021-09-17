@@ -13,7 +13,7 @@ import (
 // ========================================================================================
 // MessageFetch process message from queue
 type MessageFetch interface {
-	StartReading(startIndex int64) error
+	StartReading(startIndex int64, maxRetries int) error
 	StopOperation() error
 }
 
@@ -56,7 +56,7 @@ func DefineMessageFetcher(
 // ----------------------------------------------------------------------------------------
 
 // StartReading starts the background queue reading loop
-func (f *messageFetchImpl) StartReading(startIndex int64) error {
+func (f *messageFetchImpl) StartReading(startIndex int64, maxRetries int) error {
 	// Start reading from the queue data stream
 	f.wg.Add(1)
 	f.fetchLoopRunning = true
@@ -70,7 +70,7 @@ func (f *messageFetchImpl) StartReading(startIndex int64) error {
 		)
 		// Keep trying to read from stream unless context is cancelled
 		readFromIndex := startIndex
-		for f.operationContext.Err() == nil {
+		for itr := 0; itr < maxRetries && f.operationContext.Err() == nil; itr++ {
 			readParam := storage.ReadStreamParam{
 				TargetQueue: f.queueName, StartIndex: readFromIndex, Handler: f.processMessage,
 			}

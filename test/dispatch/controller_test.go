@@ -50,6 +50,7 @@ func TestController(t *testing.T) {
 		testClient,
 		testQueue,
 		testStore,
+		1,
 		tp,
 		testPrefix,
 		maxRetrans,
@@ -117,7 +118,7 @@ func TestController(t *testing.T) {
 			ran = true
 		}).Return(nil).Once()
 		mockQueueReader.On(
-			"StartReading", startIndex+1,
+			"StartReading", startIndex+1, 1,
 		).Return(nil).Once()
 		assert.Nil(uut.Start(ctxt))
 		assert.True(ran)
@@ -342,6 +343,7 @@ func TestControllerBlankInit(t *testing.T) {
 		testClient,
 		testQueue,
 		testStore,
+		1,
 		tp,
 		testPrefix,
 		maxRetrans,
@@ -359,7 +361,7 @@ func TestControllerBlankInit(t *testing.T) {
 	// Case 0: start the controller
 	{
 		mockQueueReader.On(
-			"StartReading", int64(0),
+			"StartReading", int64(0), 1,
 		).Return(nil).Once()
 		assert.Nil(uut.Start(ctxt))
 	}
