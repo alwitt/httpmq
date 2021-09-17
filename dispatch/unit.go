@@ -47,19 +47,20 @@ type DispatcherInitParam struct {
 	KeyPrefix   string `validate:"required"`
 	MaxInflight int
 	// Pipeline
-	MessageForward              SubmitMessage
+	MessageForward              SubmitMessage `validate:"required"`
 	DispatchUseBlockingRegister bool
 	ReadQueueTimeout            time.Duration
+	ReportError                 ReportCriticalFailure `validate:"required"`
 	// Message retries
 	MaxRetry           int
 	RetryCheckInterval time.Duration
 	// Operations
-	WG                         *sync.WaitGroup
-	RootContext                context.Context
-	QueueInterface             storage.MessageQueues
+	WG                         *sync.WaitGroup       `validate:"required"`
+	RootContext                context.Context       `validate:"required"`
+	QueueInterface             storage.MessageQueues `validate:"required"`
 	QueueReadFailureMaxRetries int
-	QueryReadRetryIntSeq       common.Sequencer
-	StoreInterface             storage.KeyValueStore
+	QueryReadRetryIntSeq       common.Sequencer      `validate:"required"`
+	StoreInterface             storage.KeyValueStore `validate:"required"`
 }
 
 // DefineDispatcher create new dispatcher unit
@@ -182,6 +183,7 @@ func DefineDispatcher(param DispatcherInitParam) (Dispatcher, error) {
 		param.QueueReadFailureMaxRetries,
 		param.QueryReadRetryIntSeq,
 		dispatch.SubmitMessageToDeliver,
+		param.ReportError,
 		ctxt,
 	)
 	if err != nil {

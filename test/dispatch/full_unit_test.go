@@ -44,6 +44,10 @@ func TestFullUnit(t *testing.T) {
 
 	retrySeq, err := common.GetExponentialSeq(float64(time.Millisecond)*100, 1.25)
 	assert.Nil(err)
+	catchError := func(err error, _ string) error {
+		assert.Nil(err)
+		return nil
+	}
 	queueName := uuid.New().String()
 	initParam := dispatch.DispatcherInitParam{
 		Client:                      "unit-tester",
@@ -53,6 +57,7 @@ func TestFullUnit(t *testing.T) {
 		MessageForward:              outputHandle,
 		DispatchUseBlockingRegister: true,
 		ReadQueueTimeout:            time.Second,
+		ReportError:                 catchError,
 		MaxRetry:                    1,
 		RetryCheckInterval:          time.Millisecond * 100,
 		WG:                          &wg,

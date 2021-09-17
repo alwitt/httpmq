@@ -93,3 +93,6 @@ type IndicateReceivedACKs func(msgIdx []int64, useContext context.Context) error
 
 // StartQueueRead function signature for starting the queue read process
 type StartQueueRead func(index int64) error
+
+// ReportCriticalFailure function signature for indicating a critical failure
+type ReportCriticalFailure func(err error, reporter string) error

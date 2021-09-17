@@ -38,6 +38,10 @@ func TestMessageFetcher(t *testing.T) {
 	testTopic := uuid.New().String()
 	retrySeq, err := common.GetExponentialSeq(float64(time.Millisecond)*100, 1.25)
 	assert.Nil(err)
+	catchError := func(err error, _ string) error {
+		assert.Nil(err)
+		return nil
+	}
 	uut, err := dispatch.DefineMessageFetcher(
 		testTopic,
 		&wg,
@@ -45,6 +49,7 @@ func TestMessageFetcher(t *testing.T) {
 		4,
 		retrySeq,
 		mockMsgDispatch.SubmitMessageToDeliver,
+		catchError,
 		utCtxt,
 	)
 	assert.Nil(err)

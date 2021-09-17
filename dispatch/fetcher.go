@@ -2,6 +2,7 @@ package dispatch
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -31,6 +32,7 @@ type messageFetchImpl struct {
 	readMaxRetry     int
 	retryIntSeq      common.Sequencer
 	forwardMsg       SubmitMessage
+	reportCritical   ReportCriticalFailure
 }
 
 // DefineMessageFetcher create new message fetch module
@@ -41,6 +43,7 @@ func DefineMessageFetcher(
 	storageReadMaxRetry int,
 	storageReadRetryIntSeq common.Sequencer,
 	forwardCB SubmitMessage,
+	reportErr ReportCriticalFailure,
 	rootCtxt context.Context,
 ) (MessageFetch, error) {
 	logTags := log.Fields{
@@ -56,6 +59,7 @@ func DefineMessageFetcher(
 		readMaxRetry:     storageReadMaxRetry,
 		retryIntSeq:      storageReadRetryIntSeq,
 		forwardMsg:       forwardCB,
+		reportCritical:   reportErr,
 	}
 	return &instance, nil
 }
@@ -99,6 +103,13 @@ func (f *messageFetchImpl) StartReading(startIndex int64) error {
 				)
 				time.Sleep(timeout)
 			}
+		}
+		// Something gone wrong
+		if itr >= f.readMaxRetry {
+			_ = f.reportCritical(
+				fmt.Errorf("exhausted retries while attempting to read from queue %s", f.queueName),
+				fmt.Sprintf("dispatch.message-fetch.%s", f.queueName),
+			)
 		}
 	}()
 	return nil
