@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	// apexJSON "github.com/apex/log/handlers/json"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -19,14 +20,15 @@ import (
 
 func TestMessageFetcher(t *testing.T) {
 	assert := assert.New(t)
+	// log.SetHandler(apexJSON.New(os.Stderr))
 	log.SetLevel(log.DebugLevel)
 
 	mockMsgDispatch := new(mocks.MessageDispatch)
 
-	utCtxt, utCancel := context.WithCancel(context.Background())
-	defer utCancel()
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
+	utCtxt, utCancel := context.WithCancel(context.Background())
+	defer utCancel()
 
 	msgQueue, _, err := storage.CreateEtcdBackedStorage(
 		[]string{"localhost:2379"}, time.Second*5,
@@ -61,7 +63,7 @@ func TestMessageFetcher(t *testing.T) {
 			},
 		)
 	}
-	ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 	assert.Nil(msgQueue.Write(msgs0[0], ctxt))
 	minIdx0, _, err := msgQueue.IndexRange(testTopic, ctxt)
 	assert.Nil(err)
@@ -80,7 +82,7 @@ func TestMessageFetcher(t *testing.T) {
 
 	// Case 1: Read from the middle of existing
 	{
-		hit := 0
+		rxACK := make(chan int)
 		mockMsgDispatch.On(
 			"SubmitMessageToDeliver",
 			mock.AnythingOfType("dispatch.MessageInFlight"),
@@ -90,7 +92,7 @@ func TestMessageFetcher(t *testing.T) {
 			assert.Equal(msgs0[2], msg.Message)
 			assert.False(msg.Redelivery)
 			assert.Equal(maxIdx02, msg.Index)
-			hit += 1
+			rxACK <- 1
 		}).Return(nil).Once()
 		mockMsgDispatch.On(
 			"SubmitMessageToDeliver",
@@ -101,13 +103,24 @@ func TestMessageFetcher(t *testing.T) {
 			assert.Equal(msgs0[3], msg.Message)
 			assert.False(msg.Redelivery)
 			assert.Equal(maxIdx03, msg.Index)
-			hit += 1
+			rxACK <- 1
 		}).Return(nil).Once()
+		log.Debug("----------------------------------------------------------")
 		assert.Nil(uut.StartReading(maxIdx01 + 1))
-		time.Sleep(time.Millisecond * 150)
-		assert.Equal(2, hit)
+		readCtxt, readCancel := context.WithTimeout(utCtxt, time.Second)
+		defer readCancel()
+		for i := 0; i < 2; i++ {
+			select {
+			case val := <-rxACK:
+				assert.Equal(1, val)
+			case <-readCtxt.Done():
+				assert.Nil(readCtxt.Err())
+			}
+		}
+		log.Debug("==========================================================")
 	}
 	assert.Nil(uut.StopOperation())
+	wg.Wait()
 
 	// Case 2: send more mesages
 	msgs2 := []common.Message{}
@@ -128,16 +141,19 @@ func TestMessageFetcher(t *testing.T) {
 		)
 	}
 	{
-		hit := 0
-		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
-		assert.Nil(msgQueue.Write(msgs2[0], ctxt))
-		minIdx2, maxIdx20, err := msgQueue.IndexRange(testTopic, ctxt)
-		assert.Nil(err)
-		assert.Equal(minIdx0, minIdx2)
-		assert.Nil(msgQueue.Write(msgs2[1], ctxt))
-		_, maxIdx21, err := msgQueue.IndexRange(testTopic, ctxt)
-		assert.Nil(err)
-		cancel()
+		rxACK := make(chan int)
+		var maxIdx20, maxIdx21 int64
+		{
+			assert.Nil(msgQueue.Write(msgs2[0], utCtxt))
+			minIdx2, t, err := msgQueue.IndexRange(testTopic, utCtxt)
+			maxIdx20 = t
+			assert.Nil(err)
+			assert.Equal(minIdx0, minIdx2)
+			assert.Nil(msgQueue.Write(msgs2[1], utCtxt))
+			_, t, err = msgQueue.IndexRange(testTopic, utCtxt)
+			maxIdx21 = t
+			assert.Nil(err)
+		}
 		mockMsgDispatch.On(
 			"SubmitMessageToDeliver",
 			mock.AnythingOfType("dispatch.MessageInFlight"),
@@ -147,7 +163,7 @@ func TestMessageFetcher(t *testing.T) {
 			assert.Equal(msgs2[0], msg.Message)
 			assert.False(msg.Redelivery)
 			assert.Equal(maxIdx20, msg.Index)
-			hit += 1
+			rxACK <- 1
 		}).Return(nil).Once()
 		mockMsgDispatch.On(
 			"SubmitMessageToDeliver",
@@ -158,11 +174,21 @@ func TestMessageFetcher(t *testing.T) {
 			assert.Equal(msgs2[1], msg.Message)
 			assert.False(msg.Redelivery)
 			assert.Equal(maxIdx21, msg.Index)
-			hit += 1
+			rxACK <- 1
 		}).Return(nil).Once()
+		log.Debug("----------------------------------------------------------")
 		assert.Nil(uut.StartReading(maxIdx03 + 1))
-		time.Sleep(time.Millisecond * 150)
-		assert.Equal(2, hit)
+		readCtxt, readCancel := context.WithTimeout(utCtxt, time.Second*2)
+		defer readCancel()
+		for i := 0; i < 2; i++ {
+			select {
+			case val := <-rxACK:
+				assert.Equal(1, val)
+			case <-readCtxt.Done():
+				assert.Nil(readCtxt.Err())
+			}
+		}
+		log.Debug("==========================================================")
 	}
 	assert.Nil(uut.StopOperation())
 }

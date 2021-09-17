@@ -34,7 +34,7 @@ type messageDispatchImpl struct {
 	stopOperation    bool
 	operationContext context.Context
 	contextCancel    context.CancelFunc
-	registerInflight registerInflightMessage
+	registerInflight RegisterInflightMessage
 }
 
 // DefineMessageDispatch create new message dispatch module
@@ -47,7 +47,7 @@ func DefineMessageDispatch(
 	alreadyInflightMsgs int,
 	maxInflightMsgs int,
 	forwardCB SubmitMessage,
-	registerMsgCB registerInflightMessage,
+	registerMsgCB RegisterInflightMessage,
 	rootCtxt context.Context,
 ) (MessageDispatch, error) {
 	logTags := log.Fields{

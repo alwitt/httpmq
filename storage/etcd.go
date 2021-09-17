@@ -149,10 +149,12 @@ func (d *etcdBackedStorage) IndexRange(
 }
 
 // ReadStream read data stream from queue, and process message
-func (d *etcdBackedStorage) ReadStream(target ReadStreamParam, ctxt context.Context) error {
+func (d *etcdBackedStorage) ReadStream(target ReadStreamParam, ctxt context.Context) (int64, error) {
 	dataStream := d.client.Watch(
-		ctxt, target.TargetQueue, clientv3.WithRev(int64(target.StartIndex)),
+		ctxt, target.TargetQueue, clientv3.WithRev(target.StartIndex),
 	)
+
+	indexToBeRead := target.StartIndex
 
 	// Start stream processing
 	for {
@@ -160,59 +162,78 @@ func (d *etcdBackedStorage) ReadStream(target ReadStreamParam, ctxt context.Cont
 		case message, ok := <-dataStream:
 			if !ok {
 				log.WithFields(d.LogTags).Infof("Watch channel for %s closed", target.TargetQueue)
-				return nil
+				return indexToBeRead, nil
 			}
-			log.WithFields(d.LogTags).Debugf(
-				"Process message from channel %s", target.TargetQueue,
+			handlerActive, nextIndex, err := d.runMessageHandler(
+				target.TargetQueue, indexToBeRead, message, target.Handler,
 			)
-			handlerActive, err := d.runMessageHandler(
-				target.TargetQueue, message, target.Handler,
-			)
+			indexToBeRead = nextIndex
 			if err != nil {
 				log.WithError(err).WithFields(d.LogTags).Errorf(
 					"Channel %s handler failed", target.TargetQueue,
 				)
-				return err
+				return indexToBeRead, err
 			}
 			if !handlerActive {
 				log.WithFields(d.LogTags).Infof("Channel %s handler inactive", target.TargetQueue)
-				return nil
+				return indexToBeRead, nil
 			}
 		case <-ctxt.Done():
 			// Received stop signal
 			log.WithFields(d.LogTags).Info("Received stop signal. Exiting watch")
-			return nil
+			return indexToBeRead, nil
 		}
 	}
 }
 
 func (d *etcdBackedStorage) runMessageHandler(
-	targetQueue string, msg clientv3.WatchResponse, handler MessageProcessor,
-) (bool, error) {
+	targetQueue string,
+	startingIndex int64,
+	msg clientv3.WatchResponse,
+	handler MessageProcessor,
+) (bool, int64, error) {
 	// Process potentially multiple events
+	largestIndex := startingIndex
+	log.WithFields(d.LogTags).Debugf(
+		"Running message handler on key %s", targetQueue,
+	)
+	defer log.WithFields(d.LogTags).Debugf(
+		"Completed message handler on key %s", targetQueue,
+	)
 	for _, oneEvent := range msg.Events {
 		index := oneEvent.Kv.ModRevision
 		stored := oneEvent.Kv.Value
+		log.WithFields(d.LogTags).Debugf(
+			"Process message from channel %s@%d", targetQueue, index,
+		)
 		var message common.Message
 		if err := json.Unmarshal(stored, &message); err != nil {
 			log.WithError(err).WithFields(d.LogTags).Errorf(
-				"Failed to parse message of key %s", string(oneEvent.Kv.Key),
+				"Failed to parse message of key %s@%d", string(oneEvent.Kv.Key), index,
 			)
-			return false, err
+			return false, index, err
 		}
 		handlerActive, err := handler(message, index)
 		if err != nil {
 			log.WithError(err).WithFields(d.LogTags).Errorf(
-				"Failed to process message of key %s", string(oneEvent.Kv.Key),
+				"Failed to process message of key %s@%d", string(oneEvent.Kv.Key), index,
 			)
-			return false, err
+			return false, index, err
 		}
+		if index > largestIndex {
+			largestIndex = index
+		}
+		log.WithFields(d.LogTags).Debugf(
+			"Current largest index %s@%d", string(oneEvent.Kv.Key), largestIndex,
+		)
 		if !handlerActive {
-			log.WithFields(d.LogTags).Infof("Handler for channel %s is inactive", targetQueue)
-			return false, nil
+			log.WithFields(d.LogTags).Infof(
+				"Handler for channel %s is inactive after %d", targetQueue, index,
+			)
+			return false, largestIndex + 1, nil
 		}
 	}
-	return true, nil
+	return true, largestIndex + 1, nil
 }
 
 func (d *etcdBackedStorage) getMutex(lockName string) *concurrency.Mutex {

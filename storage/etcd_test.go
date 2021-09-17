@@ -203,7 +203,8 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			cancel()
 		}()
 		// Start the watching
-		assert.Nil(uut.ReadStream(watchTarget, ctxt))
+		_, err := uut.ReadStream(watchTarget, ctxt)
+		assert.Nil(err)
 	}
 
 	// Case 1: watch for three messages on topic
@@ -231,24 +232,26 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			msgItr += 1
 			return msgItr < 3, nil
 		}
-		watchTarget := ReadStreamParam{
-			TargetQueue: topic,
-			StartIndex:  1,
-			Handler:     handler,
-		}
 		// Transmit the three messages
-		go func() {
-			for idx, msg := range testMsgs {
-				log.Debugf("Sending test message %d", idx)
-				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
-				assert.Nil(uut.Write(msg, ctxt))
-				cancel()
-			}
-		}()
+		for idx, msg := range testMsgs {
+			log.Debugf("Sending test message %d", idx)
+			ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+			assert.Nil(uut.Write(msg, ctxt))
+			cancel()
+		}
 		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
+		minIdx, maxIdx, err := uut.IndexRange(topic, ctxt)
+		assert.Nil(err)
+		watchTarget := ReadStreamParam{
+			TargetQueue: topic,
+			StartIndex:  minIdx,
+			Handler:     handler,
+		}
 		// Start the watching
-		assert.Nil(uut.ReadStream(watchTarget, ctxt))
+		nextIdx, err := uut.ReadStream(watchTarget, ctxt)
+		assert.Nil(err)
+		assert.Greater(nextIdx, maxIdx)
 		assert.Equal(3, msgItr)
 	}
 
@@ -280,24 +283,26 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			}
 			return true, nil
 		}
-		watchTarget := ReadStreamParam{
-			TargetQueue: topic,
-			StartIndex:  1,
-			Handler:     handler,
-		}
 		// Transmit the three messages
-		go func() {
-			for idx, msg := range testMsgs {
-				log.Debugf("Sending test message %d", idx)
-				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
-				assert.Nil(uut.Write(msg, ctxt))
-				cancel()
-			}
-		}()
+		for idx, msg := range testMsgs {
+			log.Debugf("Sending test message %d", idx)
+			ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+			assert.Nil(uut.Write(msg, ctxt))
+			cancel()
+		}
 		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
+		minIdx, maxIdx, err := uut.IndexRange(topic, ctxt)
+		assert.Nil(err)
+		watchTarget := ReadStreamParam{
+			TargetQueue: topic,
+			StartIndex:  minIdx,
+			Handler:     handler,
+		}
 		// Start the watching
-		assert.NotNil(uut.ReadStream(watchTarget, ctxt))
+		nextIdx, err := uut.ReadStream(watchTarget, ctxt)
+		assert.NotNil(err)
+		assert.InDelta(maxIdx, nextIdx, 2)
 		assert.Equal(3, msgItr)
 	}
 
@@ -329,24 +334,26 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			}
 			return true, nil
 		}
-		watchTarget := ReadStreamParam{
-			TargetQueue: topic,
-			StartIndex:  1,
-			Handler:     handler,
-		}
 		// Transmit the three messages
-		go func() {
-			for idx, msg := range testMsgs {
-				log.Debugf("Sending test message %d", idx)
-				ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
-				assert.Nil(uut.Write(msg, ctxt))
-				cancel()
-			}
-		}()
+		for idx, msg := range testMsgs {
+			log.Debugf("Sending test message %d", idx)
+			ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
+			assert.Nil(uut.Write(msg, ctxt))
+			cancel()
+		}
 		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
+		minIdx, maxIdx, err := uut.IndexRange(topic, ctxt)
+		assert.Nil(err)
+		watchTarget := ReadStreamParam{
+			TargetQueue: topic,
+			StartIndex:  minIdx,
+			Handler:     handler,
+		}
 		// Start the watching
-		assert.Nil(uut.ReadStream(watchTarget, ctxt))
+		nextIdx, err := uut.ReadStream(watchTarget, ctxt)
+		assert.Nil(err)
+		assert.InDelta(maxIdx, nextIdx, 2)
 		assert.Equal(2, msgItr)
 	}
 
@@ -399,7 +406,8 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		ctxt, cancel = context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		// Start the watching
-		assert.Nil(uut.ReadStream(watchTarget, ctxt))
+		_, err = uut.ReadStream(watchTarget, ctxt)
+		assert.Nil(err)
 		assert.Equal(5, msgItr)
 	}
 
@@ -450,7 +458,8 @@ func TestEtcdDriverStreaming(t *testing.T) {
 		ctxt, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		// Start the watching
-		assert.Nil(uut.ReadStream(watchTarget, ctxt))
+		_, err = uut.ReadStream(watchTarget, ctxt)
+		assert.Nil(err)
 		assert.Equal(5, msgItr)
 	}
 }
@@ -565,6 +574,8 @@ func TestEtcdDriverBasicAfterCompaction(t *testing.T) {
 		assert.EqualValues(testMsgs4[2], val)
 	}
 	cancel()
+
+	time.Sleep(time.Second * 15)
 }
 
 func TestEtcdDriverMutex(t *testing.T) {

@@ -25,14 +25,14 @@ func TestIntervalTimerOneShot(t *testing.T) {
 		return nil
 	}
 
-	assert.Nil(uut.Start(time.Millisecond*10, callback, true))
-	time.Sleep(time.Millisecond * 12)
+	assert.Nil(uut.Start(time.Millisecond*100, callback, true))
+	time.Sleep(time.Millisecond * 150)
 	assert.Equal(1, value)
 
-	time.Sleep(time.Millisecond * 10)
+	time.Sleep(time.Millisecond * 100)
 	assert.Equal(1, value)
 
-	assert.Nil(uut.Start(time.Millisecond*5, callback, true))
-	time.Sleep(time.Millisecond * 6)
+	assert.Nil(uut.Start(time.Millisecond*50, callback, true))
+	time.Sleep(time.Millisecond * 60)
 	assert.Equal(2, value)
 }

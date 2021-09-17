@@ -3,6 +3,7 @@ package dispatch
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/apex/log"
 	"gitlab.com/project-nan/httpmq/common"
@@ -64,12 +65,24 @@ func (f *messageFetchImpl) StartReading(startIndex int64) error {
 	f.contextCancel = cancel
 	go func() {
 		defer f.wg.Done()
-		readParam := storage.ReadStreamParam{
-			TargetQueue: f.queueName, StartIndex: startIndex, Handler: f.processMessage,
-		}
-		log.WithFields(f.LogTags).Infof("Start fetching messages from queue %s", f.queueName)
-		if err := f.storage.ReadStream(readParam, f.operationContext); err != nil {
-			log.WithError(err).WithFields(f.LogTags).Errorf("Reading queue %s failed", f.queueName)
+		log.WithFields(f.LogTags).Infof(
+			"Start fetching messages from queue %s@%d", f.queueName, startIndex,
+		)
+		// Keep trying to read from stream unless context is cancelled
+		readFromIndex := startIndex
+		for f.operationContext.Err() == nil {
+			readParam := storage.ReadStreamParam{
+				TargetQueue: f.queueName, StartIndex: readFromIndex, Handler: f.processMessage,
+			}
+			log.WithFields(f.LogTags).Debugf("Calling ReadStream")
+			nextIdx, err := f.storage.ReadStream(readParam, f.operationContext)
+			log.WithFields(f.LogTags).Debugf("Reading queue ended before processing %d", nextIdx)
+			if err != nil {
+				log.WithError(err).WithFields(f.LogTags).Errorf("Reading queue %s failed", f.queueName)
+				break
+			}
+			readFromIndex = nextIdx
+			time.Sleep(time.Millisecond * 50)
 		}
 		log.WithFields(f.LogTags).Infof("Stop fetching messages from queue %s", f.queueName)
 	}()
@@ -81,6 +94,7 @@ func (f *messageFetchImpl) processMessage(msg common.Message, index int64) (bool
 	// Repackage the message
 	wrapped := MessageInFlight{Message: msg, Index: index, Redelivery: false}
 	// Send it
+	log.WithFields(f.LogTags).Debugf("Sending onward %s", wrapped)
 	return f.fetchLoopRunning, f.forwardMsg(wrapped, f.operationContext)
 }
 
@@ -88,6 +102,7 @@ func (f *messageFetchImpl) processMessage(msg common.Message, index int64) (bool
 
 // StopOperation stop reading from queue and forwarding
 func (f *messageFetchImpl) StopOperation() error {
+	log.WithFields(f.LogTags).Info("Signal fetch loop to exit")
 	f.fetchLoopRunning = false
 	f.contextCancel()
 	return nil

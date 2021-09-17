@@ -18,7 +18,7 @@ type InfightMessageInfo struct {
 	MaxRetry    int       `json:"max_retry"`
 }
 
-// String produce ASCII repersentation
+// String produce ASCII representation
 func (m InfightMessageInfo) String() string {
 	return fmt.Sprintf(
 		"[%d](%d/%d)@%s",
@@ -70,21 +70,26 @@ func (r MessageInFlight) Value() (driver.Value, error) {
 	return json.Marshal(&r)
 }
 
+// String produce ASCII representation
+func (r MessageInFlight) String() string {
+	return fmt.Sprintf("%s@%d", r.Destination.TargetQueue, r.Index)
+}
+
 // ========================================================================================
 
 // SubmitMessage function signature for sending a message
 type SubmitMessage func(msg MessageInFlight, useContext context.Context) error
 
-// registerInflightMessage function signature for registering a new message is inflight
-type registerInflightMessage func(
+// RegisterInflightMessage function signature for registering a new message is inflight
+type RegisterInflightMessage func(
 	msgIdx int64, timestamp time.Time, useContext context.Context,
 ) error
 
-// requestRestransmit function signature for requesting message retransmission
-type requestRestransmit func(msgIdx []int64, useContext context.Context) error
+// RequestRestransmit function signature for requesting message retransmission
+type RequestRestransmit func(msgIdx []int64, useContext context.Context) error
 
-// indicateReceivedACKs function signature for indicate receive of message ACK
-type indicateReceivedACKs func(msgIdx []int64, useContext context.Context) error
+// IndicateReceivedACKs function signature for indicate receive of message ACK
+type IndicateReceivedACKs func(msgIdx []int64, useContext context.Context) error
 
-// startQueueRead function signature for starting the queue read process
-type startQueueRead func(index int64) error
+// StartQueueRead function signature for starting the queue read process
+type StartQueueRead func(index int64) error

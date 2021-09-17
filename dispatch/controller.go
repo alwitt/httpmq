@@ -21,10 +21,10 @@ const (
 // Controller controls the operation of the message dispatcher
 type Controller interface {
 	SetCallbacks(
-		reqMsgReTX requestRestransmit,
-		ackToReTX indicateReceivedACKs,
-		ackToDisp indicateReceivedACKs,
-		startReader startQueueRead,
+		reqMsgReTX RequestRestransmit,
+		ackToReTX IndicateReceivedACKs,
+		ackToDisp IndicateReceivedACKs,
+		startReader StartQueueRead,
 	)
 	Start(ctxt context.Context) error
 	ReceivedACKs(msgIndexes []int64, ctxt context.Context) error
@@ -47,10 +47,10 @@ type controllerImpl struct {
 	operationContext context.Context
 	contextCancel    context.CancelFunc
 	// Callbacks to hook into other components
-	requestMsgReTX requestRestransmit
-	sendACKToReTX  indicateReceivedACKs
-	sendACKToDisp  indicateReceivedACKs
-	startReader    startQueueRead
+	requestMsgReTX RequestRestransmit
+	sendACKToReTX  IndicateReceivedACKs
+	sendACKToDisp  IndicateReceivedACKs
+	startReader    StartQueueRead
 }
 
 // DefineController create new dispatch controller
@@ -63,10 +63,10 @@ func DefineController(
 	maxRetries int,
 	rootCtxt context.Context,
 	// Callbacks
-	reqMsgReTX requestRestransmit,
-	ackToReTX indicateReceivedACKs,
-	ackToDisp indicateReceivedACKs,
-	startReader startQueueRead,
+	reqMsgReTX RequestRestransmit,
+	ackToReTX IndicateReceivedACKs,
+	ackToDisp IndicateReceivedACKs,
+	startReader StartQueueRead,
 ) (Controller, error) {
 	logTags := log.Fields{
 		"module": "dispatch", "component": "controller", "client": client, "queue": queue,
@@ -113,10 +113,10 @@ func DefineController(
 
 // SetCallbacks install callback functions
 func (c *controllerImpl) SetCallbacks(
-	reqMsgReTX requestRestransmit,
-	ackToReTX indicateReceivedACKs,
-	ackToDisp indicateReceivedACKs,
-	startReader startQueueRead,
+	reqMsgReTX RequestRestransmit,
+	ackToReTX IndicateReceivedACKs,
+	ackToDisp IndicateReceivedACKs,
+	startReader StartQueueRead,
 ) {
 	c.requestMsgReTX = reqMsgReTX
 	c.sendACKToReTX = ackToReTX
