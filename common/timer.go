@@ -96,11 +96,9 @@ type exponentialSequence struct {
 	growthRate float64
 }
 
-func (s exponentialSequence) NextValue() float64 {
+func (s *exponentialSequence) NextValue() float64 {
 	nextValue := s.current * s.growthRate
-	defer func() {
-		s.current = nextValue
-	}()
+	s.current = nextValue
 	return nextValue
 }
 
@@ -109,5 +107,5 @@ func GetExponentialSeq(initial float64, growthRate float64) (Sequencer, error) {
 	if growthRate < 1.0 {
 		return nil, fmt.Errorf("growth rate of exponential sequence must be > 1.0")
 	}
-	return exponentialSequence{current: initial}, nil
+	return &exponentialSequence{current: initial, growthRate: growthRate}, nil
 }

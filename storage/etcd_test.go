@@ -249,9 +249,9 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			Handler:     handler,
 		}
 		// Start the watching
-		nextIdx, err := uut.ReadStream(watchTarget, ctxt)
+		latestIdx, err := uut.ReadStream(watchTarget, ctxt)
 		assert.Nil(err)
-		assert.Greater(nextIdx, maxIdx)
+		assert.Equal(latestIdx, maxIdx)
 		assert.Equal(3, msgItr)
 	}
 
@@ -300,9 +300,9 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			Handler:     handler,
 		}
 		// Start the watching
-		nextIdx, err := uut.ReadStream(watchTarget, ctxt)
+		latestIdx, err := uut.ReadStream(watchTarget, ctxt)
 		assert.NotNil(err)
-		assert.InDelta(maxIdx, nextIdx, 2)
+		assert.InDelta(maxIdx, latestIdx, 2)
 		assert.Equal(3, msgItr)
 	}
 
@@ -351,9 +351,9 @@ func TestEtcdDriverStreaming(t *testing.T) {
 			Handler:     handler,
 		}
 		// Start the watching
-		nextIdx, err := uut.ReadStream(watchTarget, ctxt)
+		latestIdx, err := uut.ReadStream(watchTarget, ctxt)
 		assert.Nil(err)
-		assert.InDelta(maxIdx, nextIdx, 2)
+		assert.InDelta(maxIdx, latestIdx, 2)
 		assert.Equal(2, msgItr)
 	}
 
@@ -574,8 +574,6 @@ func TestEtcdDriverBasicAfterCompaction(t *testing.T) {
 		assert.EqualValues(testMsgs4[2], val)
 	}
 	cancel()
-
-	time.Sleep(time.Second * 15)
 }
 
 func TestEtcdDriverMutex(t *testing.T) {

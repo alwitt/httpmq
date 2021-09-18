@@ -36,7 +36,7 @@ func TestMessageFetcher(t *testing.T) {
 	assert.Nil(err)
 
 	testTopic := uuid.New().String()
-	retrySeq, err := common.GetExponentialSeq(float64(time.Millisecond)*100, 1.25)
+	retrySeq, err := common.GetExponentialSeq(float64(time.Millisecond*100), 1.25)
 	assert.Nil(err)
 	catchError := func(err error, _ string) error {
 		assert.Nil(err)

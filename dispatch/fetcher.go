@@ -87,19 +87,25 @@ func (f *messageFetchImpl) StartReading(startIndex int64) error {
 			}
 			// Perform read
 			log.WithFields(f.LogTags).Debug("Calling ReadStream")
-			nextIdx, err := f.storage.ReadStream(readParam, f.operationContext)
-			log.WithFields(f.LogTags).Debugf("Reading queue ended before processing %d", nextIdx)
+			lastIdxRead, err := f.storage.ReadStream(readParam, f.operationContext)
+			log.WithFields(f.LogTags).Debugf(
+				"Reading queue ended before processing %d", lastIdxRead,
+			)
 			if err != nil {
-				log.WithError(err).WithFields(f.LogTags).Errorf("Reading queue %s failed", f.queueName)
+				log.WithError(err).WithFields(f.LogTags).Errorf(
+					"Reading queue %s failed", f.queueName,
+				)
 			}
-			readFromIndex = nextIdx
+			if lastIdxRead >= readFromIndex {
+				readFromIndex = lastIdxRead + 1
+			}
 			// Unexpected termination of queue read
 			if f.operationContext.Err() == nil {
 				timeout := time.Duration(f.retryIntSeq.NextValue())
 				log.WithFields(f.LogTags).Errorf(
-					"Read ended unexpectedly. Will attempt read again from %d after %s.",
-					nextIdx,
-					timeout.String(),
+					"Read ended unexpectedly. Will attempt read again from %d after %d ms.",
+					lastIdxRead,
+					timeout.Milliseconds(),
 				)
 				time.Sleep(timeout)
 			}

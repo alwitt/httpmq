@@ -36,3 +36,18 @@ func TestIntervalTimerOneShot(t *testing.T) {
 	time.Sleep(time.Millisecond * 60)
 	assert.Equal(2, value)
 }
+
+func TestExponentialSeq(t *testing.T) {
+	assert := assert.New(t)
+
+	uut, err := GetExponentialSeq(float64(time.Second), 1.25)
+	assert.Nil(err)
+	uutCast, ok := uut.(*exponentialSequence)
+	assert.True(ok)
+
+	assert.InDelta(float64(time.Second), uutCast.current, 1e-3)
+	val1 := uut.NextValue()
+	assert.Greater(val1, float64(time.Second))
+	val2 := uut.NextValue()
+	assert.Greater(val2, val1)
+}
