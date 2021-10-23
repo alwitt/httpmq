@@ -1,0 +1,21 @@
+version: '3'
+
+networks:
+  httpmq-test:
+    driver: bridge
+
+volumes:
+  nats_js_store:
+
+services:
+  nats:
+    image: nats:2.6.2
+    hostname: dev-nats
+    ports:
+      - 127.0.0.1:4222:4222
+      - 127.0.0.1:8222:8222
+    networks:
+      - httpmq-test
+    volumes:
+      - nats_js_store:/mnt/nats
+      - ./test_nats.conf:/nats-server.conf

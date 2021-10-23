@@ -15,7 +15,6 @@ generate: .prepare ## Generate test mock interfaces
 
 .PHONY: test
 test: .prepare ## Run unittests
-	# @RUN_ETCD_COMPACT_TESTS=TRUE go test --count 1 -timeout 30s -short ./...
 	@go test --count 1 -timeout 30s -short ./...
 
 .PHONY: build
