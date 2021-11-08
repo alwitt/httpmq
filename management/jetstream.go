@@ -11,12 +11,24 @@ import (
 )
 
 // JetStreamController manage JetStream
-type JetStreamController struct {
+type JetStreamController interface {
+	GetAllQueues(ctxt context.Context) map[string]*nats.StreamInfo
+	GetQueue(name string) (*nats.StreamInfo, error)
+	GetBasicQueueParam(
+		name string, topics []string, maxMessageAge time.Duration,
+	) nats.StreamConfig
+	CreateQueue(param nats.StreamConfig) error
+	DeleteQueue(name string) error
+	UpdateQueueSetting(param nats.StreamConfig) error
+}
+
+// jetStreamControllerImpl manage JetStream
+type jetStreamControllerImpl struct {
 	common.Component
 	core core.JetStream
 }
 
-// GetJetStreamController define GetJetStreamController
+// GetJetStreamController define JetStreamController
 func GetJetStreamController(
 	jsCore core.JetStream, instance string,
 ) (JetStreamController, error) {
@@ -25,14 +37,17 @@ func GetJetStreamController(
 		"component": "jetstream",
 		"instance":  instance,
 	}
-	return JetStreamController{
+	return jetStreamControllerImpl{
 		Component: common.Component{LogTags: logTags},
 		core:      jsCore,
 	}, nil
 }
 
+// =======================================================================
+// Queue related controls
+
 // GetAllQueues fetch the list all known queue
-func (js JetStreamController) GetAllQueues(ctxt context.Context) map[string]*nats.StreamInfo {
+func (js jetStreamControllerImpl) GetAllQueues(ctxt context.Context) map[string]*nats.StreamInfo {
 	readChan := js.core.JetStream().StreamsInfo()
 	knownQueues := map[string]*nats.StreamInfo{}
 	readAll := false
@@ -54,7 +69,7 @@ func (js JetStreamController) GetAllQueues(ctxt context.Context) map[string]*nat
 }
 
 // GetQueue get info on one queue
-func (js JetStreamController) GetQueue(name string) (*nats.StreamInfo, error) {
+func (js jetStreamControllerImpl) GetQueue(name string) (*nats.StreamInfo, error) {
 	info, err := js.core.JetStream().StreamInfo(name)
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Unable to get queue %s info", name)
@@ -63,14 +78,14 @@ func (js JetStreamController) GetQueue(name string) (*nats.StreamInfo, error) {
 }
 
 // GetBasicQueueParam generate a basic queue setting object
-func (js JetStreamController) GetBasicQueueParam(
+func (js jetStreamControllerImpl) GetBasicQueueParam(
 	name string, topics []string, maxMessageAge time.Duration,
 ) nats.StreamConfig {
 	return nats.StreamConfig{Name: name, Subjects: topics, MaxAge: maxMessageAge}
 }
 
 // CreateQueue define a new queue
-func (js JetStreamController) CreateQueue(param nats.StreamConfig) error {
+func (js jetStreamControllerImpl) CreateQueue(param nats.StreamConfig) error {
 	if _, err := js.core.JetStream().AddStream(&param); err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf(
 			"Unable to define new queue %s", param.Name,
@@ -82,7 +97,7 @@ func (js JetStreamController) CreateQueue(param nats.StreamConfig) error {
 }
 
 // DeleteQueue delete an existing queue
-func (js JetStreamController) DeleteQueue(name string) error {
+func (js jetStreamControllerImpl) DeleteQueue(name string) error {
 	if err := js.core.JetStream().DeleteStream(name); err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Unable to delete queue %s", name)
 		return err
@@ -92,7 +107,7 @@ func (js JetStreamController) DeleteQueue(name string) error {
 }
 
 // UpdateQueueSetting update a queue's setting
-func (js JetStreamController) UpdateQueueSetting(param nats.StreamConfig) error {
+func (js jetStreamControllerImpl) UpdateQueueSetting(param nats.StreamConfig) error {
 	if _, err := js.core.JetStream().UpdateStream(&param); err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf(
 			"Failed to update queue %s params", param.Name,
