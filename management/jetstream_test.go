@@ -74,14 +74,30 @@ func TestJetStreamControllerQueues(t *testing.T) {
 
 	// Case 1: create queue
 	queue1 := fmt.Sprintf("%s-01", testName)
-	topics1 := []string{"topic-1-0", "topic-1-1", "topic-1-2"}
+	subjects1 := []string{"topic-1-0", "topic-1-1", "topic-1-2"}
 	{
-		queueParam := uut.GetBasicQueueParam(queue1, topics1, time.Second*30)
+		maxAge := time.Second
+		queueParam := JetStreamQueueParam{
+			Name:     queue1,
+			Subjects: subjects1,
+			JetStreamQueueLimits: JetStreamQueueLimits{
+				MaxAge: &maxAge,
+			},
+		}
 		assert.Nil(uut.CreateQueue(queueParam))
 		param, err := uut.GetQueue(queue1)
 		assert.Nil(err)
 		assert.Equal(queue1, param.Config.Name)
-		assert.EqualValues(topics1, param.Config.Subjects)
+		assert.EqualValues(subjects1, param.Config.Subjects)
+	}
+	// reuse the name with different param
+	{
+		subjects := []string{"topic-1-0", "topic-1-1"}
+		queueParam := JetStreamQueueParam{
+			Name:     queue1,
+			Subjects: subjects,
+		}
+		assert.NotNil(uut.CreateQueue(queueParam))
 	}
 
 	// Case 2: delete queue
@@ -93,30 +109,35 @@ func TestJetStreamControllerQueues(t *testing.T) {
 
 	// Case 3: change queue param
 	queue3 := fmt.Sprintf("%s-03", testName)
-	topics3 := []string{"topic-3-0", "topic-3-1"}
+	subjects3 := []string{"topic-3-0", "topic-3-1"}
 	{
-		queueParam := uut.GetBasicQueueParam(queue3, topics3, time.Second*30)
+		maxAge := time.Second * 30
+		queueParam := JetStreamQueueParam{
+			Name:     queue3,
+			Subjects: subjects3,
+			JetStreamQueueLimits: JetStreamQueueLimits{
+				MaxAge: &maxAge,
+			},
+		}
 		assert.Nil(uut.CreateQueue(queueParam))
 		queueInfo, err := uut.GetQueue(queue3)
 		assert.Nil(err)
 		assert.Equal(queue3, queueInfo.Config.Name)
-		assert.EqualValues(topics3, queueInfo.Config.Subjects)
+		assert.EqualValues(subjects3, queueInfo.Config.Subjects)
 	}
 	{
-		queueInfo, err := uut.GetQueue(queue3)
-		assert.Nil(err)
-		oldParam := queueInfo.Config
-		oldParam.MaxMsgsPerSubject = 32
-		topics3 = append(topics3, "topic-3-3")
-		oldParam.Subjects = topics3
-		assert.Nil(uut.UpdateQueueSetting(oldParam))
+		subjects3 = append(subjects3, "topic-3-3")
+		assert.Nil(uut.ChangeQueueSubjects(queue3, subjects3))
+		maxMsgPerSub := int64(32)
+		newParam := JetStreamQueueLimits{MaxMsgsPerSubject: &maxMsgPerSub}
+		assert.Nil(uut.UpdateQueueLimits(queue3, newParam))
 	}
 	{
 		queueInfo, err := uut.GetQueue(queue3)
 		assert.Nil(err)
 		assert.Equal(queue3, queueInfo.Config.Name)
 		assert.Equal(int64(32), queueInfo.Config.MaxMsgsPerSubject)
-		assert.EqualValues(topics3, queueInfo.Config.Subjects)
+		assert.EqualValues(subjects3, queueInfo.Config.Subjects)
 	}
 
 	// Case 4: delete queue
@@ -138,7 +159,14 @@ func TestJetStreamControllerQueues(t *testing.T) {
 	for _, queueName := range queue5s {
 		subjs, ok := topics5s[queueName]
 		assert.True(ok)
-		queueParam := uut.GetBasicQueueParam(queueName, subjs, time.Second*30)
+		maxAge := time.Second * 30
+		queueParam := JetStreamQueueParam{
+			Name:     queueName,
+			Subjects: subjs,
+			JetStreamQueueLimits: JetStreamQueueLimits{
+				MaxAge: &maxAge,
+			},
+		}
 		assert.Nil(uut.CreateQueue(queueParam))
 	}
 	{
