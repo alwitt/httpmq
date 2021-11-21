@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/project-nan/httpmq/core"
@@ -51,7 +52,7 @@ func TestJetStreamControllerQueues(t *testing.T) {
 	assert.Nil(err)
 	defer js.Close(utCtxt)
 
-	uut, err := GetJetStreamController(js, "ut-js-queues")
+	uut, err := GetJetStreamController(js, testName)
 	assert.Nil(err)
 
 	// Clear out current queues in JetStream
@@ -192,5 +193,180 @@ func TestJetStreamControllerQueues(t *testing.T) {
 		defer cancel()
 		allQueues := uut.GetAllQueues(ctxt)
 		assert.Empty(allQueues)
+	}
+}
+
+func TestJetStreamControllerConsumers(t *testing.T) {
+	assert := assert.New(t)
+	log.SetLevel(log.DebugLevel)
+	testName := "ut-js-consumers"
+
+	utCtxt, utCtxtCancel := context.WithCancel(context.Background())
+	defer utCtxtCancel()
+
+	logTags := log.Fields{
+		"module":    "management_test",
+		"component": "JetStreamController",
+		"instance":  "consumers",
+	}
+
+	// Define NATS connection params
+	natsParam := core.NATSConnectParams{
+		ServerURI:           "nats://127.0.0.1:4222",
+		ConnectTimeout:      time.Second,
+		MaxReconnectAttempt: 0,
+		ReconnectWait:       time.Second,
+		OnDisconnectCallback: func(_ *nats.Conn, e error) {
+			if e != nil {
+				log.WithError(e).WithFields(logTags).Error(
+					"Disconnect callback triggered with failure",
+				)
+			}
+		},
+		OnReconnectCallback: func(_ *nats.Conn) {
+			log.WithFields(logTags).Debug("Reconnected with NATs server")
+		},
+		OnCloseCallback: func(_ *nats.Conn) {
+			log.WithFields(logTags).Debug("Disconnected from NATs server")
+		},
+	}
+
+	js, err := core.GetJetStream(natsParam)
+	assert.Nil(err)
+	defer js.Close(utCtxt)
+
+	uut, err := GetJetStreamController(js, testName)
+	assert.Nil(err)
+
+	// Clear out current queues in JetStream
+	{
+		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
+		defer cancel()
+		existing := uut.GetAllQueues(ctxt)
+		for queue := range existing {
+			// Clear out any consumer attached to the queue
+			consumers := uut.GetAllConsumersForQueue(queue, ctxt)
+			for consumer := range consumers {
+				assert.Nil(uut.DeleteConsumerOnQueue(queue, consumer))
+			}
+			assert.Nil(uut.DeleteQueue(queue))
+		}
+	}
+
+	// Case 0: create consumer with no queues
+	{
+		consumerParam := JetStreamConsumerParam{
+			Name: uuid.New().String(), MaxInflight: 1, Mode: "push",
+		}
+		assert.NotNil(uut.CreateConsumerForQueue(uuid.New().String(), consumerParam))
+	}
+
+	// Define two queues for operating
+	queue1 := fmt.Sprintf("%s-01", testName)
+	subjects1 := []string{"topic-1-0", "topic-1-1", "topic-1-2"}
+	queue2 := fmt.Sprintf("%s-02", testName)
+	subjects2 := []string{"topic-2-0", "topic-2-1"}
+	{
+		maxAge := time.Second
+		queueParam := JetStreamQueueParam{
+			Name:     queue1,
+			Subjects: subjects1,
+			JetStreamQueueLimits: JetStreamQueueLimits{
+				MaxAge: &maxAge,
+			},
+		}
+		assert.Nil(uut.CreateQueue(queueParam))
+		queueParam = JetStreamQueueParam{
+			Name:     queue2,
+			Subjects: subjects2,
+			JetStreamQueueLimits: JetStreamQueueLimits{
+				MaxAge: &maxAge,
+			},
+		}
+		assert.Nil(uut.CreateQueue(queueParam))
+	}
+
+	// Case 1: create consumer
+	consumer1 := uuid.New().String()
+	{
+		param := JetStreamConsumerParam{
+			Name: consumer1, MaxInflight: 1, Mode: "push",
+		}
+		assert.Nil(uut.CreateConsumerForQueue(queue1, param))
+	}
+
+	// Case 2: re-use the consumer again with the same param
+	{
+		param := JetStreamConsumerParam{
+			Name: consumer1, MaxInflight: 1, Mode: "push",
+		}
+		assert.Nil(uut.CreateConsumerForQueue(queue1, param))
+	}
+	// With different params
+	{
+		param := JetStreamConsumerParam{
+			Name: consumer1, MaxInflight: 2, Mode: "push",
+		}
+		assert.NotNil(uut.CreateConsumerForQueue(queue1, param))
+	}
+
+	// Case 3: re-use the consumer again on a different queue
+	{
+		param := JetStreamConsumerParam{
+			Name: consumer1, MaxInflight: 1, Mode: "push",
+		}
+		assert.Nil(uut.CreateConsumerForQueue(queue2, param))
+	}
+
+	// Case 4: verify the consumers are listed
+	{
+		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
+		defer cancel()
+		queue1Consumers := uut.GetAllConsumersForQueue(queue1, ctxt)
+		assert.Len(queue1Consumers, 1)
+		queue1Con1, ok := queue1Consumers[consumer1]
+		assert.True(ok)
+		assert.Equal(consumer1, queue1Con1.Config.Durable)
+		queue2Consumers := uut.GetAllConsumersForQueue(queue2, ctxt)
+		assert.Len(queue2Consumers, 1)
+		queue2Con1, ok := queue2Consumers[consumer1]
+		assert.True(ok)
+		assert.Equal(consumer1, queue2Con1.Config.Durable)
+	}
+
+	// Case 5: delete unknown consumer
+	assert.NotNil(uut.DeleteConsumerOnQueue(queue1, uuid.New().String()))
+
+	// Case 6: delete consumer from queue1
+	assert.Nil(uut.DeleteConsumerOnQueue(queue1, consumer1))
+	{
+		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
+		defer cancel()
+		queue1Consumers := uut.GetAllConsumersForQueue(queue1, ctxt)
+		assert.Empty(queue1Consumers)
+		queue2Consumers := uut.GetAllConsumersForQueue(queue2, ctxt)
+		assert.Len(queue2Consumers, 1)
+		queue2Con1, ok := queue2Consumers[consumer1]
+		assert.True(ok)
+		assert.Equal(consumer1, queue2Con1.Config.Durable)
+	}
+
+	// Case 7: create pull consumer
+	consumer7 := uuid.New().String()
+	{
+		param := JetStreamConsumerParam{
+			Name: consumer7, MaxInflight: 1, Mode: "pull",
+		}
+		assert.Nil(uut.CreateConsumerForQueue(queue1, param))
+	}
+
+	// Case 8: create pull consumer, but with delivery group
+	consumer8 := uuid.New().String()
+	{
+		group := "receiver-group"
+		param := JetStreamConsumerParam{
+			Name: consumer8, MaxInflight: 1, Mode: "pull", DeliveryGroup: &group,
+		}
+		assert.NotNil(uut.CreateConsumerForQueue(queue2, param))
 	}
 }

@@ -3,15 +3,17 @@ package management
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/apex/log"
+	"github.com/go-playground/validator/v10"
 	"github.com/nats-io/nats.go"
 	"gitlab.com/project-nan/httpmq/common"
 	"gitlab.com/project-nan/httpmq/core"
 )
 
-// JetStreamQueueLimits list queue limits
+// JetStreamQueueLimits list queue data retention settings
 type JetStreamQueueLimits struct {
 	MaxConsumers      *int           `json:"max_consumers,omitempty"`
 	MaxMsgs           *int64         `json:"max_msgs,omitempty"`
@@ -29,22 +31,57 @@ type JetStreamQueueParam struct {
 	JetStreamQueueLimits
 }
 
+// JetStreamConsumerParam list parameters for defining a consumer
+type JetStreamConsumerParam struct {
+	Name  string `json:"name" validate:"required"`
+	Notes string `json:"notes,omitempty"`
+	// DeliveryGroup a consumer with non-empty group value can be used
+	// by multiple client instances. For a subject a group listens to,
+	// the messages will shared amongst the members
+	DeliveryGroup *string `json:"delivery_group,omitempty"`
+	// MaxInflight max number of un-ACKed message permitted in-flight
+	MaxInflight int `json:"max_inflight" validate:"required,gte=1"`
+	// Mode whether the consumer is push or pull consumer
+	Mode string `json:"mode" validate:"required,oneof=push pull"`
+}
+
 // JetStreamController manage JetStream
 type JetStreamController interface {
+	// ========================================================
+	// Queue related management
+	// CreateQueue create a new JetStream queue given parameters
 	CreateQueue(param JetStreamQueueParam) error
+	// GetAllQueues query for info on all available JetStream queue
 	GetAllQueues(ctxt context.Context) map[string]*nats.StreamInfo
+	// GetQueue query for info on one JetStream queue by name
 	GetQueue(name string) (*nats.StreamInfo, error)
+	// ChangeQueueSubjects changes the target subjects of a JetStream queue
 	ChangeQueueSubjects(queue string, newSubjects []string) error
+	// UpdateQueueLimits change the data retention limits of the JetStream queue
 	UpdateQueueLimits(
 		queue string, newLimits JetStreamQueueLimits,
 	) error
+	// DeleteQueue delete a JetStream queue by name
 	DeleteQueue(name string) error
+	// ========================================================
+	// Consumer related management
+	// CreateConsumerForQueue create a new consumer on a JetStream queue
+	CreateConsumerForQueue(queue string, param JetStreamConsumerParam) error
+	// GetAllConsumersForQueue query for info on all consumers of a JetStream queue
+	GetAllConsumersForQueue(
+		queue string, ctxt context.Context,
+	) map[string]*nats.ConsumerInfo
+	// GetConsumerForQueue query for info of a consumer of a JetStream queue
+	GetConsumerForQueue(queue, consumerName string) (*nats.ConsumerInfo, error)
+	// DeleteConsumerOnQueue delete consumer of a JetSteam queue
+	DeleteConsumerOnQueue(queue, consumerName string) error
 }
 
 // jetStreamControllerImpl manage JetStream
 type jetStreamControllerImpl struct {
 	common.Component
-	core core.JetStream
+	core     core.JetStream
+	validate *validator.Validate
 }
 
 // GetJetStreamController define JetStreamController
@@ -59,6 +96,7 @@ func GetJetStreamController(
 	return jetStreamControllerImpl{
 		Component: common.Component{LogTags: logTags},
 		core:      jsCore,
+		validate:  validator.New(),
 	}, nil
 }
 
@@ -195,8 +233,8 @@ func (js jetStreamControllerImpl) UpdateQueueLimits(
 // =======================================================================
 // Consumer related controls
 
-// GetAllConsumersOfQueue fetch the list of all consumers known consumer of a queue
-func (js jetStreamControllerImpl) GetAllConsumersOfQueue(
+// GetAllConsumersForQueue fetch the list of all consumers known consumer of a queue
+func (js jetStreamControllerImpl) GetAllConsumersForQueue(
 	queue string, ctxt context.Context,
 ) map[string]*nats.ConsumerInfo {
 	readChan := js.core.JetStream().ConsumersInfo(queue)
@@ -219,41 +257,75 @@ func (js jetStreamControllerImpl) GetAllConsumersOfQueue(
 	return knownConsumer
 }
 
-// GetConsumerOfQueue get info on one consumer of a queue
-func (js jetStreamControllerImpl) GetConsumerOfQueue(queue, consumer string) (
-	*nats.ConsumerInfo, error,
-) {
-	info, err := js.core.JetStream().ConsumerInfo(queue, consumer)
+// GetConsumerForQueue get info on one consumer of a queue
+func (js jetStreamControllerImpl) GetConsumerForQueue(
+	queue, consumerName string,
+) (*nats.ConsumerInfo, error) {
+	info, err := js.core.JetStream().ConsumerInfo(queue, consumerName)
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf(
-			"Unable to get consumer %s of queue %s info", consumer, queue,
+			"Unable to get consumer %s of queue %s info", consumerName, queue,
 		)
 	}
 	return info, err
 }
 
-// CreateConsumer define a new consumer for a queue
+// CreateConsumerForQueue define a new consumer for a queue
 func (js jetStreamControllerImpl) CreateConsumerForQueue(
-	queue string, param nats.ConsumerConfig,
+	queue string, param JetStreamConsumerParam,
 ) error {
-	if _, err := js.core.JetStream().AddConsumer(queue, &param); err != nil {
+	// Verify the parameters are acceptable
+	if err := js.validate.Struct(&param); err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf(
-			"Unable to define new consumer %s for queue %s", param.Durable, queue,
+			"Unable to define new consumer %s for queue %s", param.Name, queue,
 		)
 		return err
 	}
-	log.WithFields(js.LogTags).Infof("Defined new consumer %s for queue %s", param.Durable, queue)
+	// Convert to JetStream structure
+	jsParams := nats.ConsumerConfig{
+		Durable:       param.Name,
+		Description:   param.Notes,
+		MaxDeliver:    param.MaxInflight,
+		DeliverPolicy: nats.DeliverAllPolicy,
+		AckPolicy:     nats.AckExplicitPolicy,
+	}
+	// Verify the configuration made sense
+	if param.Mode == "pull" && param.DeliveryGroup != nil {
+		err := fmt.Errorf("pull consumer can't use delivery group")
+		log.WithError(err).WithFields(js.LogTags).Errorf(
+			"Unable to define new consumer %s for queue %s", param.Name, queue,
+		)
+		return err
+	}
+	// Set the delivery group
+	if param.DeliveryGroup != nil {
+		jsParams.DeliverGroup = *param.DeliveryGroup
+	}
+	// To insure that PUSH mode is used, a subject is needed
+	if param.Mode == "push" {
+		jsParams.DeliverSubject = nats.NewInbox()
+	}
+	// Define the consumer
+	if _, err := js.core.JetStream().AddConsumer(queue, &jsParams); err != nil {
+		log.WithError(err).WithFields(js.LogTags).Errorf(
+			"Unable to define new consumer %s for queue %s", param.Name, queue,
+		)
+		return err
+	}
+	log.WithFields(js.LogTags).Infof(
+		"Defined new consumer %s for queue %s", param.Name, queue,
+	)
 	return nil
 }
 
-// DeleteConsumerFromQueue delete consumer from a queue
-func (js jetStreamControllerImpl) DeleteConsumerFromQueue(queue, consumer string) error {
-	if err := js.core.JetStream().DeleteConsumer(queue, consumer); err != nil {
+// DeleteConsumerOnQueue delete consumer from a queue
+func (js jetStreamControllerImpl) DeleteConsumerOnQueue(queue, consumerName string) error {
+	if err := js.core.JetStream().DeleteConsumer(queue, consumerName); err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf(
-			"Unable to delete consumer %s from queue %s", consumer, queue,
+			"Unable to delete consumer %s from queue %s", consumerName, queue,
 		)
 		return err
 	}
-	log.WithFields(js.LogTags).Infof("Deleted consumer %s from queue %s", consumer, queue)
+	log.WithFields(js.LogTags).Infof("Deleted consumer %s from queue %s", consumerName, queue)
 	return nil
 }
