@@ -36,7 +36,7 @@ type NatsClient struct {
 }
 
 // Close close a JetStream client
-func (js NatsClient) Close(ctxt context.Context) {
+func (js *NatsClient) Close(ctxt context.Context) {
 	if err := js.nc.FlushWithContext(ctxt); err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("NATS flush failed")
 	}
@@ -44,13 +44,18 @@ func (js NatsClient) Close(ctxt context.Context) {
 	log.WithFields(js.LogTags).Infof("Close NATS client")
 }
 
+// NATs fetch the NATs client
+func (js *NatsClient) NATs() *nats.Conn {
+	return js.nc
+}
+
 // JetStream fetch the JetStream client
-func (js NatsClient) JetStream() nats.JetStreamContext {
+func (js *NatsClient) JetStream() nats.JetStreamContext {
 	return js.js
 }
 
 // GetJetStream define a new NATS JetStream core
-func GetJetStream(param NATSConnectParams) (NatsClient, error) {
+func GetJetStream(param NATSConnectParams) (*NatsClient, error) {
 	logTags := log.Fields{
 		"module":    "core",
 		"component": "jetstream-backend",
@@ -69,7 +74,7 @@ func GetJetStream(param NATSConnectParams) (NatsClient, error) {
 	)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf("NATS client connect failed")
-		return NatsClient{}, err
+		return &NatsClient{}, err
 	}
 
 	// Define the JetStream client
@@ -82,7 +87,7 @@ func GetJetStream(param NATSConnectParams) (NatsClient, error) {
 		log.WithFields(logTags).Info("Created JetStream client")
 	}
 
-	return NatsClient{
+	return &NatsClient{
 		Component: common.Component{LogTags: logTags},
 		nc:        nc,
 		js:        js,

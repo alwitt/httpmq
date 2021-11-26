@@ -80,13 +80,13 @@ type JetStreamController interface {
 // jetStreamControllerImpl manage JetStream
 type jetStreamControllerImpl struct {
 	common.Component
-	core     core.NatsClient
+	core     *core.NatsClient
 	validate *validator.Validate
 }
 
 // GetJetStreamController define JetStreamController
 func GetJetStreamController(
-	natsCore core.NatsClient, instance string,
+	natsCore *core.NatsClient, instance string,
 ) (JetStreamController, error) {
 	logTags := log.Fields{
 		"module":    "management",
