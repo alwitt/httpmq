@@ -54,13 +54,13 @@ func TestAckTransport(t *testing.T) {
 	assert.Nil(err)
 	defer js.Close(utCtxt)
 
-	testStream := uuid.New().String()
+	testQueue := uuid.New().String()
 	testConsumer1 := uuid.New().String()
 	testConsumer2 := uuid.New().String()
 
 	uutTX, err := GetJetStreamACKBroadcaster(js, testName)
 	assert.Nil(err)
-	uutRX1, err := GetJetStreamACKReceiver(js, testStream, testConsumer1)
+	uutRX1, err := GetJetStreamACKReceiver(js, testQueue, testConsumer1)
 	assert.Nil(err)
 
 	// Case 0: start subscription on uutRX1
@@ -76,10 +76,10 @@ func TestAckTransport(t *testing.T) {
 
 	// Case 1: send an ACK
 	ack1 := AckIndication{
-		Stream:   testStream,
+		Queue:    testQueue,
 		Consumer: testConsumer1,
 		SeqNum: ackSeqNum{
-			Stream:   1,
+			Queue:    1,
 			Consumer: 10,
 		},
 	}
@@ -96,7 +96,7 @@ func TestAckTransport(t *testing.T) {
 		}
 	}
 
-	uutRX2, err := GetJetStreamACKReceiver(js, testStream, testConsumer1)
+	uutRX2, err := GetJetStreamACKReceiver(js, testQueue, testConsumer1)
 	assert.Nil(err)
 	rxChan2 := make(chan AckIndication, 1)
 	ackHandler2 := func(ack AckIndication) {
@@ -107,10 +107,10 @@ func TestAckTransport(t *testing.T) {
 
 	// Case 2: test with two instances
 	ack2 := AckIndication{
-		Stream:   testStream,
+		Queue:    testQueue,
 		Consumer: testConsumer1,
 		SeqNum: ackSeqNum{
-			Stream:   2,
+			Queue:    2,
 			Consumer: 12,
 		},
 	}
@@ -134,7 +134,7 @@ func TestAckTransport(t *testing.T) {
 		}
 	}
 
-	uutRX3, err := GetJetStreamACKReceiver(js, testStream, testConsumer2)
+	uutRX3, err := GetJetStreamACKReceiver(js, testQueue, testConsumer2)
 	assert.Nil(err)
 	rxChan3 := make(chan AckIndication, 1)
 	ackHandler3 := func(ack AckIndication) {
@@ -145,10 +145,10 @@ func TestAckTransport(t *testing.T) {
 
 	// Case 3: test with different consumer
 	ack3 := AckIndication{
-		Stream:   testStream,
+		Queue:    testQueue,
 		Consumer: testConsumer2,
 		SeqNum: ackSeqNum{
-			Stream:   3,
+			Queue:    3,
 			Consumer: 32,
 		},
 	}

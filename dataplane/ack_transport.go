@@ -15,13 +15,13 @@ import (
 
 // ackSeqNum sequence numbers of the ACK
 type ackSeqNum struct {
-	Stream   int64 `json:"stream" validate:"required"`
+	Queue    int64 `json:"queue" validate:"required"`
 	Consumer int64 `json:"consumer" validate:"required"`
 }
 
 // AckIndication information regarding an ACK
 type AckIndication struct {
-	Stream   string    `json:"stream" validate:"required"`
+	Queue    string    `json:"queue" validate:"required"`
 	Consumer string    `json:"consumer" validate:"required"`
 	SeqNum   ackSeqNum `json:"seq_num" validate:"required,dive"`
 }
@@ -29,13 +29,13 @@ type AckIndication struct {
 // String toString for ackIndication
 func (m AckIndication) String() string {
 	return fmt.Sprintf(
-		"%s@%s:ACK[S:%d, C:%d]", m.Consumer, m.Stream, m.SeqNum.Stream, m.SeqNum.Consumer,
+		"%s@%s:ACK[S:%d, C:%d]", m.Consumer, m.Queue, m.SeqNum.Queue, m.SeqNum.Consumer,
 	)
 }
 
-// defineACKBroadcastSubject helper function to define a NATs subject based on stream and consumer
-func defineACKBroadcastSubject(stream, consumer string) string {
-	return fmt.Sprintf("ack-rx.%s.%s", stream, consumer)
+// defineACKBroadcastSubject helper function to define a NATs subject based on queue and consumer
+func defineACKBroadcastSubject(queue, consumer string) string {
+	return fmt.Sprintf("ack-rx.%s.%s", queue, consumer)
 }
 
 // jetStreamAckHandler function signature for processing a JetStream ACK
@@ -52,7 +52,7 @@ type JetStreamACKReceiver interface {
 type jetStreamACKReceiverImpl struct {
 	common.Component
 	ackSubject      string
-	stream          string
+	queue           string
 	consumer        string
 	nats            *core.NatsClient
 	subscribed      bool
@@ -74,7 +74,7 @@ func GetJetStreamACKReceiver(
 	return &jetStreamACKReceiverImpl{
 		Component:       common.Component{LogTags: logTags},
 		ackSubject:      ackSubject,
-		stream:          targetStream,
+		queue:           targetStream,
 		consumer:        targetConsumer,
 		nats:            natsClient,
 		subscribed:      false,
@@ -84,7 +84,7 @@ func GetJetStreamACKReceiver(
 	}, nil
 }
 
-// SubscribeForACKs subscribe to NATs change for ACKs on (stream, consumer) tuple
+// SubscribeForACKs subscribe to NATs change for ACKs on (queue, consumer) tuple
 func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 	wg *sync.WaitGroup, opContext context.Context, handler jetStreamAckHandler,
 ) error {
@@ -169,7 +169,7 @@ func GetJetStreamACKBroadcaster(
 
 // BroadcastACK broadcast the ACK
 func (t *jetStreamACKBroadcasterImpl) BroadcastACK(ack AckIndication) error {
-	subject := defineACKBroadcastSubject(ack.Stream, ack.Consumer)
+	subject := defineACKBroadcastSubject(ack.Queue, ack.Consumer)
 	msg, err := json.Marshal(&ack)
 	if err != nil {
 		log.WithError(err).WithFields(t.LogTags).Errorf("Unable to serialize ACK %s", ack)
