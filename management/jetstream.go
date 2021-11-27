@@ -13,8 +13,8 @@ import (
 	"gitlab.com/project-nan/httpmq/core"
 )
 
-// JetStreamQueueLimits list queue data retention settings
-type JetStreamQueueLimits struct {
+// JSStreamLimits list stream data retention settings
+type JSStreamLimits struct {
 	MaxConsumers      *int           `json:"max_consumers,omitempty"`
 	MaxMsgs           *int64         `json:"max_msgs,omitempty"`
 	MaxBytes          *int64         `json:"max_bytes,omitempty"`
@@ -23,12 +23,12 @@ type JetStreamQueueLimits struct {
 	MaxMsgSize        *int32         `json:"max_msg_size,omitempty"`
 }
 
-// JetStreamQueueParam list parameters for defining a queue
-type JetStreamQueueParam struct {
-	// Name is the queue name
+// JSStreamParam list parameters for defining a stream
+type JSStreamParam struct {
+	// Name is the stream name
 	Name     string   `json:"name" validate:"required"`
 	Subjects []string `json:"subjects,omitempty"`
-	JetStreamQueueLimits
+	JSStreamLimits
 }
 
 // JetStreamConsumerParam list parameters for defining a consumer
@@ -48,33 +48,29 @@ type JetStreamConsumerParam struct {
 // JetStreamController manage JetStream
 type JetStreamController interface {
 	// ========================================================
-	// Queue related management
-	// CreateQueue create a new JetStream queue given parameters
-	CreateQueue(param JetStreamQueueParam) error
-	// GetAllQueues query for info on all available JetStream queue
-	GetAllQueues(ctxt context.Context) map[string]*nats.StreamInfo
-	// GetQueue query for info on one JetStream queue by name
-	GetQueue(name string) (*nats.StreamInfo, error)
-	// ChangeQueueSubjects changes the target subjects of a JetStream queue
-	ChangeQueueSubjects(queue string, newSubjects []string) error
-	// UpdateQueueLimits change the data retention limits of the JetStream queue
-	UpdateQueueLimits(
-		queue string, newLimits JetStreamQueueLimits,
-	) error
-	// DeleteQueue delete a JetStream queue by name
-	DeleteQueue(name string) error
+	// Stream related management
+	// CreateStream create a new JS stream given parameters
+	CreateStream(param JSStreamParam) error
+	// GetAllStreams query for info on all available JS stream
+	GetAllStreams(ctxt context.Context) map[string]*nats.StreamInfo
+	// GetStream query for info on one JS stream by name
+	GetStream(name string) (*nats.StreamInfo, error)
+	// ChangeStreamSubjects changes the target subjects of a JS stream
+	ChangeStreamSubjects(stream string, newSubjects []string) error
+	// UpdateStreamLimits change the data retention limits of the JS stream
+	UpdateStreamLimits(stream string, newLimits JSStreamLimits) error
+	// Deletestream delete a JS stream by name
+	DeleteStream(name string) error
 	// ========================================================
 	// Consumer related management
-	// CreateConsumerForQueue create a new consumer on a JetStream queue
-	CreateConsumerForQueue(queue string, param JetStreamConsumerParam) error
-	// GetAllConsumersForQueue query for info on all consumers of a JetStream queue
-	GetAllConsumersForQueue(
-		queue string, ctxt context.Context,
-	) map[string]*nats.ConsumerInfo
-	// GetConsumerForQueue query for info of a consumer of a JetStream queue
-	GetConsumerForQueue(queue, consumerName string) (*nats.ConsumerInfo, error)
-	// DeleteConsumerOnQueue delete consumer of a JetSteam queue
-	DeleteConsumerOnQueue(queue, consumerName string) error
+	// CreateConsumerForStream create a new consumer on a JS stream
+	CreateConsumerForStream(stream string, param JetStreamConsumerParam) error
+	// GetAllConsumersForStream query for info on all consumers of a JS stream
+	GetAllConsumersForStream(stream string, ctxt context.Context) map[string]*nats.ConsumerInfo
+	// GetConsumerForStream query for info of a consumer of a JS stream
+	GetConsumerForStream(stream, consumerName string) (*nats.ConsumerInfo, error)
+	// DeleteConsumerOnStream delete consumer of a JS stream
+	DeleteConsumerOnStream(stream, consumerName string) error
 }
 
 // jetStreamControllerImpl manage JetStream
@@ -101,12 +97,12 @@ func GetJetStreamController(
 }
 
 // =======================================================================
-// Queue related controls
+// Stream related controls
 
-// GetAllQueues fetch the list of all known queue
-func (js jetStreamControllerImpl) GetAllQueues(ctxt context.Context) map[string]*nats.StreamInfo {
+// GetAllStreams fetch the list of all known stream
+func (js jetStreamControllerImpl) GetAllStreams(ctxt context.Context) map[string]*nats.StreamInfo {
 	readChan := js.core.JetStream().StreamsInfo()
-	knownQueues := map[string]*nats.StreamInfo{}
+	knownStreams := map[string]*nats.StreamInfo{}
 	readAll := false
 	for !readAll {
 		select {
@@ -116,30 +112,30 @@ func (js jetStreamControllerImpl) GetAllQueues(ctxt context.Context) map[string]
 				readAll = true
 				break
 			}
-			if _, ok := knownQueues[info.Config.Name]; ok {
+			if _, ok := knownStreams[info.Config.Name]; ok {
 				log.WithFields(js.LogTags).Errorf(
 					"Stream info contain multiple entry of %s", info.Config.Name,
 				)
 			}
-			knownQueues[info.Config.Name] = info
+			knownStreams[info.Config.Name] = info
 		case <-ctxt.Done():
 			// out of time
 			readAll = true
 		}
 	}
-	return knownQueues
+	return knownStreams
 }
 
-// GetQueue get info on one queue
-func (js jetStreamControllerImpl) GetQueue(name string) (*nats.StreamInfo, error) {
+// GetStream get info on one stream
+func (js jetStreamControllerImpl) GetStream(name string) (*nats.StreamInfo, error) {
 	info, err := js.core.JetStream().StreamInfo(name)
 	if err != nil {
-		log.WithError(err).WithFields(js.LogTags).Errorf("Unable to get queue %s info", name)
+		log.WithError(err).WithFields(js.LogTags).Errorf("Unable to get stream %s info", name)
 	}
 	return info, err
 }
 
-func applyStreamLimits(targetLimit *JetStreamQueueLimits, param *nats.StreamConfig) {
+func applyStreamLimits(targetLimit *JSStreamLimits, param *nats.StreamConfig) {
 	if targetLimit.MaxConsumers != nil {
 		param.MaxConsumers = *targetLimit.MaxConsumers
 	}
@@ -160,39 +156,39 @@ func applyStreamLimits(targetLimit *JetStreamQueueLimits, param *nats.StreamConf
 	}
 }
 
-// CreateQueue define a new queue
-func (js jetStreamControllerImpl) CreateQueue(param JetStreamQueueParam) error {
+// CreateStream define a new stream
+func (js jetStreamControllerImpl) CreateStream(param JSStreamParam) error {
 	// Convert to JetStream structure
 	jsParams := nats.StreamConfig{
 		Name:     param.Name,
 		Subjects: param.Subjects,
 	}
-	applyStreamLimits(&param.JetStreamQueueLimits, &jsParams)
+	applyStreamLimits(&param.JSStreamLimits, &jsParams)
 	if _, err := js.core.JetStream().AddStream(&jsParams); err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf(
-			"Unable to define new queue %s", param.Name,
+			"Unable to define new stream %s", param.Name,
 		)
 		return err
 	}
-	log.WithFields(js.LogTags).Infof("Defined new queue %s", param.Name)
+	log.WithFields(js.LogTags).Infof("Defined new stream %s", param.Name)
 	return nil
 }
 
-// DeleteQueue delete an existing queue
-func (js jetStreamControllerImpl) DeleteQueue(name string) error {
+// DeleteStream delete an existing stream
+func (js jetStreamControllerImpl) DeleteStream(name string) error {
 	if err := js.core.JetStream().DeleteStream(name); err != nil {
-		log.WithError(err).WithFields(js.LogTags).Errorf("Unable to delete queue %s", name)
+		log.WithError(err).WithFields(js.LogTags).Errorf("Unable to delete stream %s", name)
 		return err
 	}
-	log.WithFields(js.LogTags).Infof("Deleted queue %s", name)
+	log.WithFields(js.LogTags).Infof("Deleted stream %s", name)
 	return nil
 }
 
-// ChangeQueueSubjects change the set of subjects the queue collects for
-func (js jetStreamControllerImpl) ChangeQueueSubjects(queue string, newSubjects []string) error {
-	info, err := js.core.JetStream().StreamInfo(queue)
+// ChangeStreamSubjects change the set of subjects the stream collects for
+func (js jetStreamControllerImpl) ChangeStreamSubjects(stream string, newSubjects []string) error {
+	info, err := js.core.JetStream().StreamInfo(stream)
 	if err != nil {
-		log.WithError(err).WithFields(js.LogTags).Errorf("Unable to get queue %s info", queue)
+		log.WithError(err).WithFields(js.LogTags).Errorf("Unable to get stream %s info", stream)
 		return err
 	}
 	currentConfig := info.Config
@@ -200,44 +196,44 @@ func (js jetStreamControllerImpl) ChangeQueueSubjects(queue string, newSubjects 
 	_, err = js.core.JetStream().UpdateStream(&currentConfig)
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf(
-			"Unable to change queue %s subjects", queue,
+			"Unable to change stream %s subjects", stream,
 		)
 	} else {
 		t, _ := json.Marshal(newSubjects)
-		log.WithFields(js.LogTags).Errorf("Change queue %s subjects to %s", queue, t)
+		log.WithFields(js.LogTags).Errorf("Change stream %s subjects to %s", stream, t)
 	}
 	return err
 }
 
-// UpdateQueueLimits update a queue's data retention limits
-func (js jetStreamControllerImpl) UpdateQueueLimits(
-	queue string, newLimits JetStreamQueueLimits,
+// UpdateStreamLimits update a stream's data retention limits
+func (js jetStreamControllerImpl) UpdateStreamLimits(
+	stream string, newLimits JSStreamLimits,
 ) error {
-	info, err := js.core.JetStream().StreamInfo(queue)
+	info, err := js.core.JetStream().StreamInfo(stream)
 	if err != nil {
-		log.WithError(err).WithFields(js.LogTags).Errorf("Unable to get queue %s info", queue)
+		log.WithError(err).WithFields(js.LogTags).Errorf("Unable to get stream %s info", stream)
 		return err
 	}
 	currentConfig := info.Config
 	applyStreamLimits(&newLimits, &currentConfig)
 	if _, err := js.core.JetStream().UpdateStream(&currentConfig); err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf(
-			"Failed to update queue %s retention limits", queue,
+			"Failed to update stream %s retention limits", stream,
 		)
 		return err
 	}
-	log.WithFields(js.LogTags).Errorf("Updated queue %s retention limits", queue)
+	log.WithFields(js.LogTags).Errorf("Updated stream %s retention limits", stream)
 	return nil
 }
 
 // =======================================================================
 // Consumer related controls
 
-// GetAllConsumersForQueue fetch the list of all consumers known consumer of a queue
-func (js jetStreamControllerImpl) GetAllConsumersForQueue(
-	queue string, ctxt context.Context,
+// GetAllConsumersForStream fetch the list of all consumers known consumer of a stream
+func (js jetStreamControllerImpl) GetAllConsumersForStream(
+	stream string, ctxt context.Context,
 ) map[string]*nats.ConsumerInfo {
-	readChan := js.core.JetStream().ConsumersInfo(queue)
+	readChan := js.core.JetStream().ConsumersInfo(stream)
 	knownConsumer := map[string]*nats.ConsumerInfo{}
 	readAll := false
 	for !readAll {
@@ -257,27 +253,27 @@ func (js jetStreamControllerImpl) GetAllConsumersForQueue(
 	return knownConsumer
 }
 
-// GetConsumerForQueue get info on one consumer of a queue
-func (js jetStreamControllerImpl) GetConsumerForQueue(
-	queue, consumerName string,
+// GetConsumerForStream get info on one consumer of a stream
+func (js jetStreamControllerImpl) GetConsumerForStream(
+	stream, consumerName string,
 ) (*nats.ConsumerInfo, error) {
-	info, err := js.core.JetStream().ConsumerInfo(queue, consumerName)
+	info, err := js.core.JetStream().ConsumerInfo(stream, consumerName)
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf(
-			"Unable to get consumer %s of queue %s info", consumerName, queue,
+			"Unable to get consumer %s of stream %s info", consumerName, stream,
 		)
 	}
 	return info, err
 }
 
-// CreateConsumerForQueue define a new consumer for a queue
-func (js jetStreamControllerImpl) CreateConsumerForQueue(
-	queue string, param JetStreamConsumerParam,
+// CreateConsumerForStream define a new consumer for a stream
+func (js jetStreamControllerImpl) CreateConsumerForStream(
+	stream string, param JetStreamConsumerParam,
 ) error {
 	// Verify the parameters are acceptable
 	if err := js.validate.Struct(&param); err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf(
-			"Unable to define new consumer %s for queue %s", param.Name, queue,
+			"Unable to define new consumer %s for stream %s", param.Name, stream,
 		)
 		return err
 	}
@@ -293,7 +289,7 @@ func (js jetStreamControllerImpl) CreateConsumerForQueue(
 	if param.Mode == "pull" && param.DeliveryGroup != nil {
 		err := fmt.Errorf("pull consumer can't use delivery group")
 		log.WithError(err).WithFields(js.LogTags).Errorf(
-			"Unable to define new consumer %s for queue %s", param.Name, queue,
+			"Unable to define new consumer %s for stream %s", param.Name, stream,
 		)
 		return err
 	}
@@ -306,26 +302,26 @@ func (js jetStreamControllerImpl) CreateConsumerForQueue(
 		jsParams.DeliverSubject = nats.NewInbox()
 	}
 	// Define the consumer
-	if _, err := js.core.JetStream().AddConsumer(queue, &jsParams); err != nil {
+	if _, err := js.core.JetStream().AddConsumer(stream, &jsParams); err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf(
-			"Unable to define new consumer %s for queue %s", param.Name, queue,
+			"Unable to define new consumer %s for stream %s", param.Name, stream,
 		)
 		return err
 	}
 	log.WithFields(js.LogTags).Infof(
-		"Defined new consumer %s for queue %s", param.Name, queue,
+		"Defined new consumer %s for stream %s", param.Name, stream,
 	)
 	return nil
 }
 
-// DeleteConsumerOnQueue delete consumer from a queue
-func (js jetStreamControllerImpl) DeleteConsumerOnQueue(queue, consumerName string) error {
-	if err := js.core.JetStream().DeleteConsumer(queue, consumerName); err != nil {
+// DeleteConsumerOnStream delete consumer from a stream
+func (js jetStreamControllerImpl) DeleteConsumerOnStream(stream, consumerName string) error {
+	if err := js.core.JetStream().DeleteConsumer(stream, consumerName); err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf(
-			"Unable to delete consumer %s from queue %s", consumerName, queue,
+			"Unable to delete consumer %s from stream %s", consumerName, stream,
 		)
 		return err
 	}
-	log.WithFields(js.LogTags).Infof("Deleted consumer %s from queue %s", consumerName, queue)
+	log.WithFields(js.LogTags).Infof("Deleted consumer %s from stream %s", consumerName, stream)
 	return nil
 }

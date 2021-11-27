@@ -22,8 +22,8 @@ type perConsumerInflightMessages struct {
 	inflight map[uint64]*nats.Msg
 }
 
-// perQueueInflightMessages set of perConsumerInflightMessages for each consumer
-type perQueueInflightMessages struct {
+// perStreamInflightMessages set of perConsumerInflightMessages for each consumer
+type perStreamInflightMessages struct {
 	consumers map[string]*perConsumerInflightMessages
 }
 
@@ -32,7 +32,7 @@ type jetStreamInflightMsgProcessorImpl struct {
 	common.Component
 	subject, consumer string
 	tp                common.TaskProcessor
-	inflightPerQueue  map[string]*perQueueInflightMessages
+	inflightPerStream map[string]*perStreamInflightMessages
 }
 
 // GetJetStreamInflightMsgProcessor define new JetStreamInflightMsgProcessor
@@ -45,11 +45,11 @@ func GetJetStreamInflightMsgProcessor(
 		"instance":  fmt.Sprintf("%s@%s", consumer, subject),
 	}
 	instance := jetStreamInflightMsgProcessorImpl{
-		Component:        common.Component{LogTags: logTags},
-		subject:          subject,
-		consumer:         consumer,
-		tp:               tp,
-		inflightPerQueue: make(map[string]*perQueueInflightMessages),
+		Component:         common.Component{LogTags: logTags},
+		subject:           subject,
+		consumer:          consumer,
+		tp:                tp,
+		inflightPerStream: make(map[string]*perStreamInflightMessages),
 	}
 	// Add handlers
 	if err := tp.AddToTaskExecutionMap(
@@ -150,21 +150,21 @@ func (c *jetStreamInflightMsgProcessorImpl) ProcessInflightMessage(msg *nats.Msg
 		return err
 	}
 
-	// Fetch the per queue records
-	perQueueRecords, ok := c.inflightPerQueue[meta.Stream]
+	// Fetch the per stream records
+	perStreamRecords, ok := c.inflightPerStream[meta.Stream]
 	if !ok {
-		c.inflightPerQueue[meta.Stream] = &perQueueInflightMessages{
+		c.inflightPerStream[meta.Stream] = &perStreamInflightMessages{
 			consumers: make(map[string]*perConsumerInflightMessages),
 		}
-		perQueueRecords = c.inflightPerQueue[meta.Stream]
+		perStreamRecords = c.inflightPerStream[meta.Stream]
 	}
 	// Fetch the per consumer records
-	perConsumerRecords, ok := perQueueRecords.consumers[c.consumer]
+	perConsumerRecords, ok := perStreamRecords.consumers[c.consumer]
 	if !ok {
-		perQueueRecords.consumers[c.consumer] = &perConsumerInflightMessages{
+		perStreamRecords.consumers[c.consumer] = &perConsumerInflightMessages{
 			inflight: make(map[uint64]*nats.Msg),
 		}
-		perConsumerRecords = perQueueRecords.consumers[c.consumer]
+		perConsumerRecords = perStreamRecords.consumers[c.consumer]
 	}
 
 	perConsumerRecords.inflight[meta.Sequence.Consumer] = msg
@@ -240,17 +240,17 @@ func (c *jetStreamInflightMsgProcessorImpl) processMsgACK(param interface{}) err
 
 // ProcessMsgACK handler JetStream message ACK
 func (c *jetStreamInflightMsgProcessorImpl) ProcessMsgACK(ack AckIndication) error {
-	// Fetch the per queue records
-	perQueueRecords, ok := c.inflightPerQueue[ack.Queue]
+	// Fetch the per stream records
+	perStreamRecords, ok := c.inflightPerStream[ack.Stream]
 	if !ok {
-		err := fmt.Errorf("no records related to queue %s", ack.Queue)
+		err := fmt.Errorf("no records related to stream %s", ack.Stream)
 		log.WithError(err).WithFields(c.LogTags).Errorf("Unable to process %s", ack.String())
 		return err
 	}
 	// Fetch the per consumer records
-	perConsumerRecords, ok := perQueueRecords.consumers[ack.Consumer]
+	perConsumerRecords, ok := perStreamRecords.consumers[ack.Consumer]
 	if !ok {
-		err := fmt.Errorf("no records related to consumer %s on queue %s", ack.Consumer, ack.Queue)
+		err := fmt.Errorf("no records related to consumer %s on stream %s", ack.Consumer, ack.Stream)
 		log.WithError(err).WithFields(c.LogTags).Errorf("Unable to process %s", ack.String())
 		return err
 	}
@@ -259,7 +259,7 @@ func (c *jetStreamInflightMsgProcessorImpl) ProcessMsgACK(ack AckIndication) err
 	msg, ok := perConsumerRecords.inflight[ack.SeqNum.Consumer]
 	if !ok {
 		err := fmt.Errorf(
-			"no records related message [%d] for %s@%s", ack.SeqNum.Consumer, ack.Consumer, ack.Queue,
+			"no records related message [%d] for %s@%s", ack.SeqNum.Consumer, ack.Consumer, ack.Stream,
 		)
 		log.WithError(err).WithFields(c.LogTags).Errorf("Unable to process %s", ack.String())
 		return err

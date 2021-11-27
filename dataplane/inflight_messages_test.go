@@ -63,44 +63,44 @@ func TestInflightMessageHandling(t *testing.T) {
 	jsCtrl, err := management.GetJetStreamController(js, testName)
 	assert.Nil(err)
 
-	// Clear out current queues in JetStream
+	// Clear out current streams in JetStream
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
-		existing := jsCtrl.GetAllQueues(ctxt)
-		for queue := range existing {
-			// Clear out any consumer attached to the queue
-			consumers := jsCtrl.GetAllConsumersForQueue(queue, ctxt)
+		existing := jsCtrl.GetAllStreams(ctxt)
+		for stream := range existing {
+			// Clear out any consumer attached to the stream
+			consumers := jsCtrl.GetAllConsumersForStream(stream, ctxt)
 			for consumer := range consumers {
-				assert.Nil(jsCtrl.DeleteConsumerOnQueue(queue, consumer))
+				assert.Nil(jsCtrl.DeleteConsumerOnStream(stream, consumer))
 			}
-			assert.Nil(jsCtrl.DeleteQueue(queue))
+			assert.Nil(jsCtrl.DeleteStream(stream))
 		}
 	}
 
-	// Define queue and consumers for testing
-	queue1 := uuid.New().String()
-	subjects1 := "topic-1-0"
-	queue2 := uuid.New().String()
-	subjects2 := "topic-2-0"
+	// Define stream and consumers for testing
+	stream1 := uuid.New().String()
+	subjects1 := uuid.New().String()
+	stream2 := uuid.New().String()
+	subjects2 := uuid.New().String()
 	{
 		maxAge := time.Second * 10
-		queueParam := management.JetStreamQueueParam{
-			Name:     queue1,
+		streamParam := management.JSStreamParam{
+			Name:     stream1,
 			Subjects: []string{subjects1},
-			JetStreamQueueLimits: management.JetStreamQueueLimits{
+			JSStreamLimits: management.JSStreamLimits{
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(jsCtrl.CreateQueue(queueParam))
-		queueParam = management.JetStreamQueueParam{
-			Name:     queue2,
+		assert.Nil(jsCtrl.CreateStream(streamParam))
+		streamParam = management.JSStreamParam{
+			Name:     stream2,
 			Subjects: []string{subjects2},
-			JetStreamQueueLimits: management.JetStreamQueueLimits{
+			JSStreamLimits: management.JSStreamLimits{
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(jsCtrl.CreateQueue(queueParam))
+		assert.Nil(jsCtrl.CreateStream(streamParam))
 	}
 	consumer1 := uuid.New().String()
 	var consumer1Sub1 *nats.Subscription
@@ -109,8 +109,8 @@ func TestInflightMessageHandling(t *testing.T) {
 		param := management.JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 2, Mode: "push",
 		}
-		assert.Nil(jsCtrl.CreateConsumerForQueue(queue1, param))
-		assert.Nil(jsCtrl.CreateConsumerForQueue(queue2, param))
+		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param))
+		assert.Nil(jsCtrl.CreateConsumerForStream(stream2, param))
 		s, err := js.JetStream().SubscribeSync(subjects1, nats.Durable(consumer1))
 		assert.Nil(err)
 		consumer1Sub1 = s
@@ -126,16 +126,16 @@ func TestInflightMessageHandling(t *testing.T) {
 	// Start the task processor
 	assert.Nil(tp.StartEventLoop(&wg))
 
-	// Case 0: ACK unknown queue
+	// Case 0: ACK unknown stream
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
 		assert.NotNil(
 			uut.HandlerMsgACK(
 				AckIndication{
-					Queue:    uuid.New().String(),
+					Stream:   uuid.New().String(),
 					Consumer: testName,
-					SeqNum:   ackSeqNum{Queue: 12, Consumer: 2},
+					SeqNum:   ackSeqNum{Stream: 12, Consumer: 2},
 				}, true, ctxt,
 			),
 		)
@@ -148,7 +148,7 @@ func TestInflightMessageHandling(t *testing.T) {
 	{
 		ack, err := js.JetStream().Publish(subjects1, testMsg1)
 		assert.Nil(err)
-		assert.Equal(queue1, ack.Stream)
+		assert.Equal(stream1, ack.Stream)
 	}
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second*2)
@@ -171,9 +171,9 @@ func TestInflightMessageHandling(t *testing.T) {
 		assert.Nil(
 			uut.HandlerMsgACK(
 				AckIndication{
-					Queue:    queue1,
+					Stream:   stream1,
 					Consumer: consumer1,
-					SeqNum:   ackSeqNum{Queue: testMsg1Seq.Stream, Consumer: testMsg1Seq.Consumer},
+					SeqNum:   ackSeqNum{Stream: testMsg1Seq.Stream, Consumer: testMsg1Seq.Consumer},
 				}, true, ctxt,
 			),
 		)
@@ -186,7 +186,7 @@ func TestInflightMessageHandling(t *testing.T) {
 	{
 		ack, err := js.JetStream().Publish(subjects2, testMsg3)
 		assert.Nil(err)
-		assert.Equal(queue2, ack.Stream)
+		assert.Equal(stream2, ack.Stream)
 	}
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second*2)
@@ -209,9 +209,9 @@ func TestInflightMessageHandling(t *testing.T) {
 		assert.NotNil(
 			uut.HandlerMsgACK(
 				AckIndication{
-					Queue:    queue2,
+					Stream:   stream2,
 					Consumer: consumer1,
-					SeqNum:   ackSeqNum{Queue: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer + 2},
+					SeqNum:   ackSeqNum{Stream: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer + 2},
 				}, true, ctxt,
 			),
 		)
@@ -225,9 +225,9 @@ func TestInflightMessageHandling(t *testing.T) {
 		assert.Nil(
 			uut.HandlerMsgACK(
 				AckIndication{
-					Queue:    queue2,
+					Stream:   stream2,
 					Consumer: consumer1,
-					SeqNum:   ackSeqNum{Queue: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer},
+					SeqNum:   ackSeqNum{Stream: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer},
 				}, true, ctxt,
 			),
 		)
@@ -241,9 +241,9 @@ func TestInflightMessageHandling(t *testing.T) {
 		assert.NotNil(
 			uut.HandlerMsgACK(
 				AckIndication{
-					Queue:    queue2,
+					Stream:   stream2,
 					Consumer: consumer1,
-					SeqNum:   ackSeqNum{Queue: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer},
+					SeqNum:   ackSeqNum{Stream: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer},
 				}, true, ctxt,
 			),
 		)

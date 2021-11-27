@@ -13,10 +13,10 @@ import (
 	"gitlab.com/project-nan/httpmq/core"
 )
 
-func TestJetStreamControllerQueues(t *testing.T) {
+func TestJetStreamControllerStreams(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
-	testName := "ut-js-queues"
+	testName := "ut-js-streams"
 
 	utCtxt, utCtxtCancel := context.WithCancel(context.Background())
 	defer utCtxtCancel()
@@ -24,7 +24,7 @@ func TestJetStreamControllerQueues(t *testing.T) {
 	logTags := log.Fields{
 		"module":    "management_test",
 		"component": "JetStreamController",
-		"instance":  "queues",
+		"instance":  "streams",
 	}
 
 	// Define NATS connection params
@@ -55,144 +55,144 @@ func TestJetStreamControllerQueues(t *testing.T) {
 	uut, err := GetJetStreamController(js, testName)
 	assert.Nil(err)
 
-	// Clear out current queues in JetStream
+	// Clear out current streams in JetStream
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
-		existing := uut.GetAllQueues(ctxt)
-		for queue := range existing {
-			assert.Nil(uut.DeleteQueue(queue))
+		existing := uut.GetAllStreams(ctxt)
+		for stream := range existing {
+			assert.Nil(uut.DeleteStream(stream))
 		}
 	}
 
-	// Case 0: no queues in system
+	// Case 0: no streams in system
 	{
-		dummyQueue := fmt.Sprintf("%s-00", testName)
-		_, err := uut.GetQueue(dummyQueue)
+		dummyStream := fmt.Sprintf("%s-00", testName)
+		_, err := uut.GetStream(dummyStream)
 		assert.NotNil(err)
-		assert.NotNil(uut.DeleteQueue(dummyQueue))
+		assert.NotNil(uut.DeleteStream(dummyStream))
 	}
 
-	// Case 1: create queue
-	queue1 := fmt.Sprintf("%s-01", testName)
+	// Case 1: create stream
+	stream1 := fmt.Sprintf("%s-01", testName)
 	subjects1 := []string{"topic-1-0", "topic-1-1", "topic-1-2"}
 	{
 		maxAge := time.Second
-		queueParam := JetStreamQueueParam{
-			Name:     queue1,
+		streamParam := JSStreamParam{
+			Name:     stream1,
 			Subjects: subjects1,
-			JetStreamQueueLimits: JetStreamQueueLimits{
+			JSStreamLimits: JSStreamLimits{
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(uut.CreateQueue(queueParam))
-		param, err := uut.GetQueue(queue1)
+		assert.Nil(uut.CreateStream(streamParam))
+		param, err := uut.GetStream(stream1)
 		assert.Nil(err)
-		assert.Equal(queue1, param.Config.Name)
+		assert.Equal(stream1, param.Config.Name)
 		assert.EqualValues(subjects1, param.Config.Subjects)
 	}
 	// reuse the name with different param
 	{
 		subjects := []string{"topic-1-0", "topic-1-1"}
-		queueParam := JetStreamQueueParam{
-			Name:     queue1,
+		streamParam := JSStreamParam{
+			Name:     stream1,
 			Subjects: subjects,
 		}
-		assert.NotNil(uut.CreateQueue(queueParam))
+		assert.NotNil(uut.CreateStream(streamParam))
 	}
 
-	// Case 2: delete queue
-	assert.Nil(uut.DeleteQueue(queue1))
+	// Case 2: delete stream
+	assert.Nil(uut.DeleteStream(stream1))
 	{
-		_, err := uut.GetQueue(queue1)
+		_, err := uut.GetStream(stream1)
 		assert.NotNil(err)
 	}
 
-	// Case 3: change queue param
-	queue3 := fmt.Sprintf("%s-03", testName)
+	// Case 3: change stream param
+	stream3 := fmt.Sprintf("%s-03", testName)
 	subjects3 := []string{"topic-3-0", "topic-3-1"}
 	{
 		maxAge := time.Second * 30
-		queueParam := JetStreamQueueParam{
-			Name:     queue3,
+		streamParam := JSStreamParam{
+			Name:     stream3,
 			Subjects: subjects3,
-			JetStreamQueueLimits: JetStreamQueueLimits{
+			JSStreamLimits: JSStreamLimits{
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(uut.CreateQueue(queueParam))
-		queueInfo, err := uut.GetQueue(queue3)
+		assert.Nil(uut.CreateStream(streamParam))
+		streamInfo, err := uut.GetStream(stream3)
 		assert.Nil(err)
-		assert.Equal(queue3, queueInfo.Config.Name)
-		assert.EqualValues(subjects3, queueInfo.Config.Subjects)
+		assert.Equal(stream3, streamInfo.Config.Name)
+		assert.EqualValues(subjects3, streamInfo.Config.Subjects)
 	}
 	{
 		subjects3 = append(subjects3, "topic-3-3")
-		assert.Nil(uut.ChangeQueueSubjects(queue3, subjects3))
+		assert.Nil(uut.ChangeStreamSubjects(stream3, subjects3))
 		maxMsgPerSub := int64(32)
-		newParam := JetStreamQueueLimits{MaxMsgsPerSubject: &maxMsgPerSub}
-		assert.Nil(uut.UpdateQueueLimits(queue3, newParam))
+		newParam := JSStreamLimits{MaxMsgsPerSubject: &maxMsgPerSub}
+		assert.Nil(uut.UpdateStreamLimits(stream3, newParam))
 	}
 	{
-		queueInfo, err := uut.GetQueue(queue3)
+		streamInfo, err := uut.GetStream(stream3)
 		assert.Nil(err)
-		assert.Equal(queue3, queueInfo.Config.Name)
-		assert.Equal(int64(32), queueInfo.Config.MaxMsgsPerSubject)
-		assert.EqualValues(subjects3, queueInfo.Config.Subjects)
+		assert.Equal(stream3, streamInfo.Config.Name)
+		assert.Equal(int64(32), streamInfo.Config.MaxMsgsPerSubject)
+		assert.EqualValues(subjects3, streamInfo.Config.Subjects)
 	}
 
-	// Case 4: delete queue
-	assert.Nil(uut.DeleteQueue(queue3))
+	// Case 4: delete stream
+	assert.Nil(uut.DeleteStream(stream3))
 	{
-		_, err := uut.GetQueue(queue3)
+		_, err := uut.GetStream(stream3)
 		assert.NotNil(err)
 	}
 
-	// Case 5: create multiple queues
-	queue5s := []string{}
+	// Case 5: create multiple streams
+	stream5s := []string{}
 	for itr := 0; itr < 3; itr++ {
-		queue5s = append(queue5s, fmt.Sprintf("%s-05-%d", testName, itr))
+		stream5s = append(stream5s, fmt.Sprintf("%s-05-%d", testName, itr))
 	}
 	topics5s := map[string][]string{}
-	for idx, queueName := range queue5s {
-		topics5s[queueName] = []string{fmt.Sprintf("%s-05-%d", testName, idx)}
+	for idx, streamName := range stream5s {
+		topics5s[streamName] = []string{fmt.Sprintf("%s-05-%d", testName, idx)}
 	}
-	for _, queueName := range queue5s {
-		subjs, ok := topics5s[queueName]
+	for _, streamName := range stream5s {
+		subjs, ok := topics5s[streamName]
 		assert.True(ok)
 		maxAge := time.Second * 30
-		queueParam := JetStreamQueueParam{
-			Name:     queueName,
+		streamParam := JSStreamParam{
+			Name:     streamName,
 			Subjects: subjs,
-			JetStreamQueueLimits: JetStreamQueueLimits{
+			JSStreamLimits: JSStreamLimits{
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(uut.CreateQueue(queueParam))
+		assert.Nil(uut.CreateStream(streamParam))
 	}
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
-		allQueues := uut.GetAllQueues(ctxt)
-		for _, queueName := range queue5s {
-			subjs, ok := topics5s[queueName]
+		allStreams := uut.GetAllStreams(ctxt)
+		for _, streamName := range stream5s {
+			subjs, ok := topics5s[streamName]
 			assert.True(ok)
-			info, ok := allQueues[queueName]
+			info, ok := allStreams[streamName]
 			assert.True(ok)
-			assert.Equal(queueName, info.Config.Name)
+			assert.Equal(streamName, info.Config.Name)
 			assert.EqualValues(subjs, info.Config.Subjects)
 		}
 	}
 
-	// Case 6: clean up all queues
-	for _, queueName := range queue5s {
-		assert.Nil(uut.DeleteQueue(queueName))
+	// Case 6: clean up all streams
+	for _, streamName := range stream5s {
+		assert.Nil(uut.DeleteStream(streamName))
 	}
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
-		allQueues := uut.GetAllQueues(ctxt)
-		assert.Empty(allQueues)
+		allStreams := uut.GetAllStreams(ctxt)
+		assert.Empty(allStreams)
 	}
 }
 
@@ -238,52 +238,52 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 	uut, err := GetJetStreamController(js, testName)
 	assert.Nil(err)
 
-	// Clear out current queues in JetStream
+	// Clear out current streams in JetStream
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
-		existing := uut.GetAllQueues(ctxt)
-		for queue := range existing {
-			// Clear out any consumer attached to the queue
-			consumers := uut.GetAllConsumersForQueue(queue, ctxt)
+		existing := uut.GetAllStreams(ctxt)
+		for stream := range existing {
+			// Clear out any consumer attached to the stream
+			consumers := uut.GetAllConsumersForStream(stream, ctxt)
 			for consumer := range consumers {
-				assert.Nil(uut.DeleteConsumerOnQueue(queue, consumer))
+				assert.Nil(uut.DeleteConsumerOnStream(stream, consumer))
 			}
-			assert.Nil(uut.DeleteQueue(queue))
+			assert.Nil(uut.DeleteStream(stream))
 		}
 	}
 
-	// Case 0: create consumer with no queues
+	// Case 0: create consumer with no streams
 	{
 		consumerParam := JetStreamConsumerParam{
 			Name: uuid.New().String(), MaxInflight: 1, Mode: "push",
 		}
-		assert.NotNil(uut.CreateConsumerForQueue(uuid.New().String(), consumerParam))
+		assert.NotNil(uut.CreateConsumerForStream(uuid.New().String(), consumerParam))
 	}
 
-	// Define two queues for operating
-	queue1 := fmt.Sprintf("%s-01", testName)
+	// Define two streams for operating
+	stream1 := fmt.Sprintf("%s-01", testName)
 	subjects1 := []string{"topic-1-0", "topic-1-1", "topic-1-2"}
-	queue2 := fmt.Sprintf("%s-02", testName)
+	stream2 := fmt.Sprintf("%s-02", testName)
 	subjects2 := []string{"topic-2-0", "topic-2-1"}
 	{
 		maxAge := time.Second
-		queueParam := JetStreamQueueParam{
-			Name:     queue1,
+		streamParam := JSStreamParam{
+			Name:     stream1,
 			Subjects: subjects1,
-			JetStreamQueueLimits: JetStreamQueueLimits{
+			JSStreamLimits: JSStreamLimits{
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(uut.CreateQueue(queueParam))
-		queueParam = JetStreamQueueParam{
-			Name:     queue2,
+		assert.Nil(uut.CreateStream(streamParam))
+		streamParam = JSStreamParam{
+			Name:     stream2,
 			Subjects: subjects2,
-			JetStreamQueueLimits: JetStreamQueueLimits{
+			JSStreamLimits: JSStreamLimits{
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(uut.CreateQueue(queueParam))
+		assert.Nil(uut.CreateStream(streamParam))
 	}
 
 	// Case 1: create consumer
@@ -292,7 +292,7 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 		param := JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 1, Mode: "push",
 		}
-		assert.Nil(uut.CreateConsumerForQueue(queue1, param))
+		assert.Nil(uut.CreateConsumerForStream(stream1, param))
 	}
 
 	// Case 2: re-use the consumer again with the same param
@@ -300,55 +300,55 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 		param := JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 1, Mode: "push",
 		}
-		assert.Nil(uut.CreateConsumerForQueue(queue1, param))
+		assert.Nil(uut.CreateConsumerForStream(stream1, param))
 	}
 	// With different params
 	{
 		param := JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 2, Mode: "push",
 		}
-		assert.NotNil(uut.CreateConsumerForQueue(queue1, param))
+		assert.NotNil(uut.CreateConsumerForStream(stream1, param))
 	}
 
-	// Case 3: re-use the consumer again on a different queue
+	// Case 3: re-use the consumer again on a different stream
 	{
 		param := JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 1, Mode: "push",
 		}
-		assert.Nil(uut.CreateConsumerForQueue(queue2, param))
+		assert.Nil(uut.CreateConsumerForStream(stream2, param))
 	}
 
 	// Case 4: verify the consumers are listed
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
-		queue1Consumers := uut.GetAllConsumersForQueue(queue1, ctxt)
-		assert.Len(queue1Consumers, 1)
-		queue1Con1, ok := queue1Consumers[consumer1]
+		stream1Consumers := uut.GetAllConsumersForStream(stream1, ctxt)
+		assert.Len(stream1Consumers, 1)
+		stream1Con1, ok := stream1Consumers[consumer1]
 		assert.True(ok)
-		assert.Equal(consumer1, queue1Con1.Config.Durable)
-		queue2Consumers := uut.GetAllConsumersForQueue(queue2, ctxt)
-		assert.Len(queue2Consumers, 1)
-		queue2Con1, ok := queue2Consumers[consumer1]
+		assert.Equal(consumer1, stream1Con1.Config.Durable)
+		stream2Consumers := uut.GetAllConsumersForStream(stream2, ctxt)
+		assert.Len(stream2Consumers, 1)
+		stream2Con1, ok := stream2Consumers[consumer1]
 		assert.True(ok)
-		assert.Equal(consumer1, queue2Con1.Config.Durable)
+		assert.Equal(consumer1, stream2Con1.Config.Durable)
 	}
 
 	// Case 5: delete unknown consumer
-	assert.NotNil(uut.DeleteConsumerOnQueue(queue1, uuid.New().String()))
+	assert.NotNil(uut.DeleteConsumerOnStream(stream1, uuid.New().String()))
 
-	// Case 6: delete consumer from queue1
-	assert.Nil(uut.DeleteConsumerOnQueue(queue1, consumer1))
+	// Case 6: delete consumer from stream1
+	assert.Nil(uut.DeleteConsumerOnStream(stream1, consumer1))
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
-		queue1Consumers := uut.GetAllConsumersForQueue(queue1, ctxt)
-		assert.Empty(queue1Consumers)
-		queue2Consumers := uut.GetAllConsumersForQueue(queue2, ctxt)
-		assert.Len(queue2Consumers, 1)
-		queue2Con1, ok := queue2Consumers[consumer1]
+		stream1Consumers := uut.GetAllConsumersForStream(stream1, ctxt)
+		assert.Empty(stream1Consumers)
+		stream2Consumers := uut.GetAllConsumersForStream(stream2, ctxt)
+		assert.Len(stream2Consumers, 1)
+		stream2Con1, ok := stream2Consumers[consumer1]
 		assert.True(ok)
-		assert.Equal(consumer1, queue2Con1.Config.Durable)
+		assert.Equal(consumer1, stream2Con1.Config.Durable)
 	}
 
 	// Case 7: create pull consumer
@@ -357,7 +357,7 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 		param := JetStreamConsumerParam{
 			Name: consumer7, MaxInflight: 1, Mode: "pull",
 		}
-		assert.Nil(uut.CreateConsumerForQueue(queue1, param))
+		assert.Nil(uut.CreateConsumerForStream(stream1, param))
 	}
 
 	// Case 8: create pull consumer, but with delivery group
@@ -367,6 +367,6 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 		param := JetStreamConsumerParam{
 			Name: consumer8, MaxInflight: 1, Mode: "pull", DeliveryGroup: &group,
 		}
-		assert.NotNil(uut.CreateConsumerForQueue(queue2, param))
+		assert.NotNil(uut.CreateConsumerForStream(stream2, param))
 	}
 }
