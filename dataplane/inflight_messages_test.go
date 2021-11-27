@@ -136,7 +136,7 @@ func TestInflightMessageHandling(t *testing.T) {
 					Queue:    uuid.New().String(),
 					Consumer: testName,
 					SeqNum:   ackSeqNum{Queue: 12, Consumer: 2},
-				}, ctxt,
+				}, true, ctxt,
 			),
 		)
 	}
@@ -160,7 +160,7 @@ func TestInflightMessageHandling(t *testing.T) {
 		assert.Nil(err)
 		testMsg1Seq = meta.Sequence
 		// Cache message for later ACK
-		assert.Nil(uut.RecordInflightMessage(rxMsg, ctxt))
+		assert.Nil(uut.RecordInflightMessage(rxMsg, true, ctxt))
 	}
 	log.Debug("============================= 3 =============================")
 
@@ -174,7 +174,7 @@ func TestInflightMessageHandling(t *testing.T) {
 					Queue:    queue1,
 					Consumer: consumer1,
 					SeqNum:   ackSeqNum{Queue: testMsg1Seq.Stream, Consumer: testMsg1Seq.Consumer},
-				}, ctxt,
+				}, true, ctxt,
 			),
 		)
 	}
@@ -198,7 +198,7 @@ func TestInflightMessageHandling(t *testing.T) {
 		assert.Nil(err)
 		testMsg3Seq = meta.Sequence
 		// Cache message for later ACK
-		assert.Nil(uut.RecordInflightMessage(rxMsg, ctxt))
+		assert.Nil(uut.RecordInflightMessage(rxMsg, true, ctxt))
 	}
 	log.Debug("============================= 5 =============================")
 
@@ -212,7 +212,7 @@ func TestInflightMessageHandling(t *testing.T) {
 					Queue:    queue2,
 					Consumer: consumer1,
 					SeqNum:   ackSeqNum{Queue: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer + 2},
-				}, ctxt,
+				}, true, ctxt,
 			),
 		)
 	}
@@ -228,7 +228,7 @@ func TestInflightMessageHandling(t *testing.T) {
 					Queue:    queue2,
 					Consumer: consumer1,
 					SeqNum:   ackSeqNum{Queue: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer},
-				}, ctxt,
+				}, true, ctxt,
 			),
 		)
 	}
@@ -244,7 +244,7 @@ func TestInflightMessageHandling(t *testing.T) {
 					Queue:    queue2,
 					Consumer: consumer1,
 					SeqNum:   ackSeqNum{Queue: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer},
-				}, ctxt,
+				}, true, ctxt,
 			),
 		)
 	}

@@ -13,8 +13,8 @@ import (
 
 // JetStreamInflightMsgProcessor handle inflight jetstream messages
 type JetStreamInflightMsgProcessor interface {
-	RecordInflightMessage(msg *nats.Msg, callCtxt context.Context) error
-	HandlerMsgACK(ack AckIndication, callCtxt context.Context) error
+	RecordInflightMessage(msg *nats.Msg, blocking bool, callCtxt context.Context) error
+	HandlerMsgACK(ack AckIndication, blocking bool, callCtxt context.Context) error
 }
 
 // perConsumerInflightMessages set of messages awaiting ACK for a consumer
@@ -77,7 +77,7 @@ type jsInflightCtrlRecordNewMsg struct {
 
 // RecordInflightMessage record new inflight messages
 func (c *jetStreamInflightMsgProcessorImpl) RecordInflightMessage(
-	msg *nats.Msg, callCtxt context.Context,
+	msg *nats.Msg, blocking bool, callCtxt context.Context,
 ) error {
 	resultChan := make(chan error)
 	handler := func(err error) {
@@ -93,6 +93,11 @@ func (c *jetStreamInflightMsgProcessorImpl) RecordInflightMessage(
 	if err := c.tp.Submit(request, callCtxt); err != nil {
 		log.WithError(err).WithFields(c.LogTags).Errorf("Failed to submit new inflight message")
 		return err
+	}
+
+	// Don't wait for a response
+	if !blocking {
+		return nil
 	}
 
 	var err error
@@ -177,7 +182,7 @@ type jsInflightCtrlRecordACK struct {
 
 // HandlerMsgACK handler JetStream message ACK
 func (c *jetStreamInflightMsgProcessorImpl) HandlerMsgACK(
-	ack AckIndication, callCtxt context.Context,
+	ack AckIndication, blocking bool, callCtxt context.Context,
 ) error {
 	resultChan := make(chan error)
 	handler := func(err error) {
@@ -193,6 +198,11 @@ func (c *jetStreamInflightMsgProcessorImpl) HandlerMsgACK(
 	if err := c.tp.Submit(request, callCtxt); err != nil {
 		log.WithError(err).WithFields(c.LogTags).Errorf("Failed to submit msg ACK")
 		return err
+	}
+
+	// Don't wait for a response
+	if !blocking {
+		return nil
 	}
 
 	var err error
