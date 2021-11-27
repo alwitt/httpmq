@@ -15,8 +15,8 @@ import (
 
 // ackSeqNum sequence numbers of the ACK
 type ackSeqNum struct {
-	Queue    int64 `json:"queue" validate:"required"`
-	Consumer int64 `json:"consumer" validate:"required"`
+	Queue    uint64 `json:"queue" validate:"required"`
+	Consumer uint64 `json:"consumer" validate:"required"`
 }
 
 // AckIndication information regarding an ACK
