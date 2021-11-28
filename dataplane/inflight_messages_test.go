@@ -63,21 +63,6 @@ func TestInflightMessageHandling(t *testing.T) {
 	jsCtrl, err := management.GetJetStreamController(js, testName)
 	assert.Nil(err)
 
-	// Clear out current streams in JetStream
-	{
-		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
-		defer cancel()
-		existing := jsCtrl.GetAllStreams(ctxt)
-		for stream := range existing {
-			// Clear out any consumer attached to the stream
-			consumers := jsCtrl.GetAllConsumersForStream(stream, ctxt)
-			for consumer := range consumers {
-				assert.Nil(jsCtrl.DeleteConsumerOnStream(stream, consumer))
-			}
-			assert.Nil(jsCtrl.DeleteStream(stream))
-		}
-	}
-
 	// Define stream and consumers for testing
 	stream1 := uuid.New().String()
 	subjects1 := uuid.New().String()

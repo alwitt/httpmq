@@ -16,7 +16,7 @@ import (
 func TestJetStreamControllerStreams(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
-	testName := "ut-js-streams"
+	testName := uuid.New().String()
 
 	utCtxt, utCtxtCancel := context.WithCancel(context.Background())
 	defer utCtxtCancel()
@@ -55,16 +55,6 @@ func TestJetStreamControllerStreams(t *testing.T) {
 	uut, err := GetJetStreamController(js, testName)
 	assert.Nil(err)
 
-	// Clear out current streams in JetStream
-	{
-		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
-		defer cancel()
-		existing := uut.GetAllStreams(ctxt)
-		for stream := range existing {
-			assert.Nil(uut.DeleteStream(stream))
-		}
-	}
-
 	// Case 0: no streams in system
 	{
 		dummyStream := fmt.Sprintf("%s-00", testName)
@@ -75,7 +65,11 @@ func TestJetStreamControllerStreams(t *testing.T) {
 
 	// Case 1: create stream
 	stream1 := fmt.Sprintf("%s-01", testName)
-	subjects1 := []string{"topic-1-0", "topic-1-1", "topic-1-2"}
+	subjects1 := []string{
+		fmt.Sprintf("%s-1-0", testName),
+		fmt.Sprintf("%s-1-1", testName),
+		fmt.Sprintf("%s-1-2", testName),
+	}
 	{
 		maxAge := time.Second
 		streamParam := JSStreamParam{
@@ -93,7 +87,7 @@ func TestJetStreamControllerStreams(t *testing.T) {
 	}
 	// reuse the name with different param
 	{
-		subjects := []string{"topic-1-0", "topic-1-1"}
+		subjects := []string{fmt.Sprintf("%s-1-0", testName), fmt.Sprintf("%s-1-1", testName)}
 		streamParam := JSStreamParam{
 			Name:     stream1,
 			Subjects: subjects,
@@ -110,7 +104,7 @@ func TestJetStreamControllerStreams(t *testing.T) {
 
 	// Case 3: change stream param
 	stream3 := fmt.Sprintf("%s-03", testName)
-	subjects3 := []string{"topic-3-0", "topic-3-1"}
+	subjects3 := []string{fmt.Sprintf("%s-3-0", testName), fmt.Sprintf("%s-3-1", testName)}
 	{
 		maxAge := time.Second * 30
 		streamParam := JSStreamParam{
@@ -127,7 +121,7 @@ func TestJetStreamControllerStreams(t *testing.T) {
 		assert.EqualValues(subjects3, streamInfo.Config.Subjects)
 	}
 	{
-		subjects3 = append(subjects3, "topic-3-3")
+		subjects3 = append(subjects3, fmt.Sprintf("%s-3-3", testName))
 		assert.Nil(uut.ChangeStreamSubjects(stream3, subjects3))
 		maxMsgPerSub := int64(32)
 		newParam := JSStreamLimits{MaxMsgsPerSubject: &maxMsgPerSub}
@@ -183,23 +177,12 @@ func TestJetStreamControllerStreams(t *testing.T) {
 			assert.EqualValues(subjs, info.Config.Subjects)
 		}
 	}
-
-	// Case 6: clean up all streams
-	for _, streamName := range stream5s {
-		assert.Nil(uut.DeleteStream(streamName))
-	}
-	{
-		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
-		defer cancel()
-		allStreams := uut.GetAllStreams(ctxt)
-		assert.Empty(allStreams)
-	}
 }
 
 func TestJetStreamControllerConsumers(t *testing.T) {
 	assert := assert.New(t)
 	log.SetLevel(log.DebugLevel)
-	testName := "ut-js-consumers"
+	testName := uuid.New().String()
 
 	utCtxt, utCtxtCancel := context.WithCancel(context.Background())
 	defer utCtxtCancel()
@@ -238,21 +221,6 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 	uut, err := GetJetStreamController(js, testName)
 	assert.Nil(err)
 
-	// Clear out current streams in JetStream
-	{
-		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
-		defer cancel()
-		existing := uut.GetAllStreams(ctxt)
-		for stream := range existing {
-			// Clear out any consumer attached to the stream
-			consumers := uut.GetAllConsumersForStream(stream, ctxt)
-			for consumer := range consumers {
-				assert.Nil(uut.DeleteConsumerOnStream(stream, consumer))
-			}
-			assert.Nil(uut.DeleteStream(stream))
-		}
-	}
-
 	// Case 0: create consumer with no streams
 	{
 		consumerParam := JetStreamConsumerParam{
@@ -263,9 +231,13 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 
 	// Define two streams for operating
 	stream1 := fmt.Sprintf("%s-01", testName)
-	subjects1 := []string{"topic-1-0", "topic-1-1", "topic-1-2"}
+	subjects1 := []string{
+		fmt.Sprintf("%s-1-0", testName),
+		fmt.Sprintf("%s-1-1", testName),
+		fmt.Sprintf("%s-1-2", testName),
+	}
 	stream2 := fmt.Sprintf("%s-02", testName)
-	subjects2 := []string{"topic-2-0", "topic-2-1"}
+	subjects2 := []string{fmt.Sprintf("%s-2-0", testName), fmt.Sprintf("%s-2-1", testName)}
 	{
 		maxAge := time.Second
 		streamParam := JSStreamParam{
