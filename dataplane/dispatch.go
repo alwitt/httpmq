@@ -53,7 +53,7 @@ func GetPushMessageDispatcher(
 	}
 
 	// Define components
-	ackReceiver, err := GetJetStreamACKReceiver(natsClient, stream, subject, consumer)
+	ackReceiver, err := getJetStreamACKReceiver(natsClient, stream, subject, consumer)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define ACK receiver")
 		return nil, err
@@ -63,12 +63,12 @@ func GetPushMessageDispatcher(
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define task processor")
 		return nil, err
 	}
-	msgTracking, err := GetJetStreamInflightMsgProcessor(msgTrackingTP, stream, subject, consumer)
+	msgTracking, err := getJetStreamInflightMsgProcessor(msgTrackingTP, stream, subject, consumer)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define MSG tracker")
 		return nil, err
 	}
-	subscriber, err := GetJetStreamPushSubscriber(
+	subscriber, err := getJetStreamPushSubscriber(
 		natsClient, stream, subject, consumer, deliveryGroup,
 	)
 	if err != nil {

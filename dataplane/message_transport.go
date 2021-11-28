@@ -29,8 +29,8 @@ type jetStreamPushSubscriberImpl struct {
 	lock       *sync.Mutex
 }
 
-// GetJetStreamPushSubscriber define new JetStreamPushSubscriber
-func GetJetStreamPushSubscriber(
+// getJetStreamPushSubscriber define new JetStreamPushSubscriber
+func getJetStreamPushSubscriber(
 	natsClient *core.NatsClient, stream, subject, consumer string, deliveryGroup *string,
 ) (JetStreamPushSubscriber, error) {
 	logTags := log.Fields{

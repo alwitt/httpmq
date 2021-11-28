@@ -61,7 +61,7 @@ func TestAckTransport(t *testing.T) {
 
 	uutTX, err := GetJetStreamACKBroadcaster(js, testName)
 	assert.Nil(err)
-	uutRX1, err := GetJetStreamACKReceiver(js, testStream, dummySubject, testConsumer1)
+	uutRX1, err := getJetStreamACKReceiver(js, testStream, dummySubject, testConsumer1)
 	assert.Nil(err)
 
 	// Case 0: start subscription on uutRX1
@@ -97,7 +97,7 @@ func TestAckTransport(t *testing.T) {
 		}
 	}
 
-	uutRX2, err := GetJetStreamACKReceiver(js, testStream, dummySubject, testConsumer1)
+	uutRX2, err := getJetStreamACKReceiver(js, testStream, dummySubject, testConsumer1)
 	assert.Nil(err)
 	rxChan2 := make(chan AckIndication, 1)
 	ackHandler2 := func(ack AckIndication, _ context.Context) {
@@ -135,7 +135,7 @@ func TestAckTransport(t *testing.T) {
 		}
 	}
 
-	uutRX3, err := GetJetStreamACKReceiver(js, testStream, dummySubject, testConsumer2)
+	uutRX3, err := getJetStreamACKReceiver(js, testStream, dummySubject, testConsumer2)
 	assert.Nil(err)
 	rxChan3 := make(chan AckIndication, 1)
 	ackHandler3 := func(ack AckIndication, _ context.Context) {

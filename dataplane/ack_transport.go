@@ -38,13 +38,13 @@ func defineACKBroadcastSubject(stream, consumer string) string {
 	return fmt.Sprintf("ack-rx.%s.%s", stream, consumer)
 }
 
-// jetStreamAckHandler function signature for processing a JetStream ACK
-type jetStreamAckHandler func(AckIndication, context.Context)
+// JetStreamAckHandler function signature for processing a JetStream ACK
+type JetStreamAckHandler func(AckIndication, context.Context)
 
 // JetStreamACKReceiver handle JetStream ACK being broadcast through NATs subjects
 type JetStreamACKReceiver interface {
 	SubscribeForACKs(
-		wg *sync.WaitGroup, opContext context.Context, handler jetStreamAckHandler,
+		wg *sync.WaitGroup, opContext context.Context, handler JetStreamAckHandler,
 	) error
 }
 
@@ -59,8 +59,8 @@ type jetStreamACKReceiverImpl struct {
 	validate        *validator.Validate
 }
 
-// GetJetStreamACKReceiver define JetStreamACKReceiver
-func GetJetStreamACKReceiver(
+// getJetStreamACKReceiver define JetStreamACKReceiver
+func getJetStreamACKReceiver(
 	natsClient *core.NatsClient, stream, subject, consumer string,
 ) (JetStreamACKReceiver, error) {
 	ackSubject := defineACKBroadcastSubject(stream, consumer)
@@ -84,7 +84,7 @@ func GetJetStreamACKReceiver(
 
 // SubscribeForACKs subscribe to NATs change for ACKs on (stream, consumer) tuple
 func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
-	wg *sync.WaitGroup, opContext context.Context, handler jetStreamAckHandler,
+	wg *sync.WaitGroup, opContext context.Context, handler JetStreamAckHandler,
 ) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()

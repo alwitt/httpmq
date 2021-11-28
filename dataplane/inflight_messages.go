@@ -35,8 +35,8 @@ type jetStreamInflightMsgProcessorImpl struct {
 	inflightPerStream map[string]*perStreamInflightMessages
 }
 
-// GetJetStreamInflightMsgProcessor define new JetStreamInflightMsgProcessor
-func GetJetStreamInflightMsgProcessor(
+// getJetStreamInflightMsgProcessor define new JetStreamInflightMsgProcessor
+func getJetStreamInflightMsgProcessor(
 	tp common.TaskProcessor, stream, subject, consumer string,
 ) (JetStreamInflightMsgProcessor, error) {
 	logTags := log.Fields{
