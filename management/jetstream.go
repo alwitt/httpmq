@@ -35,6 +35,8 @@ type JSStreamParam struct {
 type JetStreamConsumerParam struct {
 	Name  string `json:"name" validate:"required"`
 	Notes string `json:"notes,omitempty"`
+	// Set the consumer to filter for subjects matching this regex string
+	FilterSubject *string `json:"filter_subject,omitempty"`
 	// DeliveryGroup a consumer with non-empty group value can be used
 	// by multiple client instances. For a subject a group listens to,
 	// the messages will shared amongst the members
@@ -300,6 +302,10 @@ func (js jetStreamControllerImpl) CreateConsumerForStream(
 	// To insure that PUSH mode is used, a subject is needed
 	if param.Mode == "push" {
 		jsParams.DeliverSubject = nats.NewInbox()
+	}
+	// Filter for specific subjects
+	if param.FilterSubject != nil {
+		jsParams.FilterSubject = *param.FilterSubject
 	}
 	// Define the consumer
 	if _, err := js.core.JetStream().AddConsumer(stream, &jsParams); err != nil {
