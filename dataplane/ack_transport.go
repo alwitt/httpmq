@@ -13,8 +13,8 @@ import (
 	"gitlab.com/project-nan/httpmq/core"
 )
 
-// ackSeqNum sequence numbers of the ACK
-type ackSeqNum struct {
+// AckSeqNum sequence numbers of the ACK
+type AckSeqNum struct {
 	Stream   uint64 `json:"stream" validate:"required"`
 	Consumer uint64 `json:"consumer" validate:"required"`
 }
@@ -23,7 +23,7 @@ type ackSeqNum struct {
 type AckIndication struct {
 	Stream   string    `json:"stream" validate:"required"`
 	Consumer string    `json:"consumer" validate:"required"`
-	SeqNum   ackSeqNum `json:"seq_num" validate:"required,dive"`
+	SeqNum   AckSeqNum `json:"seq_num" validate:"required,dive"`
 }
 
 // String toString for ackIndication
@@ -39,7 +39,7 @@ func defineACKBroadcastSubject(stream, consumer string) string {
 }
 
 // jetStreamAckHandler function signature for processing a JetStream ACK
-type jetStreamAckHandler func(AckIndication)
+type jetStreamAckHandler func(AckIndication, context.Context)
 
 // JetStreamACKReceiver handle JetStream ACK being broadcast through NATs subjects
 type JetStreamACKReceiver interface {
@@ -52,8 +52,6 @@ type JetStreamACKReceiver interface {
 type jetStreamACKReceiverImpl struct {
 	common.Component
 	ackSubject      string
-	stream          string
-	consumer        string
 	nats            *core.NatsClient
 	subscribed      bool
 	ackSubscription *nats.Subscription
@@ -63,19 +61,19 @@ type jetStreamACKReceiverImpl struct {
 
 // GetJetStreamACKReceiver define JetStreamACKReceiver
 func GetJetStreamACKReceiver(
-	natsClient *core.NatsClient, targetStream, targetConsumer string,
+	natsClient *core.NatsClient, stream, subject, consumer string,
 ) (JetStreamACKReceiver, error) {
-	ackSubject := defineACKBroadcastSubject(targetStream, targetConsumer)
+	ackSubject := defineACKBroadcastSubject(stream, consumer)
 	logTags := log.Fields{
 		"module":    "dataplane",
 		"component": "js-ack-receiver",
-		"instance":  ackSubject,
+		"stream":    stream,
+		"subject":   subject,
+		"consumer":  consumer,
 	}
 	return &jetStreamACKReceiverImpl{
 		Component:       common.Component{LogTags: logTags},
 		ackSubject:      ackSubject,
-		stream:          targetStream,
-		consumer:        targetConsumer,
 		nats:            natsClient,
 		subscribed:      false,
 		ackSubscription: nil,
@@ -114,7 +112,7 @@ func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 		}
 		// Forward the message
 		log.WithFields(r.LogTags).Debugf("Received %s", ackInfo.String())
-		handler(ackInfo)
+		handler(ackInfo, opContext)
 	})
 	if err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf(

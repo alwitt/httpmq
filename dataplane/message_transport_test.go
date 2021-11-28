@@ -111,11 +111,11 @@ func TestMessageTransportPushSub(t *testing.T) {
 	log.Debug("============================= 1 =============================")
 
 	// Case 0: define new subscribers
-	rxSub1, err := GetJetStreamPushSubscriber(js, subject1, consumer1, nil)
+	rxSub1, err := GetJetStreamPushSubscriber(js, stream1, subject1, consumer1, nil)
 	assert.Nil(err)
-	rxSub2, err := GetJetStreamPushSubscriber(js, subject2, consumer2, nil)
+	rxSub2, err := GetJetStreamPushSubscriber(js, stream1, subject2, consumer2, nil)
 	assert.Nil(err)
-	rxSub3, err := GetJetStreamPushSubscriber(js, subject3, consumer3, nil)
+	rxSub3, err := GetJetStreamPushSubscriber(js, stream1, subject3, consumer3, nil)
 	assert.Nil(err)
 	log.Debug("============================= 2 =============================")
 
@@ -320,9 +320,9 @@ func TestMessageTransportPushSubGroup(t *testing.T) {
 	log.Debug("============================= 1 =============================")
 
 	// Case 0: define new subscribers
-	rxSub1, err := GetJetStreamPushSubscriber(js1, subject1, consumer1, &group1)
+	rxSub1, err := GetJetStreamPushSubscriber(js1, stream1, subject1, consumer1, &group1)
 	assert.Nil(err)
-	rxSub2, err := GetJetStreamPushSubscriber(js2, subject1, consumer1, &group1)
+	rxSub2, err := GetJetStreamPushSubscriber(js2, stream1, subject1, consumer1, &group1)
 	assert.Nil(err)
 	log.Debug("============================= 2 =============================")
 

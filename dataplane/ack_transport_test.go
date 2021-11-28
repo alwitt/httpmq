@@ -55,17 +55,18 @@ func TestAckTransport(t *testing.T) {
 	defer js.Close(utCtxt)
 
 	testStream := uuid.New().String()
+	dummySubject := uuid.New().String()
 	testConsumer1 := uuid.New().String()
 	testConsumer2 := uuid.New().String()
 
 	uutTX, err := GetJetStreamACKBroadcaster(js, testName)
 	assert.Nil(err)
-	uutRX1, err := GetJetStreamACKReceiver(js, testStream, testConsumer1)
+	uutRX1, err := GetJetStreamACKReceiver(js, testStream, dummySubject, testConsumer1)
 	assert.Nil(err)
 
 	// Case 0: start subscription on uutRX1
 	rxChan1 := make(chan AckIndication, 1)
-	ackHandler1 := func(ack AckIndication) {
+	ackHandler1 := func(ack AckIndication, _ context.Context) {
 		rxChan1 <- ack
 	}
 	err = uutRX1.SubscribeForACKs(&wg, utCtxt, ackHandler1)
@@ -78,7 +79,7 @@ func TestAckTransport(t *testing.T) {
 	ack1 := AckIndication{
 		Stream:   testStream,
 		Consumer: testConsumer1,
-		SeqNum: ackSeqNum{
+		SeqNum: AckSeqNum{
 			Stream:   1,
 			Consumer: 10,
 		},
@@ -96,10 +97,10 @@ func TestAckTransport(t *testing.T) {
 		}
 	}
 
-	uutRX2, err := GetJetStreamACKReceiver(js, testStream, testConsumer1)
+	uutRX2, err := GetJetStreamACKReceiver(js, testStream, dummySubject, testConsumer1)
 	assert.Nil(err)
 	rxChan2 := make(chan AckIndication, 1)
-	ackHandler2 := func(ack AckIndication) {
+	ackHandler2 := func(ack AckIndication, _ context.Context) {
 		rxChan2 <- ack
 	}
 	err = uutRX2.SubscribeForACKs(&wg, utCtxt, ackHandler2)
@@ -109,7 +110,7 @@ func TestAckTransport(t *testing.T) {
 	ack2 := AckIndication{
 		Stream:   testStream,
 		Consumer: testConsumer1,
-		SeqNum: ackSeqNum{
+		SeqNum: AckSeqNum{
 			Stream:   2,
 			Consumer: 12,
 		},
@@ -134,10 +135,10 @@ func TestAckTransport(t *testing.T) {
 		}
 	}
 
-	uutRX3, err := GetJetStreamACKReceiver(js, testStream, testConsumer2)
+	uutRX3, err := GetJetStreamACKReceiver(js, testStream, dummySubject, testConsumer2)
 	assert.Nil(err)
 	rxChan3 := make(chan AckIndication, 1)
-	ackHandler3 := func(ack AckIndication) {
+	ackHandler3 := func(ack AckIndication, _ context.Context) {
 		rxChan3 <- ack
 	}
 	err = uutRX3.SubscribeForACKs(&wg, utCtxt, ackHandler3)
@@ -147,7 +148,7 @@ func TestAckTransport(t *testing.T) {
 	ack3 := AckIndication{
 		Stream:   testStream,
 		Consumer: testConsumer2,
-		SeqNum: ackSeqNum{
+		SeqNum: AckSeqNum{
 			Stream:   3,
 			Consumer: 32,
 		},

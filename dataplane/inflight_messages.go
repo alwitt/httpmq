@@ -37,12 +37,14 @@ type jetStreamInflightMsgProcessorImpl struct {
 
 // GetJetStreamInflightMsgProcessor define new JetStreamInflightMsgProcessor
 func GetJetStreamInflightMsgProcessor(
-	tp common.TaskProcessor, subject, consumer string,
+	tp common.TaskProcessor, stream, subject, consumer string,
 ) (JetStreamInflightMsgProcessor, error) {
 	logTags := log.Fields{
 		"module":    "dataplane",
 		"component": "js-inflight-msg-holdling",
-		"instance":  fmt.Sprintf("%s@%s", consumer, subject),
+		"stream":    stream,
+		"subject":   subject,
+		"consumer":  consumer,
 	}
 	instance := jetStreamInflightMsgProcessorImpl{
 		Component:         common.Component{LogTags: logTags},
@@ -71,6 +73,7 @@ func GetJetStreamInflightMsgProcessor(
 
 type jsInflightCtrlRecordNewMsg struct {
 	timestamp time.Time
+	blocking  bool
 	message   *nats.Msg
 	resultCB  func(err error)
 }
@@ -86,12 +89,13 @@ func (c *jetStreamInflightMsgProcessorImpl) RecordInflightMessage(
 
 	request := jsInflightCtrlRecordNewMsg{
 		timestamp: time.Now(),
+		blocking:  blocking,
 		message:   msg,
 		resultCB:  handler,
 	}
 
 	if err := c.tp.Submit(request, callCtxt); err != nil {
-		log.WithError(err).WithFields(c.LogTags).Errorf("Failed to submit new inflight message")
+		log.WithError(err).WithFields(c.LogTags).Errorf("Failed to submit %s", msgToString(msg))
 		return err
 	}
 
@@ -114,7 +118,7 @@ func (c *jetStreamInflightMsgProcessorImpl) RecordInflightMessage(
 	}
 
 	if err != nil {
-		log.WithError(err).WithFields(c.LogTags).Errorf("Processing new inflight message failed")
+		log.WithError(err).WithFields(c.LogTags).Errorf("Processing %s failed", msgToString(msg))
 	}
 	return err
 }
@@ -129,7 +133,9 @@ func (c *jetStreamInflightMsgProcessorImpl) processInflightMessage(param interfa
 		)
 	}
 	err := c.ProcessInflightMessage(request.message)
-	request.resultCB(err)
+	if request.blocking {
+		request.resultCB(err)
+	}
 	return err
 }
 
@@ -138,7 +144,7 @@ func (c *jetStreamInflightMsgProcessorImpl) ProcessInflightMessage(msg *nats.Msg
 	// Store the message based on per-consumer sequence number of the JetStream message
 	meta, err := msg.Metadata()
 	if err != nil {
-		log.WithError(err).WithFields(c.LogTags).Error("Unable to record message")
+		log.WithError(err).WithFields(c.LogTags).Errorf("Unable to record %s", msgToString(msg))
 		return err
 	}
 	// Sanity check the consumer name match
@@ -146,7 +152,7 @@ func (c *jetStreamInflightMsgProcessorImpl) ProcessInflightMessage(msg *nats.Msg
 		err := fmt.Errorf(
 			"message expected for %s, but meta says %s", c.consumer, meta.Consumer,
 		)
-		log.WithError(err).WithFields(c.LogTags).Error("Unable to record message")
+		log.WithError(err).WithFields(c.LogTags).Errorf("Unable to record %s", msgToString(msg))
 		return err
 	}
 
@@ -168,7 +174,7 @@ func (c *jetStreamInflightMsgProcessorImpl) ProcessInflightMessage(msg *nats.Msg
 	}
 
 	perConsumerRecords.inflight[meta.Sequence.Consumer] = msg
-	log.WithFields(c.LogTags).Debugf("Recorded message [%d]", meta.Sequence.Consumer)
+	log.WithFields(c.LogTags).Debugf("Recorded %s", msgToString(msg))
 	return nil
 }
 
@@ -176,6 +182,7 @@ func (c *jetStreamInflightMsgProcessorImpl) ProcessInflightMessage(msg *nats.Msg
 
 type jsInflightCtrlRecordACK struct {
 	timestamp time.Time
+	blocking  bool
 	ack       AckIndication
 	resultCB  func(err error)
 }
@@ -191,12 +198,13 @@ func (c *jetStreamInflightMsgProcessorImpl) HandlerMsgACK(
 
 	request := jsInflightCtrlRecordACK{
 		timestamp: time.Now(),
+		blocking:  blocking,
 		ack:       ack,
 		resultCB:  handler,
 	}
 
 	if err := c.tp.Submit(request, callCtxt); err != nil {
-		log.WithError(err).WithFields(c.LogTags).Errorf("Failed to submit msg ACK")
+		log.WithError(err).WithFields(c.LogTags).Errorf("Failed to submit %s", ack.String())
 		return err
 	}
 
@@ -219,7 +227,7 @@ func (c *jetStreamInflightMsgProcessorImpl) HandlerMsgACK(
 	}
 
 	if err != nil {
-		log.WithError(err).WithFields(c.LogTags).Errorf("Processing msg ACK failed")
+		log.WithError(err).WithFields(c.LogTags).Errorf("Processing %s failed", ack.String())
 	}
 	return err
 }
@@ -234,7 +242,9 @@ func (c *jetStreamInflightMsgProcessorImpl) processMsgACK(param interface{}) err
 		)
 	}
 	err := c.ProcessMsgACK(request.ack)
-	request.resultCB(err)
+	if request.blocking {
+		request.resultCB(err)
+	}
 	return err
 }
 
@@ -269,5 +279,6 @@ func (c *jetStreamInflightMsgProcessorImpl) ProcessMsgACK(ack AckIndication) err
 		return err
 	}
 	delete(perConsumerRecords.inflight, ack.SeqNum.Consumer)
+	log.WithFields(c.LogTags).Debugf("Cleaned up based on %s", ack.String())
 	return nil
 }

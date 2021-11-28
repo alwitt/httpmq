@@ -120,7 +120,7 @@ func TestInflightMessageHandling(t *testing.T) {
 	}
 	log.Debug("============================= 1 =============================")
 
-	uut, err := GetJetStreamInflightMsgProcessor(tp, subjects1, consumer1)
+	uut, err := GetJetStreamInflightMsgProcessor(tp, stream1, subjects1, consumer1)
 	assert.Nil(err)
 
 	// Start the task processor
@@ -135,7 +135,7 @@ func TestInflightMessageHandling(t *testing.T) {
 				AckIndication{
 					Stream:   uuid.New().String(),
 					Consumer: testName,
-					SeqNum:   ackSeqNum{Stream: 12, Consumer: 2},
+					SeqNum:   AckSeqNum{Stream: 12, Consumer: 2},
 				}, true, ctxt,
 			),
 		)
@@ -173,7 +173,7 @@ func TestInflightMessageHandling(t *testing.T) {
 				AckIndication{
 					Stream:   stream1,
 					Consumer: consumer1,
-					SeqNum:   ackSeqNum{Stream: testMsg1Seq.Stream, Consumer: testMsg1Seq.Consumer},
+					SeqNum:   AckSeqNum{Stream: testMsg1Seq.Stream, Consumer: testMsg1Seq.Consumer},
 				}, true, ctxt,
 			),
 		)
@@ -211,7 +211,7 @@ func TestInflightMessageHandling(t *testing.T) {
 				AckIndication{
 					Stream:   stream2,
 					Consumer: consumer1,
-					SeqNum:   ackSeqNum{Stream: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer + 2},
+					SeqNum:   AckSeqNum{Stream: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer + 2},
 				}, true, ctxt,
 			),
 		)
@@ -227,7 +227,7 @@ func TestInflightMessageHandling(t *testing.T) {
 				AckIndication{
 					Stream:   stream2,
 					Consumer: consumer1,
-					SeqNum:   ackSeqNum{Stream: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer},
+					SeqNum:   AckSeqNum{Stream: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer},
 				}, true, ctxt,
 			),
 		)
@@ -243,7 +243,7 @@ func TestInflightMessageHandling(t *testing.T) {
 				AckIndication{
 					Stream:   stream2,
 					Consumer: consumer1,
-					SeqNum:   ackSeqNum{Stream: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer},
+					SeqNum:   AckSeqNum{Stream: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer},
 				}, true, ctxt,
 			),
 		)

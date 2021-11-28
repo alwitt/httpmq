@@ -22,8 +22,6 @@ type JetStreamPushSubscriber interface {
 // jetStreamPushSubscriberImpl implements JetStreamPushSubscriber
 type jetStreamPushSubscriberImpl struct {
 	common.Component
-	subject    string
-	consumer   string
 	nats       *core.NatsClient
 	reading    bool
 	sub        *nats.Subscription
@@ -33,12 +31,14 @@ type jetStreamPushSubscriberImpl struct {
 
 // GetJetStreamPushSubscriber define new JetStreamPushSubscriber
 func GetJetStreamPushSubscriber(
-	natsClient *core.NatsClient, subject, consumer string, deliveryGroup *string,
+	natsClient *core.NatsClient, stream, subject, consumer string, deliveryGroup *string,
 ) (JetStreamPushSubscriber, error) {
 	logTags := log.Fields{
 		"module":    "dataplane",
 		"component": "js-push-reader",
-		"instance":  fmt.Sprintf("%s@%s", consumer, subject),
+		"stream":    stream,
+		"subject":   subject,
+		"consumer":  consumer,
 	}
 	// Create the subscription now
 	var s *nats.Subscription
@@ -57,8 +57,6 @@ func GetJetStreamPushSubscriber(
 	}
 	return &jetStreamPushSubscriberImpl{
 		Component:  common.Component{LogTags: logTags},
-		subject:    subject,
-		consumer:   consumer,
 		nats:       natsClient,
 		sub:        s,
 		forwardMsg: nil,
@@ -94,15 +92,7 @@ func (r *jetStreamPushSubscriberImpl) StartReading(
 			}
 			// Forward the message
 			if newMsg != nil {
-				if meta, err := newMsg.Metadata(); err == nil {
-					log.WithFields(r.LogTags).Debugf(
-						"Received [S:%d C:%d] for %s on %s",
-						meta.Sequence.Stream,
-						meta.Sequence.Consumer,
-						meta.Consumer,
-						meta.Stream,
-					)
-				}
+				log.WithFields(r.LogTags).Debugf("Received %s", msgToString(newMsg))
 				if err := r.forwardMsg(newMsg, ctxt); err != nil {
 					log.WithError(err).WithFields(r.LogTags).Errorf("Unable to forward messages")
 				}

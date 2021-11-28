@@ -284,6 +284,7 @@ func (js jetStreamControllerImpl) CreateConsumerForStream(
 		Durable:       param.Name,
 		Description:   param.Notes,
 		MaxDeliver:    param.MaxInflight,
+		MaxAckPending: param.MaxInflight,
 		DeliverPolicy: nats.DeliverAllPolicy,
 		AckPolicy:     nats.AckExplicitPolicy,
 	}
