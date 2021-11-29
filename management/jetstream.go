@@ -18,7 +18,7 @@ type JSStreamLimits struct {
 	MaxConsumers      *int           `json:"max_consumers,omitempty"`
 	MaxMsgs           *int64         `json:"max_msgs,omitempty"`
 	MaxBytes          *int64         `json:"max_bytes,omitempty"`
-	MaxAge            *time.Duration `json:"max_age,omitempty"`
+	MaxAge            *time.Duration `json:"max_age,omitempty" swaggertype:"primitive,integer"`
 	MaxMsgsPerSubject *int64         `json:"max_msgs_per_subject,omitempty"`
 	MaxMsgSize        *int32         `json:"max_msg_size,omitempty"`
 }
@@ -49,6 +49,7 @@ type JetStreamConsumerParam struct {
 
 // JetStreamController manage JetStream
 type JetStreamController interface {
+	Ready() (bool, error)
 	// ========================================================
 	// Stream related management
 	// CreateStream create a new JS stream given parameters
@@ -96,6 +97,11 @@ func GetJetStreamController(
 		core:      natsCore,
 		validate:  validator.New(),
 	}, nil
+}
+
+// Ready indicate whether the system is considered ready
+func (js jetStreamControllerImpl) Ready() (bool, error) {
+	return js.core.NATs().Status() == nats.CONNECTED, nil
 }
 
 // =======================================================================
@@ -149,6 +155,7 @@ func applyStreamLimits(targetLimit *JSStreamLimits, param *nats.StreamConfig) {
 	}
 	if targetLimit.MaxAge != nil {
 		param.MaxAge = *targetLimit.MaxAge
+		param.Duplicates = *targetLimit.MaxAge
 	}
 	if targetLimit.MaxMsgsPerSubject != nil {
 		param.MaxMsgsPerSubject = *targetLimit.MaxMsgsPerSubject
@@ -160,6 +167,11 @@ func applyStreamLimits(targetLimit *JSStreamLimits, param *nats.StreamConfig) {
 
 // CreateStream define a new stream
 func (js jetStreamControllerImpl) CreateStream(param JSStreamParam) error {
+	if err := js.validate.Struct(&param); err != nil {
+		log.WithError(err).WithFields(js.LogTags).Error("Stream create parameters invalid")
+		return err
+	}
+
 	// Convert to JetStream structure
 	jsParams := nats.StreamConfig{
 		Name:     param.Name,

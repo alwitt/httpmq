@@ -9,8 +9,13 @@ lint: .prepare ## Lint the files
 compose: clean .prepare ## Run docker-compose to create the DEV ENV
 	@docker-compose -f docker/docker-compose.yaml up -d
 
-.PHONY: generate
-generate: .prepare ## Generate test mock interfaces
+.PHONY: doc
+doc: .prepare ## Generate the OpenAPI spec
+	@swag init
+	@rm docs/docs.go
+
+.PHONY: mock
+mock: .prepare ## Generate test mock interfaces
 	@mockery --all
 
 .PHONY: test
@@ -19,6 +24,7 @@ test: .prepare ## Run unittests
 
 .PHONY: build
 build: lint ## Build project binaries
+	@go build -o httpmq.bin .
 
 .prepare: ## Prepare the project for local development
 	@pip3 install --user pre-commit

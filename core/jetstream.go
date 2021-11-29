@@ -17,7 +17,7 @@ type NATSConnectParams struct {
 	ConnectTimeout time.Duration
 	// MaxReconnectAttempt on connection failure, max number of reconnect
 	// attempt. "-1" means infinite
-	MaxReconnectAttempt int
+	MaxReconnectAttempt int `validate:"gte=-1"`
 	// ReconnectWait wait duration between reconnect attempts
 	ReconnectWait time.Duration
 	// OnDisconnectCallback callback on disconnect
