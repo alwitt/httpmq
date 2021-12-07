@@ -2,6 +2,7 @@ package dataplane
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
@@ -448,7 +449,7 @@ func TestMessageTranscoding(t *testing.T) {
 
 	// Case 2: publish a message
 	msg2 := []byte(uuid.New().String())
-	var encoded2 *MsgToDeliver
+	var encoded2 []byte
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
@@ -467,14 +468,18 @@ func TestMessageTranscoding(t *testing.T) {
 			assert.Nil(msg.AckSync())
 			enc, err := ConvertJSMessageDeliver(subject1, msg)
 			assert.Nil(err)
-			encoded2 = enc
+			t, err := json.Marshal(&enc)
+			assert.Nil(err)
+			encoded2 = t
 		}
 	}
 
+	log.WithFields(logTags).Debugf("Encoded message %s", encoded2)
+
 	// Case 3: verify the decoded message matches
 	{
-		decode, err := encoded2.GetOriginalMsg()
-		assert.Nil(err)
-		assert.EqualValues(msg2, decode)
+		var parsed MsgToDeliver
+		assert.Nil(json.Unmarshal(encoded2, &parsed))
+		assert.EqualValues(msg2, parsed.Message)
 	}
 }
