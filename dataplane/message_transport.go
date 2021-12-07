@@ -14,9 +14,17 @@ import (
 // ForwardMessageHandlerCB callback used to forward new messages
 type ForwardMessageHandlerCB func(msg *nats.Msg, ctxt context.Context) error
 
+// AlertOnErrorCB callback used to expose internal error to an outer context for handling
+type AlertOnErrorCB func(err error)
+
 // JetStreamPushSubscriber component directly reading from JetStream with push consumer
 type JetStreamPushSubscriber interface {
-	StartReading(forwardCB ForwardMessageHandlerCB, wg *sync.WaitGroup, ctxt context.Context) error
+	StartReading(
+		forwardCB ForwardMessageHandlerCB,
+		errorCB AlertOnErrorCB,
+		wg *sync.WaitGroup,
+		ctxt context.Context,
+	) error
 }
 
 // jetStreamPushSubscriberImpl implements JetStreamPushSubscriber
@@ -26,6 +34,7 @@ type jetStreamPushSubscriberImpl struct {
 	reading    bool
 	sub        *nats.Subscription
 	forwardMsg ForwardMessageHandlerCB
+	errorCB    AlertOnErrorCB
 	lock       *sync.Mutex
 }
 
@@ -60,13 +69,17 @@ func getJetStreamPushSubscriber(
 		nats:       natsClient,
 		sub:        s,
 		forwardMsg: nil,
+		errorCB:    nil,
 		lock:       &sync.Mutex{},
 	}, nil
 }
 
 // StartReading begin reading data from JetStream
 func (r *jetStreamPushSubscriberImpl) StartReading(
-	forwardCB ForwardMessageHandlerCB, wg *sync.WaitGroup, ctxt context.Context,
+	forwardCB ForwardMessageHandlerCB,
+	errorCB AlertOnErrorCB,
+	wg *sync.WaitGroup,
+	ctxt context.Context,
 ) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -78,6 +91,7 @@ func (r *jetStreamPushSubscriberImpl) StartReading(
 	}
 	wg.Add(1)
 	r.forwardMsg = forwardCB
+	r.errorCB = errorCB
 	r.reading = true
 	// Start reading from JetStream
 	go func() {
@@ -88,6 +102,7 @@ func (r *jetStreamPushSubscriberImpl) StartReading(
 			newMsg, err := r.sub.NextMsgWithContext(ctxt)
 			if err != nil {
 				log.WithError(err).WithFields(r.LogTags).Errorf("Read failure")
+				r.errorCB(err)
 				break
 			}
 			// Forward the message
@@ -95,6 +110,7 @@ func (r *jetStreamPushSubscriberImpl) StartReading(
 				log.WithFields(r.LogTags).Debugf("Received %s", msgToString(newMsg))
 				if err := r.forwardMsg(newMsg, ctxt); err != nil {
 					log.WithError(err).WithFields(r.LogTags).Errorf("Unable to forward messages")
+					r.errorCB(err)
 				}
 			}
 		}

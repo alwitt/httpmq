@@ -104,6 +104,10 @@ func TestMessageTransportPushSub(t *testing.T) {
 	assert.Nil(err)
 	log.Debug("============================= 2 =============================")
 
+	internalErrorHandler := func(err error) {
+		assert.Equal("nats: connection closed", err.Error())
+	}
+
 	// Case 1: start reading messages
 	rxChan1 := make(chan *nats.Msg, 1)
 	msgHandler1 := func(msg *nats.Msg, _ context.Context) error {
@@ -120,10 +124,10 @@ func TestMessageTransportPushSub(t *testing.T) {
 		rxChan3 <- msg
 		return nil
 	}
-	assert.Nil(rxSub1.StartReading(msgHandler1, &wg, utCtxt))
-	assert.NotNil(rxSub1.StartReading(msgHandler1, &wg, utCtxt))
-	assert.Nil(rxSub2.StartReading(msgHandler2, &wg, utCtxt))
-	assert.Nil(rxSub3.StartReading(msgHandler3, &wg, utCtxt))
+	assert.Nil(rxSub1.StartReading(msgHandler1, internalErrorHandler, &wg, utCtxt))
+	assert.NotNil(rxSub1.StartReading(msgHandler1, internalErrorHandler, &wg, utCtxt))
+	assert.Nil(rxSub2.StartReading(msgHandler2, internalErrorHandler, &wg, utCtxt))
+	assert.Nil(rxSub3.StartReading(msgHandler3, internalErrorHandler, &wg, utCtxt))
 	log.Debug("============================= 3 =============================")
 
 	publisher, err := GetJetStreamPublisher(js, testName)
@@ -296,6 +300,10 @@ func TestMessageTransportPushSubGroup(t *testing.T) {
 	assert.Nil(err)
 	log.Debug("============================= 2 =============================")
 
+	internalErrorHandler := func(err error) {
+		assert.Equal("nats: connection closed", err.Error())
+	}
+
 	// Case 1: start reading messages
 	type msgTuple struct {
 		msg *nats.Msg
@@ -310,8 +318,8 @@ func TestMessageTransportPushSubGroup(t *testing.T) {
 		rxChan <- msgTuple{msg: msg, id: 2}
 		return nil
 	}
-	assert.Nil(rxSub1.StartReading(msgHandler1, &wg, utCtxt))
-	assert.Nil(rxSub2.StartReading(msgHandler2, &wg, utCtxt))
+	assert.Nil(rxSub1.StartReading(msgHandler1, internalErrorHandler, &wg, utCtxt))
+	assert.Nil(rxSub2.StartReading(msgHandler2, internalErrorHandler, &wg, utCtxt))
 	log.Debug("============================= 3 =============================")
 
 	publisher, err := GetJetStreamPublisher(js1, testName)

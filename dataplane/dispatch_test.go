@@ -89,12 +89,16 @@ func TestPushMessageDispatcher(t *testing.T) {
 		return nil
 	}
 
+	internalErrorHandler := func(err error) {
+		assert.Equal("nats: connection closed", err.Error())
+	}
+
 	// Case 0: start a new dispatcher
 	uut, err := GetPushMessageDispatcher(
 		js, stream1, subject1, consumer1, nil, maxInflight, &wg, utCtxt,
 	)
 	assert.Nil(err)
-	assert.Nil(uut.Start(msgHandler))
+	assert.Nil(uut.Start(msgHandler, internalErrorHandler))
 	log.Debug("============================= 2 =============================")
 
 	publisher, err := GetJetStreamPublisher(js, testName)

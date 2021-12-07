@@ -14,7 +14,7 @@ import (
 // MessageDispatcher process a consumer subscription request and dispatch
 // messages to the consumer
 type MessageDispatcher interface {
-	Start(msgOutput ForwardMessageHandlerCB) error
+	Start(msgOutput ForwardMessageHandlerCB, errorCB AlertOnErrorCB) error
 }
 
 // pushMessageDispatcher implements MessageDispatcher for a push consumer
@@ -91,7 +91,9 @@ func GetPushMessageDispatcher(
 }
 
 // Start starts the push message dispatcher operation
-func (d *pushMessageDispatcher) Start(msgOutput ForwardMessageHandlerCB) error {
+func (d *pushMessageDispatcher) Start(
+	msgOutput ForwardMessageHandlerCB, errorCB AlertOnErrorCB,
+) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	if d.started {
@@ -133,7 +135,7 @@ func (d *pushMessageDispatcher) Start(msgOutput ForwardMessageHandlerCB) error {
 			return err
 		}
 		return nil
-	}, d.wg, d.optContext); err != nil {
+	}, errorCB, d.wg, d.optContext); err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to start MSG subscriber")
 		return err
 	}
