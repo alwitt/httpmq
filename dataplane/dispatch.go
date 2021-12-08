@@ -51,6 +51,9 @@ func GetPushMessageDispatcher(
 		"subject":   subject,
 		"consumer":  consumer,
 	}
+	if ctxt.Value(common.RequestID{}) != nil {
+		logTags["request"] = ctxt.Value(common.RequestID{}).(string)
+	}
 
 	// Define components
 	ackReceiver, err := getJetStreamACKReceiver(natsClient, stream, subject, consumer)
@@ -63,7 +66,9 @@ func GetPushMessageDispatcher(
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define task processor")
 		return nil, err
 	}
-	msgTracking, err := getJetStreamInflightMsgProcessor(msgTrackingTP, stream, subject, consumer)
+	msgTracking, err := getJetStreamInflightMsgProcessor(
+		msgTrackingTP, stream, subject, consumer, ctxt,
+	)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define MSG tracker")
 		return nil, err

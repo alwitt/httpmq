@@ -95,23 +95,31 @@ func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 	r.subscribed = true
 	// Subscribe to the ACK channel for updates
 	ackSub, err := r.nats.NATs().Subscribe(r.ackSubject, func(msg *nats.Msg) {
+		localLogTags := log.Fields{}
+		if err := common.DeepCopy(&r.LogTags, &localLogTags); err != nil {
+			log.WithError(err).WithFields(r.LogTags).Errorf("Failed to deep-copy logtags")
+			return
+		}
+		if opContext.Value(common.RequestID{}) != nil {
+			localLogTags["request"] = opContext.Value(common.RequestID{}).(string)
+		}
 		// Process the message
 		var ackInfo AckIndication
 		if err := json.Unmarshal(msg.Data, &ackInfo); err != nil {
-			log.WithError(err).WithFields(r.LogTags).Errorf(
+			log.WithError(err).WithFields(localLogTags).Errorf(
 				"Failed to read ACK message: %s", msg.Data,
 			)
 			return
 		}
 		// Validate the message
 		if err := r.validate.Struct(&ackInfo); err != nil {
-			log.WithError(err).WithFields(r.LogTags).Errorf(
+			log.WithError(err).WithFields(localLogTags).Errorf(
 				"Failed to validate ACK message: %s", msg.Data,
 			)
 			return
 		}
 		// Forward the message
-		log.WithFields(r.LogTags).Debugf("Received %s", ackInfo.String())
+		log.WithFields(localLogTags).Debugf("Received %s", ackInfo.String())
 		handler(ackInfo, opContext)
 	})
 	if err != nil {
@@ -141,7 +149,7 @@ func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 
 // JetStreamACKBroadcaster broadcast JetStream ACK through NATs subjects
 type JetStreamACKBroadcaster interface {
-	BroadcastACK(ack AckIndication) error
+	BroadcastACK(ack AckIndication, ctxt context.Context) error
 }
 
 // jetStreamACKBroadcasterImpl implements JetStreamACKBroadcaster
@@ -168,22 +176,30 @@ func GetJetStreamACKBroadcaster(
 }
 
 // BroadcastACK broadcast the ACK
-func (t *jetStreamACKBroadcasterImpl) BroadcastACK(ack AckIndication) error {
+func (t *jetStreamACKBroadcasterImpl) BroadcastACK(ack AckIndication, ctxt context.Context) error {
+	localLogTags := log.Fields{}
+	if err := common.DeepCopy(&t.LogTags, &localLogTags); err != nil {
+		log.WithError(err).WithFields(t.LogTags).Errorf("Failed to deep-copy logtags")
+		return err
+	}
+	if ctxt.Value(common.RequestID{}) != nil {
+		localLogTags["request"] = ctxt.Value(common.RequestID{}).(string)
+	}
 	if err := t.validate.Struct(&ack); err != nil {
-		log.WithError(err).WithFields(t.LogTags).Error("ACK parameter invalid")
+		log.WithError(err).WithFields(localLogTags).Error("ACK parameter invalid")
 		return err
 	}
 	subject := defineACKBroadcastSubject(ack.Stream, ack.Consumer)
 	msg, err := json.Marshal(&ack)
 	if err != nil {
-		log.WithError(err).WithFields(t.LogTags).Errorf("Unable to serialize ACK %s", ack)
+		log.WithError(err).WithFields(localLogTags).Errorf("Unable to serialize ACK %s", ack)
 		return err
 	}
-	log.WithFields(t.LogTags).Debugf("Sending %s on %s", ack, subject)
+	log.WithFields(localLogTags).Debugf("Sending %s on %s", ack, subject)
 	if err := t.nats.NATs().Publish(subject, msg); err != nil {
-		log.WithError(err).WithFields(t.LogTags).Errorf("Failed to send ACK %s on %s", ack, subject)
+		log.WithError(err).WithFields(localLogTags).Errorf("Failed to send ACK %s on %s", ack, subject)
 		return err
 	}
-	log.WithFields(t.LogTags).Debugf("Sent %s on %s", ack, subject)
+	log.WithFields(localLogTags).Debugf("Sent %s on %s", ack, subject)
 	return nil
 }

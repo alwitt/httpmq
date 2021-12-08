@@ -81,12 +81,20 @@ func (r *jetStreamPushSubscriberImpl) StartReading(
 	wg *sync.WaitGroup,
 	ctxt context.Context,
 ) error {
+	localLogTags := log.Fields{}
+	if err := common.DeepCopy(&r.LogTags, &localLogTags); err != nil {
+		log.WithError(err).WithFields(r.LogTags).Errorf("Failed to deep-copy logtags")
+		return err
+	}
+	if ctxt.Value(common.RequestID{}) != nil {
+		localLogTags["request"] = ctxt.Value(common.RequestID{}).(string)
+	}
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	// Already reading
 	if r.reading {
 		err := fmt.Errorf("already reading")
-		log.WithError(err).WithFields(r.LogTags).Error("Unable to start reading")
+		log.WithError(err).WithFields(localLogTags).Error("Unable to start reading")
 		return err
 	}
 	wg.Add(1)
@@ -96,34 +104,34 @@ func (r *jetStreamPushSubscriberImpl) StartReading(
 	// Start reading from JetStream
 	go func() {
 		defer wg.Done()
-		log.WithFields(r.LogTags).Infof("Starting reading from JetStream")
-		defer log.WithFields(r.LogTags).Infof("Stopping JetStream read loop")
+		log.WithFields(localLogTags).Infof("Starting reading from JetStream")
+		defer log.WithFields(localLogTags).Infof("Stopping JetStream read loop")
 		defer func() {
 			if err := r.sub.Unsubscribe(); err != nil {
-				log.WithError(err).WithFields(r.LogTags).Error("Unsubscribe failed")
+				log.WithError(err).WithFields(localLogTags).Error("Unsubscribe failed")
 			} else {
-				log.WithFields(r.LogTags).Infof("Unsubscribed from subject")
+				log.WithFields(localLogTags).Infof("Unsubscribed from subject")
 			}
 		}()
 		defer func() {
 			if err := r.sub.Drain(); err != nil {
-				log.WithError(err).WithFields(r.LogTags).Error("Drain failed")
+				log.WithError(err).WithFields(localLogTags).Error("Drain failed")
 			} else {
-				log.WithFields(r.LogTags).Infof("Drained subscription")
+				log.WithFields(localLogTags).Infof("Drained subscription")
 			}
 		}()
 		for {
 			newMsg, err := r.sub.NextMsgWithContext(ctxt)
 			if err != nil {
-				log.WithError(err).WithFields(r.LogTags).Errorf("Read failure")
+				log.WithError(err).WithFields(localLogTags).Errorf("Read failure")
 				r.errorCB(err)
 				break
 			}
 			// Forward the message
 			if newMsg != nil {
-				log.WithFields(r.LogTags).Debugf("Received %s", msgToString(newMsg))
+				log.WithFields(localLogTags).Debugf("Received %s", msgToString(newMsg))
 				if err := r.forwardMsg(newMsg, ctxt); err != nil {
-					log.WithError(err).WithFields(r.LogTags).Errorf("Unable to forward messages")
+					log.WithError(err).WithFields(localLogTags).Errorf("Unable to forward messages")
 					r.errorCB(err)
 				}
 			}
@@ -159,9 +167,17 @@ func GetJetStreamPublisher(
 
 // Publish publish a message on a subject
 func (s *jetStreamPublisherImpl) Publish(subject string, msg []byte, ctxt context.Context) error {
+	localLogTags := log.Fields{}
+	if err := common.DeepCopy(&s.LogTags, &localLogTags); err != nil {
+		log.WithError(err).WithFields(s.LogTags).Errorf("Failed to deep-copy logtags")
+		return err
+	}
+	if ctxt.Value(common.RequestID{}) != nil {
+		localLogTags["request"] = ctxt.Value(common.RequestID{}).(string)
+	}
 	ack, err := s.nats.JetStream().PublishAsync(subject, msg)
 	if err != nil {
-		log.WithError(err).WithFields(s.LogTags).Errorf("Unable to send message")
+		log.WithError(err).WithFields(localLogTags).Errorf("Unable to send message")
 		return err
 	}
 	// Wait for success, failure, or timeout
@@ -169,23 +185,23 @@ func (s *jetStreamPublisherImpl) Publish(subject string, msg []byte, ctxt contex
 	case goodSig, ok := <-ack.Ok():
 		if !ok {
 			err := fmt.Errorf("reading nats.PubAckFuture OK channel failure")
-			log.WithError(err).WithFields(s.LogTags).Errorf("Message send failure")
+			log.WithError(err).WithFields(localLogTags).Errorf("Message send failure")
 			return err
 		}
-		log.WithFields(s.LogTags).Debugf(
+		log.WithFields(localLogTags).Debugf(
 			"Sent [%d] to %s/%s", goodSig.Sequence, goodSig.Stream, subject,
 		)
 		return nil
 	case txErr, ok := <-ack.Err():
 		if !ok {
 			err := fmt.Errorf("reading nats.PubAckFuture error channel failure")
-			log.WithError(err).WithFields(s.LogTags).Errorf("Message send failure")
+			log.WithError(err).WithFields(localLogTags).Errorf("Message send failure")
 			return err
 		}
 		return txErr
 	case <-ctxt.Done():
 		err := ctxt.Err()
-		log.WithError(err).WithFields(s.LogTags).Errorf("Message send timed out")
+		log.WithError(err).WithFields(localLogTags).Errorf("Message send timed out")
 		return err
 	}
 }

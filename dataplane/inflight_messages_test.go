@@ -105,7 +105,7 @@ func TestInflightMessageHandling(t *testing.T) {
 	}
 	log.Debug("============================= 1 =============================")
 
-	uut, err := getJetStreamInflightMsgProcessor(tp, stream1, subjects1, consumer1)
+	uut, err := getJetStreamInflightMsgProcessor(tp, stream1, subjects1, consumer1, utCtxt)
 	assert.Nil(err)
 
 	// Start the task processor

@@ -178,7 +178,7 @@ func TestPushMessageDispatcher(t *testing.T) {
 
 	// Case 4: ACK the first message
 	assert.Nil(ackSend.BroadcastACK(
-		AckIndication{Stream: stream1, Consumer: consumer1, SeqNum: msg1SeqNum},
+		AckIndication{Stream: stream1, Consumer: consumer1, SeqNum: msg1SeqNum}, utCtxt,
 	))
 	log.Debug("============================= 9 =============================")
 	// The third message should come now

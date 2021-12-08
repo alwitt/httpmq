@@ -24,7 +24,7 @@ type cliArgs struct {
 	Dataplane  cmd.DataplaneCLIArgs  `validate:"-"`
 }
 
-var args cliArgs
+var cmdArgs cliArgs
 
 var logTags log.Fields
 
@@ -41,7 +41,7 @@ func main() {
 	if err != nil {
 		log.WithError(err).Fatal("Unable to read hostname")
 	}
-	args.Hostname = hostname
+	cmdArgs.Hostname = hostname
 	logTags = log.Fields{
 		"module":    "main",
 		"component": "main",
@@ -58,7 +58,7 @@ func main() {
 				EnvVars:     []string{"LOG_AS_JSON"},
 				Value:       false,
 				DefaultText: "false",
-				Destination: &args.JSONLog,
+				Destination: &cmdArgs.JSONLog,
 				Required:    false,
 			},
 			&cli.StringFlag{
@@ -68,7 +68,7 @@ func main() {
 				EnvVars:     []string{"LOG_LEVEL"},
 				Value:       "warn",
 				DefaultText: "warn",
-				Destination: &args.LogLevel,
+				Destination: &cmdArgs.LogLevel,
 				Required:    false,
 			},
 			// NATs
@@ -79,7 +79,7 @@ func main() {
 				EnvVars:     []string{"NATS_SERVER_URI"},
 				Value:       "nats://127.0.0.1:4222",
 				DefaultText: "nats://127.0.0.1:4222",
-				Destination: &args.NATS.ServerURI,
+				Destination: &cmdArgs.NATS.ServerURI,
 				Required:    false,
 			},
 			&cli.DurationFlag{
@@ -89,7 +89,7 @@ func main() {
 				EnvVars:     []string{"NATS_CONNECT_TIMEOUT"},
 				Value:       time.Second * 15,
 				DefaultText: "15s",
-				Destination: &args.NATS.ConnectTimeout,
+				Destination: &cmdArgs.NATS.ConnectTimeout,
 				Required:    false,
 			},
 			&cli.DurationFlag{
@@ -99,7 +99,7 @@ func main() {
 				EnvVars:     []string{"NATS_RECONNECT_WAIT"},
 				Value:       time.Second * 15,
 				DefaultText: "15s",
-				Destination: &args.NATS.ReconnectWait,
+				Destination: &cmdArgs.NATS.ReconnectWait,
 				Required:    false,
 			},
 			&cli.IntFlag{
@@ -109,7 +109,7 @@ func main() {
 				EnvVars:     []string{"NATS_MAX_RECONNECT_ATTEMPTS"},
 				Value:       -1,
 				DefaultText: "-1",
-				Destination: &args.NATS.MaxReconnectAttempt,
+				Destination: &cmdArgs.NATS.MaxReconnectAttempt,
 				Required:    false,
 			},
 		},
@@ -118,13 +118,13 @@ func main() {
 			{
 				Name:   "management",
 				Usage:  "Run the httpmq management server",
-				Flags:  cmd.GetManagementCLIFlags(&args.Management),
+				Flags:  cmd.GetManagementCLIFlags(&cmdArgs.Management),
 				Action: startManagementServer,
 			},
 			{
 				Name:   "dataplane",
 				Usage:  "Run the httpmq dataplane server",
-				Flags:  cmd.GetDataplaneCLIFlags(&args.Dataplane),
+				Flags:  cmd.GetDataplaneCLIFlags(&cmdArgs.Dataplane),
 				Action: startDataplaneServer,
 			},
 		},
@@ -138,10 +138,10 @@ func main() {
 
 // setupLogging helper function to prepare the app logging
 func setupLogging() {
-	if args.JSONLog {
+	if cmdArgs.JSONLog {
 		log.SetHandler(apexJSON.New(os.Stderr))
 	}
-	switch args.LogLevel {
+	switch cmdArgs.LogLevel {
 	case "debug":
 		log.SetLevel(log.DebugLevel)
 	case "info":
@@ -158,12 +158,16 @@ func setupLogging() {
 // initialCmdArgsProcessing perform initial CMD arg processing
 func initialCmdArgsProcessing() error {
 	validate := validator.New()
-	if err := validate.Struct(&args); err != nil {
+	if err := validate.Struct(&cmdArgs); err != nil {
 		log.WithError(err).WithFields(logTags).Error("Invalid CMD args")
 		return err
 	}
 	setupLogging()
-	tmp, _ := json.Marshal(&args)
+	tmp, _ := json.Marshal(&cmdArgs)
+	// if err != nil {
+	// 	log.WithError(err).WithFields(logTags).Error("Failed to marshal args")
+	// 	return err
+	// }
 	log.Debugf("Starting params %s", tmp)
 	return nil
 }
@@ -171,18 +175,18 @@ func initialCmdArgsProcessing() error {
 // prepareJetStreamClient define the NATS client
 func prepareJetStreamClient() (*core.NatsClient, error) {
 	natsParam := core.NATSConnectParams{
-		ServerURI:           args.NATS.ServerURI,
-		ConnectTimeout:      args.NATS.ConnectTimeout,
-		MaxReconnectAttempt: args.NATS.MaxReconnectAttempt,
-		ReconnectWait:       args.NATS.ReconnectWait,
+		ServerURI:           cmdArgs.NATS.ServerURI,
+		ConnectTimeout:      cmdArgs.NATS.ConnectTimeout,
+		MaxReconnectAttempt: cmdArgs.NATS.MaxReconnectAttempt,
+		ReconnectWait:       cmdArgs.NATS.ReconnectWait,
 		OnDisconnectCallback: func(_ *nats.Conn, e error) {
 			log.WithError(e).WithFields(logTags).Errorf(
-				"NATS client disconnected from server %s", args.NATS.ServerURI,
+				"NATS client disconnected from server %s", cmdArgs.NATS.ServerURI,
 			)
 		},
 		OnReconnectCallback: func(_ *nats.Conn) {
 			log.WithFields(logTags).Warnf(
-				"NATS client reconnected with server %s", args.NATS.ServerURI,
+				"NATS client reconnected with server %s", cmdArgs.NATS.ServerURI,
 			)
 		},
 		OnCloseCallback: func(_ *nats.Conn) {
@@ -204,12 +208,12 @@ func startManagementServer(c *cli.Context) error {
 	js, err := prepareJetStreamClient()
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf(
-			"Failed to defin NATS client with %s", args.NATS.ServerURI,
+			"Failed to defin NATS client with %s", cmdArgs.NATS.ServerURI,
 		)
 		return nil
 	}
 
-	return cmd.RunManagementServer(args.Management, args.Hostname, js)
+	return cmd.RunManagementServer(cmdArgs.Management, cmdArgs.Hostname, js)
 }
 
 // ============================================================================
@@ -224,10 +228,10 @@ func startDataplaneServer(c *cli.Context) error {
 	js, err := prepareJetStreamClient()
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf(
-			"Failed to defin NATS client with %s", args.NATS.ServerURI,
+			"Failed to defin NATS client with %s", cmdArgs.NATS.ServerURI,
 		)
 		return nil
 	}
 
-	return cmd.RunDataplaneServer(args.Dataplane, args.Hostname, js)
+	return cmd.RunDataplaneServer(cmdArgs.Dataplane, cmdArgs.Hostname, js)
 }

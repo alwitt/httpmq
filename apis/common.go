@@ -1,10 +1,12 @@
 package apis
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/apex/log"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"gitlab.com/project-nan/httpmq/common"
 )
@@ -85,4 +87,20 @@ func (h APIRestHandler) reply(
 func (h APIRestHandler) Write(p []byte) (n int, err error) {
 	log.WithFields(h.LogTags).Infof("%s", p)
 	return len(p), nil
+}
+
+// attachRequestID middleware function to attach a request ID to a API request
+func (h APIRestHandler) attachRequestID(next http.HandlerFunc) http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		// use provided request id from incoming request if any
+		reqID := r.Header.Get("Httpmq-Request-ID")
+		if reqID == "" {
+			// or use some generated string
+			reqID = uuid.New().String()
+		}
+		log.WithFields(h.LogTags).Debugf("New request ID %s", reqID)
+		ctx := context.WithValue(r.Context(), common.RequestID{}, reqID)
+
+		next(rw, r.WithContext(ctx))
+	}
 }

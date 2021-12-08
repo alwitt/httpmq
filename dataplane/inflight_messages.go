@@ -37,7 +37,7 @@ type jetStreamInflightMsgProcessorImpl struct {
 
 // getJetStreamInflightMsgProcessor define new JetStreamInflightMsgProcessor
 func getJetStreamInflightMsgProcessor(
-	tp common.TaskProcessor, stream, subject, consumer string,
+	tp common.TaskProcessor, stream, subject, consumer string, ctxt context.Context,
 ) (JetStreamInflightMsgProcessor, error) {
 	logTags := log.Fields{
 		"module":    "dataplane",
@@ -45,6 +45,9 @@ func getJetStreamInflightMsgProcessor(
 		"stream":    stream,
 		"subject":   subject,
 		"consumer":  consumer,
+	}
+	if ctxt.Value(common.RequestID{}) != nil {
+		logTags["request"] = ctxt.Value(common.RequestID{}).(string)
 	}
 	instance := jetStreamInflightMsgProcessorImpl{
 		Component:         common.Component{LogTags: logTags},

@@ -71,11 +71,27 @@ func GetAPIRestJetStreamDataplaneHandler(
 func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, r *http.Request) {
 	restCall := "POST /v1/data/subject/{subjectName}"
 
+	localLogTags := log.Fields{}
+	if err := common.DeepCopy(&h.LogTags, &localLogTags); err != nil {
+		msg := "Prep failed"
+		log.WithError(err).WithFields(h.LogTags).Error("Failed to deep-copy logtags")
+		h.reply(
+			w,
+			http.StatusInternalServerError,
+			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			restCall,
+		)
+		return
+	}
+	if r.Context().Value(common.RequestID{}) != nil {
+		localLogTags["request"] = r.Context().Value(common.RequestID{}).(string)
+	}
+
 	vars := mux.Vars(r)
 	subjectName, ok := vars["subjectName"]
 	if !ok {
 		msg := "No subject name provided"
-		log.WithFields(h.LogTags).Errorf(msg)
+		log.WithFields(localLogTags).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall)
 		return
 	}
@@ -88,13 +104,13 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, 
 		decodeNum, err := io.Copy(buf, decoder)
 		if err != nil {
 			msg := "Failed to base64 decode body"
-			log.WithError(err).WithFields(h.LogTags).Errorf(msg)
+			log.WithError(err).WithFields(localLogTags).Errorf(msg)
 			h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall)
 			return
 		}
 		if decodeNum == 0 {
 			msg := "Base64 decode resulted in empty body"
-			log.WithFields(h.LogTags).Errorf(msg)
+			log.WithFields(localLogTags).Errorf(msg)
 			h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall)
 			return
 		}
@@ -104,7 +120,7 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, 
 	// Publish the message
 	if err := h.publisher.Publish(subjectName, decodedMsg, r.Context()); err != nil {
 		msg := fmt.Sprintf("Unable to publish message to %s", subjectName)
-		log.WithError(err).WithFields(h.LogTags).Errorf(msg)
+		log.WithError(err).WithFields(localLogTags).Errorf(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
 				http.StatusInternalServerError, &msg,
@@ -118,9 +134,9 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, 
 
 // PublishMessageHandler Wrapper around PublishMessage
 func (h APIRestJetStreamDataplaneHandler) PublishMessageHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
 		h.PublishMessage(w, r)
-	}
+	})
 }
 
 // =======================================================================
@@ -145,18 +161,34 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessageHandler() http.HandlerFu
 func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r *http.Request) {
 	restCall := "POST /v1/data/stream/{streamName}/consumer/{consumerName}/ack"
 
+	localLogTags := log.Fields{}
+	if err := common.DeepCopy(&h.LogTags, &localLogTags); err != nil {
+		msg := "Prep failed"
+		log.WithError(err).WithFields(h.LogTags).Error("Failed to deep-copy logtags")
+		h.reply(
+			w,
+			http.StatusInternalServerError,
+			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			restCall,
+		)
+		return
+	}
+	if r.Context().Value(common.RequestID{}) != nil {
+		localLogTags["request"] = r.Context().Value(common.RequestID{}).(string)
+	}
+
 	vars := mux.Vars(r)
 	streamName, ok := vars["streamName"]
 	if !ok {
 		msg := "No stream name provided"
-		log.WithFields(h.LogTags).Errorf(msg)
+		log.WithFields(localLogTags).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall)
 		return
 	}
 	consumerName, ok := vars["consumerName"]
 	if !ok {
 		msg := "No consumer name provided"
-		log.WithFields(h.LogTags).Errorf(msg)
+		log.WithFields(localLogTags).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall)
 		return
 	}
@@ -164,7 +196,7 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 	var sequence dataplane.AckSeqNum
 	if err := json.NewDecoder(r.Body).Decode(&sequence); err != nil {
 		msg := "Unable to parse request body"
-		log.WithError(err).WithFields(h.LogTags).Error(msg)
+		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall)
 		return
 	}
@@ -172,7 +204,7 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 	// Validate input
 	if err := h.validate.Struct(&sequence); err != nil {
 		msg := "Unable to parse request body"
-		log.WithError(err).WithFields(h.LogTags).Error(msg)
+		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall)
 		return
 	}
@@ -184,9 +216,9 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 	}
 
 	// Broadcast the ACK
-	if err := h.ackBroadcast.BroadcastACK(ackInfo); err != nil {
+	if err := h.ackBroadcast.BroadcastACK(ackInfo, r.Context()); err != nil {
 		msg := fmt.Sprintf("Failed to broadcast ACK %s", ackInfo.String())
-		log.WithError(err).WithFields(h.LogTags).Error(msg)
+		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
 				http.StatusInternalServerError, &msg,
@@ -200,9 +232,9 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 
 // ReceiveMsgACKHandler Wrapper around ReceiveMsgACK
 func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACKHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
 		h.ReceiveMsgACK(w, r)
-	}
+	})
 }
 
 // -----------------------------------------------------------------------
@@ -225,20 +257,36 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACKHandler() http.HandlerFun
 func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r *http.Request) {
 	restCall := "GET /v1/data/stream/{streamName}/consumer/{consumerName}"
 
+	localLogTagsInitial := log.Fields{}
+	if err := common.DeepCopy(&h.LogTags, &localLogTagsInitial); err != nil {
+		msg := "Prep failed"
+		log.WithError(err).WithFields(h.LogTags).Error("Failed to deep-copy logtags")
+		h.reply(
+			w,
+			http.StatusInternalServerError,
+			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			restCall,
+		)
+		return
+	}
+	if r.Context().Value(common.RequestID{}) != nil {
+		localLogTagsInitial["request"] = r.Context().Value(common.RequestID{}).(string)
+	}
+
 	// --------------------------------------------------------------------------
 	// Read operation parameters
 	vars := mux.Vars(r)
 	streamName, ok := vars["streamName"]
 	if !ok {
 		msg := "No stream name provided"
-		log.WithFields(h.LogTags).Errorf(msg)
+		log.WithFields(localLogTagsInitial).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall)
 		return
 	}
 	consumerName, ok := vars["consumerName"]
 	if !ok {
 		msg := "No consumer name provided"
-		log.WithFields(h.LogTags).Errorf(msg)
+		log.WithFields(localLogTagsInitial).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall)
 		return
 	}
@@ -254,7 +302,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		t, ok := requestQueries["subject_name"]
 		if !ok || len(t) != 1 {
 			msg := "Missing subscribe subject / Multiple subjects"
-			log.WithFields(h.LogTags).Errorf(msg)
+			log.WithFields(localLogTagsInitial).Errorf(msg)
 			h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall)
 			return
 		}
@@ -266,7 +314,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		if ok {
 			if len(t) != 1 {
 				msg := "Multiple max_msg_inflight"
-				log.WithFields(h.LogTags).Errorf(msg)
+				log.WithFields(localLogTagsInitial).Errorf(msg)
 				h.reply(
 					w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall,
 				)
@@ -275,7 +323,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 			p, err := strconv.Atoi(t[0])
 			if err != nil {
 				msg := "Unable to parse max_msg_inflight"
-				log.WithError(err).WithFields(h.LogTags).Errorf(msg)
+				log.WithError(err).WithFields(localLogTagsInitial).Errorf(msg)
 				h.reply(
 					w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall,
 				)
@@ -290,7 +338,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		if ok {
 			if len(t) != 1 {
 				msg := "Multiple delivery groups"
-				log.WithFields(h.LogTags).Errorf(msg)
+				log.WithFields(localLogTagsInitial).Errorf(msg)
 				h.reply(
 					w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall,
 				)
@@ -313,6 +361,9 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		"subject":        subjectName,
 		"consumer":       consumerName,
 		"delivery_group": deliveryGroup,
+	}
+	if r.Context().Value(common.RequestID{}) != nil {
+		logTags["request"] = r.Context().Value(common.RequestID{}).(string)
 	}
 
 	// Create stream flusher
@@ -447,9 +498,9 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 
 // PushSubscribeHandler Wrapper around PushSubscribe
 func (h APIRestJetStreamDataplaneHandler) PushSubscribeHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
 		h.PushSubscribe(w, r)
-	}
+	})
 }
 
 // =======================================================================

@@ -84,7 +84,7 @@ func TestAckTransport(t *testing.T) {
 			Consumer: 10,
 		},
 	}
-	assert.Nil(uutTX.BroadcastACK(ack1))
+	assert.Nil(uutTX.BroadcastACK(ack1, utCtxt))
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
@@ -115,7 +115,7 @@ func TestAckTransport(t *testing.T) {
 			Consumer: 12,
 		},
 	}
-	assert.Nil(uutTX.BroadcastACK(ack2))
+	assert.Nil(uutTX.BroadcastACK(ack2, utCtxt))
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
@@ -153,7 +153,7 @@ func TestAckTransport(t *testing.T) {
 			Consumer: 32,
 		},
 	}
-	assert.Nil(uutTX.BroadcastACK(ack3))
+	assert.Nil(uutTX.BroadcastACK(ack3, utCtxt))
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Millisecond*150)
 		defer cancel()
