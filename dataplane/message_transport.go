@@ -98,6 +98,20 @@ func (r *jetStreamPushSubscriberImpl) StartReading(
 		defer wg.Done()
 		log.WithFields(r.LogTags).Infof("Starting reading from JetStream")
 		defer log.WithFields(r.LogTags).Infof("Stopping JetStream read loop")
+		defer func() {
+			if err := r.sub.Unsubscribe(); err != nil {
+				log.WithError(err).WithFields(r.LogTags).Error("Unsubscribe failed")
+			} else {
+				log.WithFields(r.LogTags).Infof("Unsubscribed from subject")
+			}
+		}()
+		defer func() {
+			if err := r.sub.Drain(); err != nil {
+				log.WithError(err).WithFields(r.LogTags).Error("Drain failed")
+			} else {
+				log.WithFields(r.LogTags).Infof("Drained subscription")
+			}
+		}()
 		for {
 			newMsg, err := r.sub.NextMsgWithContext(ctxt)
 			if err != nil {

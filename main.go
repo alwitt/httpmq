@@ -20,7 +20,8 @@ type cliArgs struct {
 	NATS     core.NATSConnectParams `validate:"required,dive"`
 	Hostname string
 	// For various subcommands
-	Management cmd.ManagementCLIArgs
+	Management cmd.ManagementCLIArgs `validate:"-"`
+	Dataplane  cmd.DataplaneCLIArgs  `validate:"-"`
 }
 
 var args cliArgs
@@ -120,6 +121,12 @@ func main() {
 				Flags:  cmd.GetManagementCLIFlags(&args.Management),
 				Action: startManagementServer,
 			},
+			{
+				Name:   "dataplane",
+				Usage:  "Run the httpmq dataplane server",
+				Flags:  cmd.GetDataplaneCLIFlags(&args.Dataplane),
+				Action: startDataplaneServer,
+			},
 		},
 	}
 
@@ -203,4 +210,24 @@ func startManagementServer(c *cli.Context) error {
 	}
 
 	return cmd.RunManagementServer(args.Management, args.Hostname, js)
+}
+
+// ============================================================================
+// Dataplane subcommand
+
+// startDataplaneServer run the dataplane server
+func startDataplaneServer(c *cli.Context) error {
+	if err := initialCmdArgsProcessing(); err != nil {
+		return err
+	}
+
+	js, err := prepareJetStreamClient()
+	if err != nil {
+		log.WithError(err).WithFields(logTags).Errorf(
+			"Failed to defin NATS client with %s", args.NATS.ServerURI,
+		)
+		return nil
+	}
+
+	return cmd.RunDataplaneServer(args.Dataplane, args.Hostname, js)
 }

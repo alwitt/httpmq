@@ -147,7 +147,8 @@ type JetStreamACKBroadcaster interface {
 // jetStreamACKBroadcasterImpl implements JetStreamACKBroadcaster
 type jetStreamACKBroadcasterImpl struct {
 	common.Component
-	nats *core.NatsClient
+	nats     *core.NatsClient
+	validate *validator.Validate
 }
 
 // GetJetStreamACKBroadcaster define JetStreamACKBroadcaster
@@ -162,11 +163,16 @@ func GetJetStreamACKBroadcaster(
 	return &jetStreamACKBroadcasterImpl{
 		Component: common.Component{LogTags: logTags},
 		nats:      natsClient,
+		validate:  validator.New(),
 	}, nil
 }
 
 // BroadcastACK broadcast the ACK
 func (t *jetStreamACKBroadcasterImpl) BroadcastACK(ack AckIndication) error {
+	if err := t.validate.Struct(&ack); err != nil {
+		log.WithError(err).WithFields(t.LogTags).Error("ACK parameter invalid")
+		return err
+	}
 	subject := defineACKBroadcastSubject(ack.Stream, ack.Consumer)
 	msg, err := json.Marshal(&ack)
 	if err != nil {

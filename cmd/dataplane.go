@@ -15,41 +15,41 @@ import (
 	"github.com/urfave/cli/v2"
 	"gitlab.com/project-nan/httpmq/apis"
 	"gitlab.com/project-nan/httpmq/core"
-	"gitlab.com/project-nan/httpmq/management"
+	"gitlab.com/project-nan/httpmq/dataplane"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
 
-// ManagementRestEndpoints end-point path configs for management control API
-type ManagementRestEndpoints struct {
+// DataplaneRestEndpoints end-point path configs for dataplane API
+type DataplaneRestEndpoints struct {
 	PathPrefix string
 }
 
-// ManagementCLIArgs arguments
-type ManagementCLIArgs struct {
+// DataplaneCLIArgs arguments
+type DataplaneCLIArgs struct {
 	ServerPort int `validate:"required,gt=0,lt=65536"`
-	Endpoints  ManagementRestEndpoints
+	Endpoints  DataplaneRestEndpoints
 }
 
-// GetManagementCLIFlags retreive the set of CMD flags for management server
-func GetManagementCLIFlags(args *ManagementCLIArgs) []cli.Flag {
+// GetDataplaneCLIFlags retreive the set of CMD flags for dataplane server
+func GetDataplaneCLIFlags(args *DataplaneCLIArgs) []cli.Flag {
 	return []cli.Flag{
 		&cli.IntFlag{
-			Name:        "management-server-port",
-			Usage:       "Management server port",
-			Aliases:     []string{"msp"},
-			EnvVars:     []string{"MANAGEMENT_SERVER_PORT"},
-			Value:       3000,
-			DefaultText: "3000",
+			Name:        "dataplane-server-port",
+			Usage:       "Dataplane server port",
+			Aliases:     []string{"dsp"},
+			EnvVars:     []string{"DATAPLANE_SERVER_PORT"},
+			Value:       3001,
+			DefaultText: "3001",
 			Destination: &args.ServerPort,
 			Required:    false,
 		},
 		// End-point related
 		&cli.StringFlag{
-			Name:        "management-server-endpoint-prefix",
-			Usage:       "Set the end-point path prefix for the management APIs",
-			Aliases:     []string{"msep"},
-			EnvVars:     []string{"MANAGEMENT_SERVER_ENDPOINT_PREFIX"},
+			Name:        "dataplane-server-endpoint-prefix",
+			Usage:       "Set the end-point path prefix for the dataplane APIs",
+			Aliases:     []string{"dsep"},
+			EnvVars:     []string{"DATAPLANE_SERVER_ENDPOINT_PREFIX"},
 			Value:       "/",
 			DefaultText: "/",
 			Destination: &args.Endpoints.PathPrefix,
@@ -58,9 +58,9 @@ func GetManagementCLIFlags(args *ManagementCLIArgs) []cli.Flag {
 	}
 }
 
-// RunManagementServer run the management server
-func RunManagementServer(
-	params ManagementCLIArgs, instance string, natsClient *core.NatsClient,
+// RunDataplaneServer run the dataplane server
+func RunDataplaneServer(
+	params DataplaneCLIArgs, instance string, natsClient *core.NatsClient,
 ) error {
 	logTags := log.Fields{
 		"module":    "cmd",
@@ -74,13 +74,19 @@ func RunManagementServer(
 		return err
 	}
 
-	controller, err := management.GetJetStreamController(natsClient, instance)
+	msgPub, err := dataplane.GetJetStreamPublisher(natsClient, instance)
 	if err != nil {
-		log.WithError(err).WithFields(logTags).Errorf("Unable to define JetStream controller")
+		log.WithError(err).WithFields(logTags).Errorf("Unable to define message publisher")
 		return err
 	}
 
-	httpHandler, err := apis.GetAPIRestJetStreamManagementHandler(controller)
+	ackPub, err := dataplane.GetJetStreamACKBroadcaster(natsClient, instance)
+	if err != nil {
+		log.WithError(err).WithFields(logTags).Errorf("Unable to define ACK broadcaster")
+		return err
+	}
+
+	httpHandler, err := apis.GetAPIRestJetStreamDataplaneHandler(natsClient, msgPub, ackPub)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define HTTP handler")
 		return err
@@ -92,39 +98,26 @@ func RunManagementServer(
 	router := mux.NewRouter()
 	mainRouter := apis.RegisterPathPrefix(router, params.Endpoints.PathPrefix, nil)
 
-	// All stream routes
-	streamAPIRouter := apis.RegisterPathPrefix(
-		mainRouter, "/v1/admin/stream", map[string]http.HandlerFunc{
-			"post": httpHandler.CreateStreamHandler(),
-			"get":  httpHandler.GetAllStreamsHandler(),
+	// Message publish
+	_ = apis.RegisterPathPrefix(
+		mainRouter, "/v1/data/subject/{subjectName}", map[string]http.HandlerFunc{
+			"post": httpHandler.PublishMessageHandler(),
 		},
 	)
 
-	// Per stream routes
-	perStreamAPIRounter := apis.RegisterPathPrefix(
-		streamAPIRouter, "/{streamName}", map[string]http.HandlerFunc{
-			"get":    httpHandler.GetStreamHandler(),
-			"delete": httpHandler.DeleteStreamHandler(),
+	// Subscription
+	subscribeAPIRouter := apis.RegisterPathPrefix(
+		mainRouter,
+		"/v1/data/stream/{streamName}/consumer/{consumerName}",
+		map[string]http.HandlerFunc{
+			"get": httpHandler.PushSubscribeHandler(),
 		},
 	)
-	_ = apis.RegisterPathPrefix(perStreamAPIRounter, "/subject", map[string]http.HandlerFunc{
-		"put": httpHandler.ChangeStreamSubjectsHandler(),
-	})
-	_ = apis.RegisterPathPrefix(perStreamAPIRounter, "/limit", map[string]http.HandlerFunc{
-		"put": httpHandler.UpdateStreamLimitsHandler(),
-	})
-
-	// All consumer routes
-	consumerAPIRouter := apis.RegisterPathPrefix(
-		perStreamAPIRounter, "/consumer", map[string]http.HandlerFunc{
-			"post": httpHandler.CreateConsumerHandler(),
-			"get":  httpHandler.GetAllConsumersHandler(),
+	_ = apis.RegisterPathPrefix(
+		subscribeAPIRouter, "/ack", map[string]http.HandlerFunc{
+			"post": httpHandler.ReceiveMsgACKHandler(),
 		},
 	)
-	_ = apis.RegisterPathPrefix(consumerAPIRouter, "/{consumerName}", map[string]http.HandlerFunc{
-		"get":    httpHandler.GetConsumerHandler(),
-		"delete": httpHandler.DeleteConsumerHandler(),
-	})
 
 	// Health check
 	_ = apis.RegisterPathPrefix(mainRouter, "/alive", map[string]http.HandlerFunc{
@@ -143,7 +136,6 @@ func RunManagementServer(
 	httpSrv := &http.Server{
 		Addr:         serverListen,
 		WriteTimeout: time.Second * 60,
-		ReadTimeout:  time.Second * 60,
 		Handler:      h2c.NewHandler(router, &http2.Server{}),
 	}
 
