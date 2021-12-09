@@ -14,10 +14,17 @@ import (
 	"gitlab.com/project-nan/httpmq/core"
 )
 
+type natsArgs struct {
+	ServerURI           string `validate:"required,uri"`
+	ConnectTimeout      time.Duration
+	MaxReconnectAttempt int `validate:"gte=-1"`
+	ReconnectWait       time.Duration
+}
+
 type cliArgs struct {
 	JSONLog  bool
-	LogLevel string                 `validate:"required,oneof=debug info warn error"`
-	NATS     core.NATSConnectParams `validate:"required,dive"`
+	LogLevel string   `validate:"required,oneof=debug info warn error"`
+	NATS     natsArgs `validate:"required,dive"`
 	Hostname string
 	// For various subcommands
 	Management cmd.ManagementCLIArgs `validate:"-"`
@@ -163,11 +170,12 @@ func initialCmdArgsProcessing() error {
 		return err
 	}
 	setupLogging()
-	tmp, _ := json.Marshal(&cmdArgs)
-	// if err != nil {
-	// 	log.WithError(err).WithFields(logTags).Error("Failed to marshal args")
-	// 	return err
-	// }
+	tmp, err := json.Marshal(&cmdArgs)
+	// args don't marshal
+	if err != nil {
+		log.WithError(err).WithFields(logTags).Error("Failed to marshal args")
+		return err
+	}
 	log.Debugf("Starting params %s", tmp)
 	return nil
 }
