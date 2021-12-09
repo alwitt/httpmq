@@ -83,8 +83,11 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, 
 		)
 		return
 	}
-	if r.Context().Value(common.RequestID{}) != nil {
-		localLogTags["request"] = r.Context().Value(common.RequestID{}).(string)
+	if r.Context().Value(common.RequestParam{}) != nil {
+		v, ok := r.Context().Value(common.RequestParam{}).(common.RequestParam)
+		if ok {
+			v.UpdateLogTags(localLogTags)
+		}
 	}
 
 	vars := mux.Vars(r)
@@ -173,8 +176,11 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 		)
 		return
 	}
-	if r.Context().Value(common.RequestID{}) != nil {
-		localLogTags["request"] = r.Context().Value(common.RequestID{}).(string)
+	if r.Context().Value(common.RequestParam{}) != nil {
+		v, ok := r.Context().Value(common.RequestParam{}).(common.RequestParam)
+		if ok {
+			v.UpdateLogTags(localLogTags)
+		}
 	}
 
 	vars := mux.Vars(r)
@@ -269,8 +275,11 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		)
 		return
 	}
-	if r.Context().Value(common.RequestID{}) != nil {
-		localLogTagsInitial["request"] = r.Context().Value(common.RequestID{}).(string)
+	if r.Context().Value(common.RequestParam{}) != nil {
+		v, ok := r.Context().Value(common.RequestParam{}).(common.RequestParam)
+		if ok {
+			v.UpdateLogTags(localLogTagsInitial)
+		}
 	}
 
 	// --------------------------------------------------------------------------
@@ -362,8 +371,11 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		"consumer":       consumerName,
 		"delivery_group": deliveryGroup,
 	}
-	if r.Context().Value(common.RequestID{}) != nil {
-		logTags["request"] = r.Context().Value(common.RequestID{}).(string)
+	if r.Context().Value(common.RequestParam{}) != nil {
+		v, ok := r.Context().Value(common.RequestParam{}).(common.RequestParam)
+		if ok {
+			v.UpdateLogTags(logTags)
+		}
 	}
 
 	// Create stream flusher

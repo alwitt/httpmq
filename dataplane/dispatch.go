@@ -51,8 +51,11 @@ func GetPushMessageDispatcher(
 		"subject":   subject,
 		"consumer":  consumer,
 	}
-	if ctxt.Value(common.RequestID{}) != nil {
-		logTags["request"] = ctxt.Value(common.RequestID{}).(string)
+	if ctxt.Value(common.RequestParam{}) != nil {
+		v, ok := ctxt.Value(common.RequestParam{}).(common.RequestParam)
+		if ok {
+			v.UpdateLogTags(logTags)
+		}
 	}
 
 	// Define components

@@ -100,8 +100,11 @@ func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 			log.WithError(err).WithFields(r.LogTags).Errorf("Failed to deep-copy logtags")
 			return
 		}
-		if opContext.Value(common.RequestID{}) != nil {
-			localLogTags["request"] = opContext.Value(common.RequestID{}).(string)
+		if opContext.Value(common.RequestParam{}) != nil {
+			v, ok := opContext.Value(common.RequestParam{}).(common.RequestParam)
+			if ok {
+				v.UpdateLogTags(localLogTags)
+			}
 		}
 		// Process the message
 		var ackInfo AckIndication
@@ -182,8 +185,11 @@ func (t *jetStreamACKBroadcasterImpl) BroadcastACK(ack AckIndication, ctxt conte
 		log.WithError(err).WithFields(t.LogTags).Errorf("Failed to deep-copy logtags")
 		return err
 	}
-	if ctxt.Value(common.RequestID{}) != nil {
-		localLogTags["request"] = ctxt.Value(common.RequestID{}).(string)
+	if ctxt.Value(common.RequestParam{}) != nil {
+		v, ok := ctxt.Value(common.RequestParam{}).(common.RequestParam)
+		if ok {
+			v.UpdateLogTags(localLogTags)
+		}
 	}
 	if err := t.validate.Struct(&ack); err != nil {
 		log.WithError(err).WithFields(localLogTags).Error("ACK parameter invalid")

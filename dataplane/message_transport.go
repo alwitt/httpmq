@@ -86,8 +86,11 @@ func (r *jetStreamPushSubscriberImpl) StartReading(
 		log.WithError(err).WithFields(r.LogTags).Errorf("Failed to deep-copy logtags")
 		return err
 	}
-	if ctxt.Value(common.RequestID{}) != nil {
-		localLogTags["request"] = ctxt.Value(common.RequestID{}).(string)
+	if ctxt.Value(common.RequestParam{}) != nil {
+		v, ok := ctxt.Value(common.RequestParam{}).(common.RequestParam)
+		if ok {
+			v.UpdateLogTags(localLogTags)
+		}
 	}
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -172,8 +175,11 @@ func (s *jetStreamPublisherImpl) Publish(subject string, msg []byte, ctxt contex
 		log.WithError(err).WithFields(s.LogTags).Errorf("Failed to deep-copy logtags")
 		return err
 	}
-	if ctxt.Value(common.RequestID{}) != nil {
-		localLogTags["request"] = ctxt.Value(common.RequestID{}).(string)
+	if ctxt.Value(common.RequestParam{}) != nil {
+		v, ok := ctxt.Value(common.RequestParam{}).(common.RequestParam)
+		if ok {
+			v.UpdateLogTags(localLogTags)
+		}
 	}
 	ack, err := s.nats.JetStream().PublishAsync(subject, msg)
 	if err != nil {

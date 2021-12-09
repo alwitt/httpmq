@@ -99,7 +99,11 @@ func (h APIRestHandler) attachRequestID(next http.HandlerFunc) http.HandlerFunc 
 			reqID = uuid.New().String()
 		}
 		log.WithFields(h.LogTags).Debugf("New request ID %s", reqID)
-		ctx := context.WithValue(r.Context(), common.RequestID{}, reqID)
+		ctx := context.WithValue(
+			r.Context(), common.RequestParam{}, common.RequestParam{
+				ID: reqID, Method: r.Method, URI: r.URL.String(),
+			},
+		)
 
 		next(rw, r.WithContext(ctx))
 	}
