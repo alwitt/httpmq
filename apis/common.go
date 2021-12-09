@@ -92,18 +92,22 @@ func (h APIRestHandler) Write(p []byte) (n int, err error) {
 // attachRequestID middleware function to attach a request ID to a API request
 func (h APIRestHandler) attachRequestID(next http.HandlerFunc) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		localLogTags := log.Fields{}
+		if err := common.DeepCopy(&h.LogTags, &localLogTags); err != nil {
+			log.WithError(err).WithFields(h.LogTags).Errorf("Failed to deep-copy logtags")
+			return
+		}
 		// use provided request id from incoming request if any
 		reqID := r.Header.Get("Httpmq-Request-ID")
 		if reqID == "" {
 			// or use some generated string
 			reqID = uuid.New().String()
 		}
-		log.WithFields(h.LogTags).Debugf("New request ID %s", reqID)
-		ctx := context.WithValue(
-			r.Context(), common.RequestParam{}, common.RequestParam{
-				ID: reqID, Method: r.Method, URI: r.URL.String(),
-			},
-		)
+		// Construct new request param tracking
+		params := common.RequestParam{ID: reqID, Method: r.Method, URI: r.URL.String()}
+		params.UpdateLogTags(localLogTags)
+		log.WithFields(localLogTags).Debugf("New request ID %s", reqID)
+		ctx := context.WithValue(r.Context(), common.RequestParam{}, params)
 
 		next(rw, r.WithContext(ctx))
 	}

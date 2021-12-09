@@ -92,20 +92,20 @@ func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 	if r.subscribed {
 		return fmt.Errorf("already instructed to subscribe to %s", r.ackSubject)
 	}
+	localLogTags := log.Fields{}
+	if err := common.DeepCopy(&r.LogTags, &localLogTags); err != nil {
+		log.WithError(err).WithFields(r.LogTags).Errorf("Failed to deep-copy logtags")
+		return err
+	}
+	if opContext.Value(common.RequestParam{}) != nil {
+		v, ok := opContext.Value(common.RequestParam{}).(common.RequestParam)
+		if ok {
+			v.UpdateLogTags(localLogTags)
+		}
+	}
 	r.subscribed = true
 	// Subscribe to the ACK channel for updates
 	ackSub, err := r.nats.NATs().Subscribe(r.ackSubject, func(msg *nats.Msg) {
-		localLogTags := log.Fields{}
-		if err := common.DeepCopy(&r.LogTags, &localLogTags); err != nil {
-			log.WithError(err).WithFields(r.LogTags).Errorf("Failed to deep-copy logtags")
-			return
-		}
-		if opContext.Value(common.RequestParam{}) != nil {
-			v, ok := opContext.Value(common.RequestParam{}).(common.RequestParam)
-			if ok {
-				v.UpdateLogTags(localLogTags)
-			}
-		}
 		// Process the message
 		var ackInfo AckIndication
 		if err := json.Unmarshal(msg.Data, &ackInfo); err != nil {
@@ -126,7 +126,7 @@ func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 		handler(ackInfo, opContext)
 	})
 	if err != nil {
-		log.WithError(err).WithFields(r.LogTags).Errorf(
+		log.WithError(err).WithFields(localLogTags).Errorf(
 			"Failed to subscribe to ACK channel %s", r.ackSubject,
 		)
 		return err
@@ -137,13 +137,13 @@ func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 	go func() {
 		defer wg.Done()
 		<-opContext.Done()
-		log.WithFields(r.LogTags).Debugf("Unsubscribing from ACK channel %s", r.ackSubject)
+		log.WithFields(localLogTags).Debugf("Unsubscribing from ACK channel %s", r.ackSubject)
 		if err := r.ackSubscription.Unsubscribe(); err != nil {
-			log.WithError(err).WithFields(r.LogTags).Errorf(
+			log.WithError(err).WithFields(localLogTags).Errorf(
 				"Error occurred when unsubscribing from ACK channel %s", r.ackSubject,
 			)
 		}
-		log.WithFields(r.LogTags).Infof("Unsubscribed from ACK channel %s", r.ackSubject)
+		log.WithFields(localLogTags).Infof("Unsubscribed from ACK channel %s", r.ackSubject)
 	}()
 	return nil
 }

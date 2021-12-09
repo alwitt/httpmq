@@ -34,6 +34,12 @@ func GetIntervalTimerInstance(
 	logTags := log.Fields{
 		"module": "common", "component": "interval-timer", "instance": name,
 	}
+	if rootCtxt.Value(RequestParam{}) != nil {
+		v, ok := rootCtxt.Value(RequestParam{}).(RequestParam)
+		if ok {
+			v.UpdateLogTags(logTags)
+		}
+	}
 	return &intervalTimerImpl{
 		Component:        Component{LogTags: logTags},
 		rootContext:      rootCtxt,

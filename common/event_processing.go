@@ -40,6 +40,12 @@ func GetNewTaskProcessorInstance(
 	logTags := log.Fields{
 		"module": "common", "component": "task-processor", "instance": name,
 	}
+	if ctxt.Value(RequestParam{}) != nil {
+		v, ok := ctxt.Value(RequestParam{}).(RequestParam)
+		if ok {
+			v.UpdateLogTags(logTags)
+		}
+	}
 	optCtxt, cancel := context.WithCancel(ctxt)
 	return &taskProcessorImpl{
 		Component:        Component{LogTags: logTags},
@@ -167,6 +173,12 @@ func GetNewTaskDemuxProcessorInstance(
 	}
 	logTags := log.Fields{
 		"module": "common", "component": "task-demux-processor/%s", "instance": name,
+	}
+	if ctxt.Value(RequestParam{}) != nil {
+		v, ok := ctxt.Value(RequestParam{}).(RequestParam)
+		if ok {
+			v.UpdateLogTags(logTags)
+		}
 	}
 	return &taskDemuxProcessorImpl{
 		name:             name,
