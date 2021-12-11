@@ -36,7 +36,16 @@ func getStdRESTErrorMsg(code int, message *string) StandardResponse {
 }
 
 // writeRESTResponse write a REST response
-func writeRESTResponse(w http.ResponseWriter, respCode int, resp interface{}) error {
+func writeRESTResponse(
+	w http.ResponseWriter, r *http.Request, respCode int, resp interface{},
+) error {
+	w.Header().Set("content-type", "application/json")
+	if r.Context().Value(common.RequestParam{}) != nil {
+		v, ok := r.Context().Value(common.RequestParam{}).(common.RequestParam)
+		if ok {
+			w.Header().Add("Httpmq-Request-ID", v.ID)
+		}
+	}
 	w.WriteHeader(respCode)
 	t, err := json.Marshal(resp)
 	if err != nil {
@@ -74,10 +83,11 @@ type APIRestHandler struct {
 
 // reply helper function for writing responses
 func (h APIRestHandler) reply(
-	w http.ResponseWriter, respCode int, resp interface{}, restCall string,
+	w http.ResponseWriter, respCode int, resp interface{}, restCall string, r *http.Request,
 ) {
-	if err := writeRESTResponse(w, respCode, &resp); err != nil {
-		log.WithError(err).WithFields(h.LogTags).Errorf(
+	localLogTags, _ := common.UpdateLogTags(h.LogTags, r.Context())
+	if err := writeRESTResponse(w, r, respCode, &resp); err != nil {
+		log.WithError(err).WithFields(localLogTags).Errorf(
 			"Failed to write REST response for %s", restCall,
 		)
 	}
@@ -92,11 +102,7 @@ func (h APIRestHandler) Write(p []byte) (n int, err error) {
 // attachRequestID middleware function to attach a request ID to a API request
 func (h APIRestHandler) attachRequestID(next http.HandlerFunc) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		localLogTags := log.Fields{}
-		if err := common.DeepCopy(&h.LogTags, &localLogTags); err != nil {
-			log.WithError(err).WithFields(h.LogTags).Errorf("Failed to deep-copy logtags")
-			return
-		}
+		localLogTags, _ := common.UpdateLogTags(h.LogTags, r.Context())
 		// use provided request id from incoming request if any
 		reqID := r.Header.Get("Httpmq-Request-ID")
 		if reqID == "" {
@@ -105,7 +111,6 @@ func (h APIRestHandler) attachRequestID(next http.HandlerFunc) http.HandlerFunc 
 		}
 		// Construct new request param tracking
 		params := common.RequestParam{ID: reqID, Method: r.Method, URI: r.URL.String()}
-		params.UpdateLogTags(localLogTags)
 		log.WithFields(localLogTags).Debugf("New request ID %s", reqID)
 		ctx := context.WithValue(r.Context(), common.RequestParam{}, params)
 

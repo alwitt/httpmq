@@ -71,7 +71,7 @@ func TestPushMessageDispatcher(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(jsCtrl.CreateStream(streamParam))
+		assert.Nil(jsCtrl.CreateStream(streamParam, utCtxt))
 	}
 	consumer1 := uuid.New().String()
 	maxInflight := 2
@@ -79,7 +79,7 @@ func TestPushMessageDispatcher(t *testing.T) {
 		param := management.JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: maxInflight, Mode: "push", FilterSubject: &subject1,
 		}
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param))
+		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param, utCtxt))
 	}
 	log.Debug("============================= 1 =============================")
 

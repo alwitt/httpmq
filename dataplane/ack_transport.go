@@ -92,16 +92,10 @@ func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 	if r.subscribed {
 		return fmt.Errorf("already instructed to subscribe to %s", r.ackSubject)
 	}
-	localLogTags := log.Fields{}
-	if err := common.DeepCopy(&r.LogTags, &localLogTags); err != nil {
-		log.WithError(err).WithFields(r.LogTags).Errorf("Failed to deep-copy logtags")
+	localLogTags, err := common.UpdateLogTags(r.LogTags, opContext)
+	if err != nil {
+		log.WithError(err).WithFields(r.LogTags).Errorf("Failed to update logtags")
 		return err
-	}
-	if opContext.Value(common.RequestParam{}) != nil {
-		v, ok := opContext.Value(common.RequestParam{}).(common.RequestParam)
-		if ok {
-			v.UpdateLogTags(localLogTags)
-		}
 	}
 	r.subscribed = true
 	// Subscribe to the ACK channel for updates
@@ -180,16 +174,10 @@ func GetJetStreamACKBroadcaster(
 
 // BroadcastACK broadcast the ACK
 func (t *jetStreamACKBroadcasterImpl) BroadcastACK(ack AckIndication, ctxt context.Context) error {
-	localLogTags := log.Fields{}
-	if err := common.DeepCopy(&t.LogTags, &localLogTags); err != nil {
-		log.WithError(err).WithFields(t.LogTags).Errorf("Failed to deep-copy logtags")
+	localLogTags, err := common.UpdateLogTags(t.LogTags, ctxt)
+	if err != nil {
+		log.WithError(err).WithFields(t.LogTags).Errorf("Failed to update logtags")
 		return err
-	}
-	if ctxt.Value(common.RequestParam{}) != nil {
-		v, ok := ctxt.Value(common.RequestParam{}).(common.RequestParam)
-		if ok {
-			v.UpdateLogTags(localLogTags)
-		}
 	}
 	if err := t.validate.Struct(&ack); err != nil {
 		log.WithError(err).WithFields(localLogTags).Error("ACK parameter invalid")

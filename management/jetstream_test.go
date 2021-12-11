@@ -58,9 +58,9 @@ func TestJetStreamControllerStreams(t *testing.T) {
 	// Case 0: no streams in system
 	{
 		dummyStream := fmt.Sprintf("%s-00", testName)
-		_, err := uut.GetStream(dummyStream)
+		_, err := uut.GetStream(dummyStream, utCtxt)
 		assert.NotNil(err)
-		assert.NotNil(uut.DeleteStream(dummyStream))
+		assert.NotNil(uut.DeleteStream(dummyStream, utCtxt))
 	}
 
 	// Case 1: create stream
@@ -79,8 +79,8 @@ func TestJetStreamControllerStreams(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(uut.CreateStream(streamParam))
-		param, err := uut.GetStream(stream1)
+		assert.Nil(uut.CreateStream(streamParam, utCtxt))
+		param, err := uut.GetStream(stream1, utCtxt)
 		assert.Nil(err)
 		assert.Equal(stream1, param.Config.Name)
 		assert.EqualValues(subjects1, param.Config.Subjects)
@@ -92,13 +92,13 @@ func TestJetStreamControllerStreams(t *testing.T) {
 			Name:     stream1,
 			Subjects: subjects,
 		}
-		assert.NotNil(uut.CreateStream(streamParam))
+		assert.NotNil(uut.CreateStream(streamParam, utCtxt))
 	}
 
 	// Case 2: delete stream
-	assert.Nil(uut.DeleteStream(stream1))
+	assert.Nil(uut.DeleteStream(stream1, utCtxt))
 	{
-		_, err := uut.GetStream(stream1)
+		_, err := uut.GetStream(stream1, utCtxt)
 		assert.NotNil(err)
 	}
 
@@ -114,21 +114,21 @@ func TestJetStreamControllerStreams(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(uut.CreateStream(streamParam))
-		streamInfo, err := uut.GetStream(stream3)
+		assert.Nil(uut.CreateStream(streamParam, utCtxt))
+		streamInfo, err := uut.GetStream(stream3, utCtxt)
 		assert.Nil(err)
 		assert.Equal(stream3, streamInfo.Config.Name)
 		assert.EqualValues(subjects3, streamInfo.Config.Subjects)
 	}
 	{
 		subjects3 = append(subjects3, fmt.Sprintf("%s-3-3", testName))
-		assert.Nil(uut.ChangeStreamSubjects(stream3, subjects3))
+		assert.Nil(uut.ChangeStreamSubjects(stream3, subjects3, utCtxt))
 		maxMsgPerSub := int64(32)
 		newParam := JSStreamLimits{MaxMsgsPerSubject: &maxMsgPerSub}
-		assert.Nil(uut.UpdateStreamLimits(stream3, newParam))
+		assert.Nil(uut.UpdateStreamLimits(stream3, newParam, utCtxt))
 	}
 	{
-		streamInfo, err := uut.GetStream(stream3)
+		streamInfo, err := uut.GetStream(stream3, utCtxt)
 		assert.Nil(err)
 		assert.Equal(stream3, streamInfo.Config.Name)
 		assert.Equal(int64(32), streamInfo.Config.MaxMsgsPerSubject)
@@ -136,9 +136,9 @@ func TestJetStreamControllerStreams(t *testing.T) {
 	}
 
 	// Case 4: delete stream
-	assert.Nil(uut.DeleteStream(stream3))
+	assert.Nil(uut.DeleteStream(stream3, utCtxt))
 	{
-		_, err := uut.GetStream(stream3)
+		_, err := uut.GetStream(stream3, utCtxt)
 		assert.NotNil(err)
 	}
 
@@ -162,7 +162,7 @@ func TestJetStreamControllerStreams(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(uut.CreateStream(streamParam))
+		assert.Nil(uut.CreateStream(streamParam, utCtxt))
 	}
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
@@ -226,7 +226,7 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 		consumerParam := JetStreamConsumerParam{
 			Name: uuid.New().String(), MaxInflight: 1, Mode: "push",
 		}
-		assert.NotNil(uut.CreateConsumerForStream(uuid.New().String(), consumerParam))
+		assert.NotNil(uut.CreateConsumerForStream(uuid.New().String(), consumerParam, utCtxt))
 	}
 
 	// Define two streams for operating
@@ -247,7 +247,7 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(uut.CreateStream(streamParam))
+		assert.Nil(uut.CreateStream(streamParam, utCtxt))
 		streamParam = JSStreamParam{
 			Name:     stream2,
 			Subjects: subjects2,
@@ -255,7 +255,7 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(uut.CreateStream(streamParam))
+		assert.Nil(uut.CreateStream(streamParam, utCtxt))
 	}
 
 	// Case 1: create consumer
@@ -264,7 +264,7 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 		param := JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 1, Mode: "push",
 		}
-		assert.Nil(uut.CreateConsumerForStream(stream1, param))
+		assert.Nil(uut.CreateConsumerForStream(stream1, param, utCtxt))
 	}
 
 	// Case 2: re-use the consumer again with the same param
@@ -272,14 +272,14 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 		param := JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 1, Mode: "push",
 		}
-		assert.Nil(uut.CreateConsumerForStream(stream1, param))
+		assert.Nil(uut.CreateConsumerForStream(stream1, param, utCtxt))
 	}
 	// With different params
 	{
 		param := JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 2, Mode: "push",
 		}
-		assert.NotNil(uut.CreateConsumerForStream(stream1, param))
+		assert.NotNil(uut.CreateConsumerForStream(stream1, param, utCtxt))
 	}
 
 	// Case 3: re-use the consumer again on a different stream
@@ -287,7 +287,7 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 		param := JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 1, Mode: "push",
 		}
-		assert.Nil(uut.CreateConsumerForStream(stream2, param))
+		assert.Nil(uut.CreateConsumerForStream(stream2, param, utCtxt))
 	}
 
 	// Case 4: verify the consumers are listed
@@ -307,10 +307,10 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 	}
 
 	// Case 5: delete unknown consumer
-	assert.NotNil(uut.DeleteConsumerOnStream(stream1, uuid.New().String()))
+	assert.NotNil(uut.DeleteConsumerOnStream(stream1, uuid.New().String(), utCtxt))
 
 	// Case 6: delete consumer from stream1
-	assert.Nil(uut.DeleteConsumerOnStream(stream1, consumer1))
+	assert.Nil(uut.DeleteConsumerOnStream(stream1, consumer1, utCtxt))
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
@@ -329,7 +329,7 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 		param := JetStreamConsumerParam{
 			Name: consumer7, MaxInflight: 1, Mode: "pull",
 		}
-		assert.Nil(uut.CreateConsumerForStream(stream1, param))
+		assert.Nil(uut.CreateConsumerForStream(stream1, param, utCtxt))
 	}
 
 	// Case 8: create pull consumer, but with delivery group
@@ -339,6 +339,6 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 		param := JetStreamConsumerParam{
 			Name: consumer8, MaxInflight: 1, Mode: "pull", DeliveryGroup: &group,
 		}
-		assert.NotNil(uut.CreateConsumerForStream(stream2, param))
+		assert.NotNil(uut.CreateConsumerForStream(stream2, param, utCtxt))
 	}
 }

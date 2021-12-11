@@ -77,7 +77,7 @@ func TestInflightMessageHandling(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(jsCtrl.CreateStream(streamParam))
+		assert.Nil(jsCtrl.CreateStream(streamParam, utCtxt))
 		streamParam = management.JSStreamParam{
 			Name:     stream2,
 			Subjects: []string{subjects2},
@@ -85,7 +85,7 @@ func TestInflightMessageHandling(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(jsCtrl.CreateStream(streamParam))
+		assert.Nil(jsCtrl.CreateStream(streamParam, utCtxt))
 	}
 	consumer1 := uuid.New().String()
 	var consumer1Sub1 *nats.Subscription
@@ -94,8 +94,8 @@ func TestInflightMessageHandling(t *testing.T) {
 		param := management.JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 2, Mode: "push",
 		}
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param))
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream2, param))
+		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param, utCtxt))
+		assert.Nil(jsCtrl.CreateConsumerForStream(stream2, param, utCtxt))
 		s, err := js.JetStream().SubscribeSync(subjects1, nats.Durable(consumer1))
 		assert.Nil(err)
 		consumer1Sub1 = s

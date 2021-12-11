@@ -75,7 +75,7 @@ func TestMessageTransportPushSub(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(jsCtrl.CreateStream(streamParam))
+		assert.Nil(jsCtrl.CreateStream(streamParam, utCtxt))
 	}
 	consumer1 := uuid.New().String()
 	consumer2 := uuid.New().String()
@@ -84,15 +84,15 @@ func TestMessageTransportPushSub(t *testing.T) {
 		param := management.JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 1, Mode: "push", FilterSubject: &subject1,
 		}
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param))
+		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param, utCtxt))
 		param = management.JetStreamConsumerParam{
 			Name: consumer2, MaxInflight: 1, Mode: "push", FilterSubject: &subject2,
 		}
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param))
+		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param, utCtxt))
 		param = management.JetStreamConsumerParam{
 			Name: consumer3, MaxInflight: 1, Mode: "push", FilterSubject: &subject3,
 		}
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param))
+		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param, utCtxt))
 	}
 	log.Debug("============================= 1 =============================")
 
@@ -282,7 +282,7 @@ func TestMessageTransportPushSubGroup(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(jsCtrl.CreateStream(streamParam))
+		assert.Nil(jsCtrl.CreateStream(streamParam, utCtxt))
 	}
 	consumer1 := uuid.New().String()
 	group1 := uuid.New().String()
@@ -290,7 +290,7 @@ func TestMessageTransportPushSubGroup(t *testing.T) {
 		param := management.JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 1, Mode: "push", DeliveryGroup: &group1,
 		}
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param))
+		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param, utCtxt))
 	}
 	log.Debug("============================= 1 =============================")
 
@@ -415,14 +415,14 @@ func TestMessageTranscoding(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(jsCtrl.CreateStream(streamParam))
+		assert.Nil(jsCtrl.CreateStream(streamParam, utCtxt))
 	}
 	consumer1 := uuid.New().String()
 	{
 		param := management.JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 1, Mode: "push", FilterSubject: &subject1,
 		}
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param))
+		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param, utCtxt))
 	}
 	log.Debug("============================= 1 =============================")
 

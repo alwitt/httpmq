@@ -81,16 +81,10 @@ func (r *jetStreamPushSubscriberImpl) StartReading(
 	wg *sync.WaitGroup,
 	ctxt context.Context,
 ) error {
-	localLogTags := log.Fields{}
-	if err := common.DeepCopy(&r.LogTags, &localLogTags); err != nil {
-		log.WithError(err).WithFields(r.LogTags).Errorf("Failed to deep-copy logtags")
+	localLogTags, err := common.UpdateLogTags(r.LogTags, ctxt)
+	if err != nil {
+		log.WithError(err).WithFields(r.LogTags).Errorf("Failed to update logtags")
 		return err
-	}
-	if ctxt.Value(common.RequestParam{}) != nil {
-		v, ok := ctxt.Value(common.RequestParam{}).(common.RequestParam)
-		if ok {
-			v.UpdateLogTags(localLogTags)
-		}
 	}
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -170,16 +164,10 @@ func GetJetStreamPublisher(
 
 // Publish publish a message on a subject
 func (s *jetStreamPublisherImpl) Publish(subject string, msg []byte, ctxt context.Context) error {
-	localLogTags := log.Fields{}
-	if err := common.DeepCopy(&s.LogTags, &localLogTags); err != nil {
-		log.WithError(err).WithFields(s.LogTags).Errorf("Failed to deep-copy logtags")
+	localLogTags, err := common.UpdateLogTags(s.LogTags, ctxt)
+	if err != nil {
+		log.WithError(err).WithFields(s.LogTags).Errorf("Failed to update logtags")
 		return err
-	}
-	if ctxt.Value(common.RequestParam{}) != nil {
-		v, ok := ctxt.Value(common.RequestParam{}).(common.RequestParam)
-		if ok {
-			v.UpdateLogTags(localLogTags)
-		}
 	}
 	ack, err := s.nats.JetStream().PublishAsync(subject, msg)
 	if err != nil {

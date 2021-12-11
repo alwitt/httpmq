@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"encoding/gob"
 
 	"github.com/apex/log"
@@ -21,4 +22,20 @@ func DeepCopy(src, dst interface{}) error {
 		return err
 	}
 	return gob.NewDecoder(bytes.NewBuffer(buf.Bytes())).Decode(dst)
+}
+
+// UpdateLogTags augment the existing log tags with info from Context
+func UpdateLogTags(original log.Fields, ctxt context.Context) (log.Fields, error) {
+	newLogTags := log.Fields{}
+	if err := DeepCopy(&original, &newLogTags); err != nil {
+		log.WithError(err).WithFields(original).Errorf("Failed to deep-copy logtags")
+		return original, err
+	}
+	if ctxt.Value(RequestParam{}) != nil {
+		v, ok := ctxt.Value(RequestParam{}).(RequestParam)
+		if ok {
+			v.UpdateLogTags(newLogTags)
+		}
+	}
+	return newLogTags, nil
 }
