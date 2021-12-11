@@ -47,8 +47,6 @@ type JetStreamConsumerParam struct {
 	Mode string `json:"mode" validate:"required,oneof=push pull"`
 }
 
-// TODO: All context.Context to all the APIs of JetStreamController
-
 // JetStreamController manage JetStream
 type JetStreamController interface {
 	Ready() (bool, error)
