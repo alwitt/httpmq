@@ -27,6 +27,8 @@ type APIRestJetStreamDataplaneHandler struct {
 	publisher    dataplane.JetStreamPublisher
 	ackBroadcast dataplane.JetStreamACKBroadcaster
 	validate     *validator.Validate
+	baseContext  context.Context
+	wg           *sync.WaitGroup
 }
 
 // GetAPIRestJetStreamDataplaneHandler define APIRestJetStreamDataplaneHandler
@@ -34,6 +36,8 @@ func GetAPIRestJetStreamDataplaneHandler(
 	client *core.NatsClient,
 	runTimePublisher dataplane.JetStreamPublisher,
 	ackBroadcast dataplane.JetStreamACKBroadcaster,
+	baseContext context.Context,
+	wg *sync.WaitGroup,
 ) (APIRestJetStreamDataplaneHandler, error) {
 	logTags := log.Fields{
 		"module":    "rest",
@@ -47,6 +51,8 @@ func GetAPIRestJetStreamDataplaneHandler(
 		publisher:    runTimePublisher,
 		ackBroadcast: ackBroadcast,
 		validate:     validator.New(),
+		baseContext:  baseContext,
+		wg:           wg,
 	}, nil
 }
 
@@ -385,8 +391,6 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 	}
 
 	// Create the dispatcher
-	wg := sync.WaitGroup{}
-	defer wg.Wait()
 	runtimeCtxt, cancel := context.WithCancel(r.Context())
 	defer cancel()
 	dispatcher, err := dataplane.GetPushMessageDispatcher(
@@ -396,7 +400,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		consumerName,
 		deliveryGroup,
 		maxInflightMsg,
-		&wg,
+		h.wg,
 		runtimeCtxt,
 	)
 	if err != nil {
@@ -455,10 +459,20 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 	}
 	for !complete {
 		select {
+		case <-h.baseContext.Done():
+			// Server stopping
+			complete = true
+			log.WithFields(logTags).Info("Terminating PUSH subscription on server stop")
+			msg := "Server stopping"
+			h.reply(
+				w, http.StatusInternalServerError, getStdRESTErrorMsg(
+					http.StatusInternalServerError, &msg,
+				), restCall, r,
+			)
 		case <-r.Context().Done():
 			// Request closed
 			complete = true
-			log.WithFields(logTags).Info("Terminating PUSH subscription")
+			log.WithFields(logTags).Info("Terminating PUSH subscription on request end")
 			h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
 		case err, ok := <-internalError:
 			// Internal system error

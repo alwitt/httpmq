@@ -4,8 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/apex/log"
@@ -60,7 +59,11 @@ func GetDataplaneCLIFlags(args *DataplaneCLIArgs) []cli.Flag {
 
 // RunDataplaneServer run the dataplane server
 func RunDataplaneServer(
-	params DataplaneCLIArgs, instance string, natsClient *core.NatsClient,
+	params DataplaneCLIArgs,
+	instance string,
+	natsClient *core.NatsClient,
+	runTimeContext context.Context,
+	wg *sync.WaitGroup,
 ) error {
 	logTags := log.Fields{
 		"module":    "cmd",
@@ -86,7 +89,11 @@ func RunDataplaneServer(
 		return err
 	}
 
-	httpHandler, err := apis.GetAPIRestJetStreamDataplaneHandler(natsClient, msgPub, ackPub)
+	localCtxt, lclCancel := context.WithCancel(runTimeContext)
+	defer lclCancel()
+	httpHandler, err := apis.GetAPIRestJetStreamDataplaneHandler(
+		natsClient, msgPub, ackPub, localCtxt, wg,
+	)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define HTTP handler")
 		return err
@@ -139,9 +146,12 @@ func RunDataplaneServer(
 		Handler:      h2c.NewHandler(router, &http2.Server{}),
 	}
 
+	// Cancel runtime context on shutdown
+	httpSrv.RegisterOnShutdown(lclCancel)
+
 	// Start the server
 	go func() {
-		if err := httpSrv.ListenAndServe(); err != nil {
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.WithError(err).Error("HTTP Server Failure")
 		}
 	}()
@@ -150,12 +160,7 @@ func RunDataplaneServer(
 
 	// ============================================================================
 
-	cc := make(chan os.Signal, 1)
-	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C)
-	// SIGKILL, SIGQUIT or SIGTERM (Ctrl+/) will not be caught.
-	signal.Notify(cc, os.Interrupt)
-
-	<-cc
+	<-runTimeContext.Done()
 
 	// Stop the HTTP server
 	{

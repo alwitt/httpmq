@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"os"
+	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/apex/log"
@@ -181,7 +184,7 @@ func initialCmdArgsProcessing() error {
 }
 
 // prepareJetStreamClient define the NATS client
-func prepareJetStreamClient() (*core.NatsClient, error) {
+func prepareJetStreamClient(ctxtCancel context.CancelFunc) (*core.NatsClient, error) {
 	natsParam := core.NATSConnectParams{
 		ServerURI:           cmdArgs.NATS.ServerURI,
 		ConnectTimeout:      cmdArgs.NATS.ConnectTimeout,
@@ -198,10 +201,29 @@ func prepareJetStreamClient() (*core.NatsClient, error) {
 			)
 		},
 		OnCloseCallback: func(_ *nats.Conn) {
-			log.WithFields(logTags).Fatal("NATS client closed connection")
+			log.WithFields(logTags).Error("NATS client closed connection")
+			ctxtCancel()
 		},
 	}
 	return core.GetJetStream(natsParam)
+}
+
+func defineControlVars() (*sync.WaitGroup, context.Context, context.CancelFunc) {
+	runTimeContext, rtCancel := context.WithCancel(context.Background())
+	return &sync.WaitGroup{}, runTimeContext, rtCancel
+}
+
+// signalRecvSetup helper function for setting up the SIG receive handler
+func signalRecvSetup(wg *sync.WaitGroup, ctxtCancel context.CancelFunc) {
+	go func() {
+		defer wg.Done()
+		cc := make(chan os.Signal, 1)
+		// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C)
+		// SIGKILL, SIGQUIT or SIGTERM (Ctrl+/) will not be caught.
+		signal.Notify(cc, os.Interrupt)
+		<-cc
+		ctxtCancel()
+	}()
 }
 
 // ============================================================================
@@ -213,15 +235,21 @@ func startManagementServer(c *cli.Context) error {
 		return err
 	}
 
-	js, err := prepareJetStreamClient()
+	wg, runTimeContext, rtCancel := defineControlVars()
+	defer wg.Wait()
+	defer rtCancel()
+
+	js, err := prepareJetStreamClient(rtCancel)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf(
-			"Failed to defin NATS client with %s", cmdArgs.NATS.ServerURI,
+			"Failed to define NATS client with %s", cmdArgs.NATS.ServerURI,
 		)
 		return nil
 	}
 
-	return cmd.RunManagementServer(cmdArgs.Management, cmdArgs.Hostname, js)
+	signalRecvSetup(wg, rtCancel)
+
+	return cmd.RunManagementServer(cmdArgs.Management, cmdArgs.Hostname, js, runTimeContext)
 }
 
 // ============================================================================
@@ -233,13 +261,21 @@ func startDataplaneServer(c *cli.Context) error {
 		return err
 	}
 
-	js, err := prepareJetStreamClient()
+	wg, runTimeContext, rtCancel := defineControlVars()
+	defer wg.Wait()
+	defer rtCancel()
+
+	js, err := prepareJetStreamClient(rtCancel)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf(
-			"Failed to defin NATS client with %s", cmdArgs.NATS.ServerURI,
+			"Failed to define NATS client with %s", cmdArgs.NATS.ServerURI,
 		)
 		return nil
 	}
 
-	return cmd.RunDataplaneServer(cmdArgs.Dataplane, cmdArgs.Hostname, js)
+	signalRecvSetup(wg, rtCancel)
+
+	return cmd.RunDataplaneServer(
+		cmdArgs.Dataplane, cmdArgs.Hostname, js, runTimeContext, wg,
+	)
 }

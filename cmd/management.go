@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"os/signal"
 	"time"
 
 	"github.com/apex/log"
@@ -60,7 +58,10 @@ func GetManagementCLIFlags(args *ManagementCLIArgs) []cli.Flag {
 
 // RunManagementServer run the management server
 func RunManagementServer(
-	params ManagementCLIArgs, instance string, natsClient *core.NatsClient,
+	params ManagementCLIArgs,
+	instance string,
+	natsClient *core.NatsClient,
+	runtimeContext context.Context,
 ) error {
 	logTags := log.Fields{
 		"module":    "cmd",
@@ -158,18 +159,13 @@ func RunManagementServer(
 
 	// ============================================================================
 
-	cc := make(chan os.Signal, 1)
-	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C)
-	// SIGKILL, SIGQUIT or SIGTERM (Ctrl+/) will not be caught.
-	signal.Notify(cc, os.Interrupt)
-
-	<-cc
+	<-runtimeContext.Done()
 
 	// Stop the HTTP server
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
-		if err := httpSrv.Shutdown(ctx); err != nil {
+		if err := httpSrv.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
 			log.WithError(err).Error("Failure during HTTP shutdown")
 		}
 	}
