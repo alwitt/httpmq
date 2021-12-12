@@ -67,7 +67,6 @@ To start the management server locally
 
 ```shell
 $ ./httpmq.bin -l debug --nmra 1 management
-2021/12/08 10:22:51 debug Starting params
 2021/12/08 10:22:51  info Created JetStream client  component=jetstream-backend instance=nats://127.0.0.1:4222 module=core
 2021/12/08 10:22:51  info Started HTTP server on http://:3000 component=management instance=dvm-personal module=cmd
 ```
@@ -80,7 +79,6 @@ To start the dataplane server locally
 
 ```shell
 $ ./httpmq.bin -l debug --nmra 1 dataplane
-2021/12/08 10:24:31 debug Starting params
 2021/12/08 10:24:31  info Created JetStream client  component=jetstream-backend instance=nats://127.0.0.1:4222 module=core
 2021/12/08 10:24:31  info Started HTTP server on http://:3001 component=management instance=dvm-personal module=cmd
 ```
