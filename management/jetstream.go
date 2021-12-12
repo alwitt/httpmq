@@ -43,6 +43,10 @@ type JetStreamConsumerParam struct {
 	DeliveryGroup *string `json:"delivery_group,omitempty"`
 	// MaxInflight max number of un-ACKed message permitted in-flight
 	MaxInflight int `json:"max_inflight" validate:"required,gte=1"`
+	// MaxRetry max number of times an un-ACKed message is resent (-1: infinite)
+	MaxRetry *int `json:"max_retry,omitempty" validate:"omitempty,gte=-1"`
+	// AckWait when specified, the number of ns to wait for ACK before retry
+	AckWait *time.Duration `json:"ack_wait,omitempty" swaggertype:"primitive,integer"`
 	// Mode whether the consumer is push or pull consumer
 	Mode string `json:"mode" validate:"required,oneof=push pull"`
 }
@@ -332,10 +336,16 @@ func (js jetStreamControllerImpl) CreateConsumerForStream(
 	jsParams := nats.ConsumerConfig{
 		Durable:       param.Name,
 		Description:   param.Notes,
-		MaxDeliver:    param.MaxInflight,
 		MaxAckPending: param.MaxInflight,
 		DeliverPolicy: nats.DeliverAllPolicy,
 		AckPolicy:     nats.AckExplicitPolicy,
+	}
+	// Redeliver settings
+	if param.MaxRetry != nil {
+		jsParams.MaxDeliver = *param.MaxRetry
+	}
+	if param.AckWait != nil {
+		jsParams.AckWait = *param.AckWait
 	}
 	// Verify the configuration made sense
 	if param.Mode == "pull" && param.DeliveryGroup != nil {

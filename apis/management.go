@@ -96,13 +96,14 @@ func convertStreamInfo(original *nats.StreamInfo) APIRestRespStreamInfo {
 
 // APIRestRespConsumerConfig Adhoc structure for persenting nats.ConsumerConfig
 type APIRestRespConsumerConfig struct {
-	Description    string `json:"notes,omitempty"`
-	DeliverSubject string `json:"deliver_subject,omitempty"`
-	DeliverGroup   string `json:"deliver_group,omitempty"`
-	MaxDeliver     int    `json:"max_deliver,omitempty"`
-	FilterSubject  string `json:"filter_subject,omitempty"`
-	MaxWaiting     int    `json:"max_waiting,omitempty"`
-	MaxAckPending  int    `json:"max_ack_pending,omitempty"`
+	Description    string        `json:"notes,omitempty"`
+	DeliverSubject string        `json:"deliver_subject,omitempty"`
+	DeliverGroup   string        `json:"deliver_group,omitempty"`
+	MaxDeliver     int           `json:"max_deliver,omitempty"`
+	AckWait        time.Duration `json:"ack_wait" swaggertype:"primitive,integer"`
+	FilterSubject  string        `json:"filter_subject,omitempty"`
+	MaxWaiting     int           `json:"max_waiting,omitempty"`
+	MaxAckPending  int           `json:"max_ack_pending,omitempty"`
 }
 
 // APIRestRespSequenceInfo Adhoc structure for persenting nats.SequenceInfo
@@ -137,6 +138,7 @@ func convertConsumerInfo(original *nats.ConsumerInfo) APIRestRespConsumerInfo {
 			DeliverSubject: original.Config.DeliverSubject,
 			DeliverGroup:   original.Config.DeliverGroup,
 			MaxDeliver:     original.Config.MaxDeliver,
+			AckWait:        original.Config.AckWait,
 			FilterSubject:  original.Config.FilterSubject,
 			MaxWaiting:     original.Config.MaxWaiting,
 			MaxAckPending:  original.Config.MaxAckPending,
