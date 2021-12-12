@@ -1,11 +1,11 @@
 # HTTP MQ
 
-HTTP/2 Based Message Broker
+HTTP/2 based message broker built around NATS JetStream.
 
 ---
 ## Local Testing - Setup
 
-Start the test NATS JetStream server
+Start the local development NATS JetStream server
 
 ```shell
 make compose
@@ -38,7 +38,28 @@ $ docker logs docker_nats_1
 [1] 2021/12/08 18:15:54.796280 [INF] Server is ready
 ```
 
-To start the management server
+Available Makefile targets are
+
+```shell
+$ make help
+lint                           Lint the files
+compose                        Run docker-compose to create the DEV ENV
+doc                            Generate the OpenAPI spec
+mock                           Generate test mock interfaces
+test                           Run unittests
+build                          Build project binaries
+clean                          Clean up DEV ENV
+help                           Display this help screen
+```
+
+Verify projects builds, and passes unit-tests
+
+```shell
+$ make
+$ make test
+```
+
+To start the management server locally
 
 ```shell
 ./httpmq.bin -l debug --nmra 1 management
@@ -51,7 +72,7 @@ $ ./httpmq.bin -l debug --nmra 1 management
 2021/12/08 10:22:51  info Started HTTP server on http://:3000 component=management instance=dvm-personal module=cmd
 ```
 
-To start the dataplane server
+To start the dataplane server locally
 
 ```shell
 ./httpmq.bin -l debug --nmra 1 dataplane
@@ -70,7 +91,7 @@ $ ./httpmq.bin -l debug --nmra 1 dataplane
 Start by defining a JetStream stream
 
 ```shell
-curl --location --request POST 'http://127.0.0.1:3000/v1/admin/stream' \
+curl -X POST 'http://127.0.0.1:3000/v1/admin/stream' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "name": "test-stream-00",
@@ -82,10 +103,12 @@ curl --location --request POST 'http://127.0.0.1:3000/v1/admin/stream' \
 }'
 ```
 
+Response should be `{"success":true}`.
+
 Define a consumer for the stream
 
 ```shell
-curl --location --request POST 'http://127.0.0.1:3000/v1/admin/stream/test-stream-00/consumer' \
+curl -X POST 'http://127.0.0.1:3000/v1/admin/stream/test-stream-00/consumer' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "max_inflight": 4,
@@ -95,10 +118,12 @@ curl --location --request POST 'http://127.0.0.1:3000/v1/admin/stream/test-strea
 }'
 ```
 
-Verify the consumer is ready for use
+Response should be `{"success":true}`.
+
+Verify the consumer is defined
 
 ```shell
-curl --location --request GET 'http://127.0.0.1:3000/v1/admin/stream/test-stream-00/consumer/test-consumer-00'
+curl 'http://127.0.0.1:3000/v1/admin/stream/test-stream-00/consumer/test-consumer-00'
 ```
 
 ```json
@@ -110,7 +135,8 @@ curl --location --request GET 'http://127.0.0.1:3000/v1/admin/stream/test-stream
         "created": "2021-12-08T18:28:39.508206919Z",
         "config": {
             "deliver_subject": "_INBOX.bw26u2OqnVvhimXiT6RTeg",
-            "max_deliver": 4,
+            "max_deliver": -1,
+            "ack_wait": 30000000000,
             "filter_subject": "test-subject.01",
             "max_ack_pending": 4
         },
@@ -136,7 +162,7 @@ curl --location --request GET 'http://127.0.0.1:3000/v1/admin/stream/test-stream
 To publish a message for a subject
 
 ```shell
-curl --location --request POST 'http://127.0.0.1:3001/v1/data/subject/test-subject.01' --header 'Content-Type: text/plain' --data-raw "$(echo 'Hello World' | base64)"
+curl -X POST 'http://127.0.0.1:3001/v1/data/subject/test-subject.01' --header 'Content-Type: text/plain' --data-raw "$(echo 'Hello World' | base64)"
 ```
 
 > **IMPORTANT:** The message body is Base64 encoded.
@@ -155,8 +181,13 @@ To subscribe to messages for a consumer on a stream
 curl http://127.0.0.1:3001/v1/data/stream/test-stream-00/consumer/test-consumer-00?subject_name=test-subject.01 --http2-prior-knowledge
 ```
 
+```shell
+$ curl http://127.0.0.1:3001/v1/data/stream/test-stream-00/consumer/test-consumer-00?subject_name=test-subject.01 --http2-prior-knowledge
+{"stream":"test-stream-00","subject":"test-subject.01","consumer":"test-consumer-00","sequence":{"stream":1,"consumer":1},"b64_msg":"SGVsbG8gV29ybGQK"}
+```
+
 After receiving a message, ACK that message with
 
 ```shell
-curl --location --request POST 'http://127.0.0.1:3001/v1/data/stream/test-stream-00/consumer/test-consumer-00/ack' --header 'Content-Type: application/json' --data-raw '{"consumer": 1,"stream": 1}'
+curl -X POST 'http://127.0.0.1:3001/v1/data/stream/test-stream-00/consumer/test-consumer-00/ack' --header 'Content-Type: application/json' --data-raw '{"consumer": 1,"stream": 1}'
 ```
