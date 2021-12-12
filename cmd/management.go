@@ -150,7 +150,7 @@ func RunManagementServer(
 
 	// Start the server
 	go func() {
-		if err := httpSrv.ListenAndServe(); err != nil {
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.WithError(err).Error("HTTP Server Failure")
 		}
 	}()
@@ -165,7 +165,7 @@ func RunManagementServer(
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
-		if err := httpSrv.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
+		if err := httpSrv.Shutdown(ctx); err != nil {
 			log.WithError(err).Error("Failure during HTTP shutdown")
 		}
 	}

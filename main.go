@@ -215,6 +215,7 @@ func defineControlVars() (*sync.WaitGroup, context.Context, context.CancelFunc) 
 
 // signalRecvSetup helper function for setting up the SIG receive handler
 func signalRecvSetup(wg *sync.WaitGroup, ctxtCancel context.CancelFunc) {
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		cc := make(chan os.Signal, 1)
