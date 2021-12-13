@@ -179,7 +179,7 @@ func (c *jetStreamInflightMsgProcessorImpl) ProcessInflightMessage(msg *nats.Msg
 		perConsumerRecords = perStreamRecords.consumers[c.consumer]
 	}
 
-	perConsumerRecords.inflight[meta.Sequence.Consumer] = msg
+	perConsumerRecords.inflight[meta.Sequence.Stream] = msg
 	log.WithFields(c.LogTags).Debugf("Recorded %s", msgToString(msg))
 	return nil
 }
@@ -272,10 +272,10 @@ func (c *jetStreamInflightMsgProcessorImpl) ProcessMsgACK(ack AckIndication) err
 	}
 
 	// ACK the stored message
-	msg, ok := perConsumerRecords.inflight[ack.SeqNum.Consumer]
+	msg, ok := perConsumerRecords.inflight[ack.SeqNum.Stream]
 	if !ok {
 		err := fmt.Errorf(
-			"no records related message [%d] for %s@%s", ack.SeqNum.Consumer, ack.Consumer, ack.Stream,
+			"no records related message [%d] for %s@%s", ack.SeqNum.Stream, ack.Consumer, ack.Stream,
 		)
 		log.WithError(err).WithFields(c.LogTags).Errorf("Unable to process %s", ack.String())
 		return err
@@ -284,7 +284,7 @@ func (c *jetStreamInflightMsgProcessorImpl) ProcessMsgACK(ack AckIndication) err
 		log.WithError(err).WithFields(c.LogTags).Errorf("Unable to process %s", ack.String())
 		return err
 	}
-	delete(perConsumerRecords.inflight, ack.SeqNum.Consumer)
+	delete(perConsumerRecords.inflight, ack.SeqNum.Stream)
 	log.WithFields(c.LogTags).Debugf("Cleaned up based on %s", ack.String())
 	return nil
 }

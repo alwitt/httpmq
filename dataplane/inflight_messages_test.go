@@ -196,7 +196,7 @@ func TestInflightMessageHandling(t *testing.T) {
 				AckIndication{
 					Stream:   stream2,
 					Consumer: consumer1,
-					SeqNum:   AckSeqNum{Stream: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer + 2},
+					SeqNum:   AckSeqNum{Stream: testMsg3Seq.Stream + 2, Consumer: testMsg3Seq.Consumer},
 				}, true, ctxt,
 			),
 		)
