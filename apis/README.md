@@ -201,6 +201,14 @@ Query for the details of all streams
 |404|[Not Found](https://tools.ietf.org/html/rfc7231#section-6.5.4)|error|string|
 |500|[Internal Server Error](https://tools.ietf.org/html/rfc7231#section-6.6.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
 
+### Response Headers
+
+|Status|Header|Type|Format|Description|
+|---|---|---|---|---|
+|200|Httpmq-Request-ID|string||Request ID|
+|400|Httpmq-Request-ID|string||Request ID|
+|500|Httpmq-Request-ID|string||Request ID|
+
 <aside class="success">
 This operation does not require authentication
 </aside>
@@ -257,6 +265,14 @@ Define new JetStream stream
 |404|[Not Found](https://tools.ietf.org/html/rfc7231#section-6.5.4)|error|string|
 |500|[Internal Server Error](https://tools.ietf.org/html/rfc7231#section-6.6.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
 
+### Response Headers
+
+|Status|Header|Type|Format|Description|
+|---|---|---|---|---|
+|200|Httpmq-Request-ID|string||Request ID|
+|400|Httpmq-Request-ID|string||Request ID|
+|500|Httpmq-Request-ID|string||Request ID|
+
 <aside class="success">
 This operation does not require authentication
 </aside>
@@ -295,6 +311,14 @@ Delete a stream
 |400|[Bad Request](https://tools.ietf.org/html/rfc7231#section-6.5.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
 |404|[Not Found](https://tools.ietf.org/html/rfc7231#section-6.5.4)|error|string|
 |500|[Internal Server Error](https://tools.ietf.org/html/rfc7231#section-6.6.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
+
+### Response Headers
+
+|Status|Header|Type|Format|Description|
+|---|---|---|---|---|
+|200|Httpmq-Request-ID|string||Request ID|
+|400|Httpmq-Request-ID|string||Request ID|
+|500|Httpmq-Request-ID|string||Request ID|
 
 <aside class="success">
 This operation does not require authentication
@@ -359,6 +383,14 @@ Query for the details of one stream
 |400|[Bad Request](https://tools.ietf.org/html/rfc7231#section-6.5.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
 |404|[Not Found](https://tools.ietf.org/html/rfc7231#section-6.5.4)|error|string|
 |500|[Internal Server Error](https://tools.ietf.org/html/rfc7231#section-6.6.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
+
+### Response Headers
+
+|Status|Header|Type|Format|Description|
+|---|---|---|---|---|
+|200|Httpmq-Request-ID|string||Request ID|
+|400|Httpmq-Request-ID|string||Request ID|
+|500|Httpmq-Request-ID|string||Request ID|
 
 <aside class="success">
 This operation does not require authentication
@@ -459,6 +491,14 @@ Query for the details of all consumers of a stream
 |404|[Not Found](https://tools.ietf.org/html/rfc7231#section-6.5.4)|error|string|
 |500|[Internal Server Error](https://tools.ietf.org/html/rfc7231#section-6.6.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
 
+### Response Headers
+
+|Status|Header|Type|Format|Description|
+|---|---|---|---|---|
+|200|Httpmq-Request-ID|string||Request ID|
+|400|Httpmq-Request-ID|string||Request ID|
+|500|Httpmq-Request-ID|string||Request ID|
+
 <aside class="success">
 This operation does not require authentication
 </aside>
@@ -514,6 +554,14 @@ Create a new consumer on a stream. The stream must already be defined.
 |404|[Not Found](https://tools.ietf.org/html/rfc7231#section-6.5.4)|error|string|
 |500|[Internal Server Error](https://tools.ietf.org/html/rfc7231#section-6.6.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
 
+### Response Headers
+
+|Status|Header|Type|Format|Description|
+|---|---|---|---|---|
+|200|Httpmq-Request-ID|string||Request ID|
+|400|Httpmq-Request-ID|string||Request ID|
+|500|Httpmq-Request-ID|string||Request ID|
+
 <aside class="success">
 This operation does not require authentication
 </aside>
@@ -553,6 +601,14 @@ Delete one consumer of a stream
 |400|[Bad Request](https://tools.ietf.org/html/rfc7231#section-6.5.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
 |404|[Not Found](https://tools.ietf.org/html/rfc7231#section-6.5.4)|error|string|
 |500|[Internal Server Error](https://tools.ietf.org/html/rfc7231#section-6.6.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
+
+### Response Headers
+
+|Status|Header|Type|Format|Description|
+|---|---|---|---|---|
+|200|Httpmq-Request-ID|string||Request ID|
+|400|Httpmq-Request-ID|string||Request ID|
+|500|Httpmq-Request-ID|string||Request ID|
 
 <aside class="success">
 This operation does not require authentication
@@ -623,6 +679,14 @@ Query for the details of a consumer on a stream
 |404|[Not Found](https://tools.ietf.org/html/rfc7231#section-6.5.4)|error|string|
 |500|[Internal Server Error](https://tools.ietf.org/html/rfc7231#section-6.6.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
 
+### Response Headers
+
+|Status|Header|Type|Format|Description|
+|---|---|---|---|---|
+|200|Httpmq-Request-ID|string||Request ID|
+|400|Httpmq-Request-ID|string||Request ID|
+|500|Httpmq-Request-ID|string||Request ID|
+
 <aside class="success">
 This operation does not require authentication
 </aside>
@@ -676,6 +740,14 @@ Change the data retention limits of a stream
 |404|[Not Found](https://tools.ietf.org/html/rfc7231#section-6.5.4)|error|string|
 |500|[Internal Server Error](https://tools.ietf.org/html/rfc7231#section-6.6.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
 
+### Response Headers
+
+|Status|Header|Type|Format|Description|
+|---|---|---|---|---|
+|200|Httpmq-Request-ID|string||Request ID|
+|400|Httpmq-Request-ID|string||Request ID|
+|500|Httpmq-Request-ID|string||Request ID|
+
 <aside class="success">
 This operation does not require authentication
 </aside>
@@ -726,6 +798,14 @@ Change the list of subjects of interest for a stream
 |404|[Not Found](https://tools.ietf.org/html/rfc7231#section-6.5.4)|error|string|
 |500|[Internal Server Error](https://tools.ietf.org/html/rfc7231#section-6.6.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
 
+### Response Headers
+
+|Status|Header|Type|Format|Description|
+|---|---|---|---|---|
+|200|Httpmq-Request-ID|string||Request ID|
+|400|Httpmq-Request-ID|string||Request ID|
+|500|Httpmq-Request-ID|string||Request ID|
+
 <aside class="success">
 This operation does not require authentication
 </aside>
@@ -736,7 +816,7 @@ This operation does not require authentication
 
 `GET /v1/data/stream/{streamName}/consumer/{consumerName}`
 
-Establish a JetStream pull subscribe session for a client
+Establish a JetStream pull subscribe session for a client. This is a long lived
 
 <h3 id="establish-a-pull-subscribe-session-parameters">Parameters</h3>
 
@@ -746,7 +826,7 @@ Establish a JetStream pull subscribe session for a client
 |consumerName|path|string|true|JetStream consumer name|
 |subject_name|query|string|true|JetStream subject to subscribe to|
 |max_msg_inflight|query|integer|false|Max number of inflight messages (DEFAULT: 1)|
-|delivery_group|query|string|false|Optionally, set the delivery group for consumer|
+|delivery_group|query|string|false|Needed if consumer uses delivery groups|
 
 > Example responses
 
@@ -770,6 +850,14 @@ Establish a JetStream pull subscribe session for a client
 |400|[Bad Request](https://tools.ietf.org/html/rfc7231#section-6.5.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
 |404|[Not Found](https://tools.ietf.org/html/rfc7231#section-6.5.4)|error|string|
 |500|[Internal Server Error](https://tools.ietf.org/html/rfc7231#section-6.6.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
+
+### Response Headers
+
+|Status|Header|Type|Format|Description|
+|---|---|---|---|---|
+|200|Httpmq-Request-ID|string||Request ID|
+|400|Httpmq-Request-ID|string||Request ID|
+|500|Httpmq-Request-ID|string||Request ID|
 
 <aside class="success">
 This operation does not require authentication
@@ -821,6 +909,14 @@ Process JetStream message ACK for a stream / consumer
 |404|[Not Found](https://tools.ietf.org/html/rfc7231#section-6.5.4)|error|string|
 |500|[Internal Server Error](https://tools.ietf.org/html/rfc7231#section-6.6.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
 
+### Response Headers
+
+|Status|Header|Type|Format|Description|
+|---|---|---|---|---|
+|200|Httpmq-Request-ID|string||Request ID|
+|400|Httpmq-Request-ID|string||Request ID|
+|500|Httpmq-Request-ID|string||Request ID|
+
 <aside class="success">
 This operation does not require authentication
 </aside>
@@ -829,7 +925,7 @@ This operation does not require authentication
 
 `POST /v1/data/subject/{subjectName}`
 
-Publish a message to a JetStream subject
+Publish a Base64 encoded message to a JetStream subject
 
 > Body parameter
 
@@ -867,6 +963,14 @@ string
 |400|[Bad Request](https://tools.ietf.org/html/rfc7231#section-6.5.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
 |404|[Not Found](https://tools.ietf.org/html/rfc7231#section-6.5.4)|error|string|
 |500|[Internal Server Error](https://tools.ietf.org/html/rfc7231#section-6.6.1)|error|[apis.StandardResponse](#schemaapis.standardresponse)|
+
+### Response Headers
+
+|Status|Header|Type|Format|Description|
+|---|---|---|---|---|
+|200|Httpmq-Request-ID|string||Request ID|
+|400|Httpmq-Request-ID|string||Request ID|
+|500|Httpmq-Request-ID|string||Request ID|
 
 <aside class="success">
 This operation does not require authentication

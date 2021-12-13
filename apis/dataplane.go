@@ -63,7 +63,7 @@ func GetAPIRestJetStreamDataplaneHandler(
 
 // PublishMessage godoc
 // @Summary Publish a message
-// @Description Publish a message to a JetStream subject
+// @Description Publish a Base64 encoded message to a JetStream subject
 // @tags Dataplane,post,publish
 // @Accept plain
 // @Produce json
@@ -73,6 +73,7 @@ func GetAPIRestJetStreamDataplaneHandler(
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
 // @Router /v1/data/subject/{subjectName} [post]
 func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, r *http.Request) {
 	restCall := "POST /v1/data/subject/{subjectName}"
@@ -165,6 +166,7 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessageHandler() http.HandlerFu
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
 // @Router /v1/data/stream/{streamName}/consumer/{consumerName}/ack [post]
 func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r *http.Request) {
 	restCall := "POST /v1/data/stream/{streamName}/consumer/{consumerName}/ack"
@@ -249,18 +251,21 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACKHandler() http.HandlerFun
 
 // PushSubscribe godoc
 // @Summary Establish a pull subscribe session
-// @Description Establish a JetStream pull subscribe session for a client
+// @Description Establish a JetStream pull subscribe session for a client. This is a long lived
+// server send event stream. The stream will close on client disconnect, server shutdown, or
+// server internal error.
 // @tags Dataplane,get,subscribe
 // @Produce json
 // @Param streamName path string true "JetStream stream name"
 // @Param consumerName path string true "JetStream consumer name"
 // @Param subject_name query string true "JetStream subject to subscribe to"
 // @Param max_msg_inflight query integer false "Max number of inflight messages (DEFAULT: 1)"
-// @Param delivery_group query string false "Optionally, set the delivery group for consumer"
+// @Param delivery_group query string false "Needed if consumer uses delivery groups"
 // @Success 200 {object} StandardResponse "success"
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
 // @Router /v1/data/stream/{streamName}/consumer/{consumerName} [get]
 func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r *http.Request) {
 	restCall := "GET /v1/data/stream/{streamName}/consumer/{consumerName}"
