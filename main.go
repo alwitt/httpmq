@@ -40,8 +40,7 @@ var logTags log.Fields
 
 // @title httpmq
 // @version v0.1.0
-// @description httpmq primary app
-// @termsOfService http://swagger.io/terms/
+// @description HTTP/2 based message broker built around NATS JetStream
 
 // @host localhost:3000
 // @BasePath /

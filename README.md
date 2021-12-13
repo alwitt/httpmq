@@ -2,10 +2,9 @@
 
 HTTP/2 based message broker built around NATS JetStream.
 
----
-## Local Testing - Setup
+# Getting Started
 
-Start the local development NATS JetStream server
+Start the local development NATS server with JetStream enabled
 
 ```shell
 make compose
@@ -59,6 +58,9 @@ $ make
 $ make test
 ```
 
+---
+## Start Local Test Servers
+
 To start the management server locally
 
 ```shell
@@ -84,7 +86,7 @@ $ ./httpmq.bin -l debug --nmra 1 dataplane
 ```
 
 ---
-## Local Testing - Management
+## Define Elements For Testing
 
 Start by defining a JetStream stream
 
@@ -155,7 +157,7 @@ curl 'http://127.0.0.1:3000/v1/admin/stream/test-stream-00/consumer/test-consume
 ```
 
 ---
-## Local Testing - Publishing Messages
+## Publishing Messages
 
 To publish a message for a subject
 
@@ -171,7 +173,7 @@ curl -X POST 'http://127.0.0.1:3001/v1/data/subject/test-subject.01' --header 'C
 > ```
 
 ---
-## Local Testing - Reading Messages
+## Subscribing For Messages
 
 To subscribe to messages for a consumer on a stream
 
