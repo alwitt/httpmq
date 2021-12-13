@@ -11,9 +11,11 @@ import (
 	"gitlab.com/project-nan/httpmq/common"
 )
 
-// JetStreamInflightMsgProcessor handle inflight jetstream messages
+// JetStreamInflightMsgProcessor processes inflight JetStream messages awaiting ACK
 type JetStreamInflightMsgProcessor interface {
+	// RecordInflightMessage records a new JetStream message inflight awaiting ACK
 	RecordInflightMessage(msg *nats.Msg, blocking bool, callCtxt context.Context) error
+	// HandlerMsgACK processes a new message ACK
 	HandlerMsgACK(ack AckIndication, blocking bool, callCtxt context.Context) error
 }
 
@@ -84,7 +86,7 @@ type jsInflightCtrlRecordNewMsg struct {
 	resultCB  func(err error)
 }
 
-// RecordInflightMessage record new inflight messages
+// RecordInflightMessage records a new JetStream message inflight awaiting ACK
 func (c *jetStreamInflightMsgProcessorImpl) RecordInflightMessage(
 	msg *nats.Msg, blocking bool, callCtxt context.Context,
 ) error {
@@ -145,7 +147,7 @@ func (c *jetStreamInflightMsgProcessorImpl) processInflightMessage(param interfa
 	return err
 }
 
-// ProcessInflightMessage record new inflight messages
+// ProcessInflightMessage records a new JetStream message inflight awaiting ACK
 func (c *jetStreamInflightMsgProcessorImpl) ProcessInflightMessage(msg *nats.Msg) error {
 	// Store the message based on per-consumer sequence number of the JetStream message
 	meta, err := msg.Metadata()
@@ -193,7 +195,7 @@ type jsInflightCtrlRecordACK struct {
 	resultCB  func(err error)
 }
 
-// HandlerMsgACK handler JetStream message ACK
+// HandlerMsgACK processes a new message ACK
 func (c *jetStreamInflightMsgProcessorImpl) HandlerMsgACK(
 	ack AckIndication, blocking bool, callCtxt context.Context,
 ) error {
@@ -254,7 +256,7 @@ func (c *jetStreamInflightMsgProcessorImpl) processMsgACK(param interface{}) err
 	return err
 }
 
-// ProcessMsgACK handler JetStream message ACK
+// ProcessMsgACK processes a new message ACK
 func (c *jetStreamInflightMsgProcessorImpl) ProcessMsgACK(ack AckIndication) error {
 	// Fetch the per stream records
 	perStreamRecords, ok := c.inflightPerStream[ack.Stream]

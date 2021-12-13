@@ -13,17 +13,22 @@ import (
 	"gitlab.com/project-nan/httpmq/core"
 )
 
-// AckSeqNum sequence numbers of the ACK
+// AckSeqNum are the sequence numbers of the NATs JetStream message
 type AckSeqNum struct {
-	Stream   uint64 `json:"stream" validate:"required"`
+	// Stream is the JetStream message sequence number for this stream
+	Stream uint64 `json:"stream" validate:"required"`
+	// Consumer is the JetStream message sequence number for this consumer
 	Consumer uint64 `json:"consumer" validate:"required"`
 }
 
-// AckIndication information regarding an ACK
+// AckIndication is the ACK of a NATs JetStream message which contains its key parameters
 type AckIndication struct {
-	Stream   string    `json:"stream" validate:"required"`
-	Consumer string    `json:"consumer" validate:"required"`
-	SeqNum   AckSeqNum `json:"seq_num" validate:"required,dive"`
+	// Stream is the name of the stream
+	Stream string `json:"stream" validate:"required"`
+	// Consumer is the name of the consumer
+	Consumer string `json:"consumer" validate:"required"`
+	// SeqNum is the sequence number of the JetStream message
+	SeqNum AckSeqNum `json:"seq_num" validate:"required,dive"`
 }
 
 // String toString for ackIndication
@@ -38,11 +43,12 @@ func defineACKBroadcastSubject(stream, consumer string) string {
 	return fmt.Sprintf("ack-rx.%s.%s", stream, consumer)
 }
 
-// JetStreamAckHandler function signature for processing a JetStream ACK
+// JetStreamAckHandler is the function signature for callback processing a JetStream ACK
 type JetStreamAckHandler func(AckIndication, context.Context)
 
-// JetStreamACKReceiver handle JetStream ACK being broadcast through NATs subjects
+// JetStreamACKReceiver processes JetStream message ACKs being broadcast through NATs subjects
 type JetStreamACKReceiver interface {
+	// SubscribeForACKs start receiving JetStream message ACKs
 	SubscribeForACKs(
 		wg *sync.WaitGroup, opContext context.Context, handler JetStreamAckHandler,
 	) error
@@ -82,7 +88,7 @@ func getJetStreamACKReceiver(
 	}, nil
 }
 
-// SubscribeForACKs subscribe to NATs change for ACKs on (stream, consumer) tuple
+// SubscribeForACKs start receiving JetStream message ACKs
 func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 	wg *sync.WaitGroup, opContext context.Context, handler JetStreamAckHandler,
 ) error {
@@ -144,8 +150,9 @@ func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 
 // ==============================================================================
 
-// JetStreamACKBroadcaster broadcast JetStream ACK through NATs subjects
+// JetStreamACKBroadcaster broadcasts JetStream message ACK through NATs subjects
 type JetStreamACKBroadcaster interface {
+	// BroadcastACK broadcast a JetStream message ACK
 	BroadcastACK(ack AckIndication, ctxt context.Context) error
 }
 
@@ -172,7 +179,7 @@ func GetJetStreamACKBroadcaster(
 	}, nil
 }
 
-// BroadcastACK broadcast the ACK
+// BroadcastACK broadcast a JetStream message ACK
 func (t *jetStreamACKBroadcasterImpl) BroadcastACK(ack AckIndication, ctxt context.Context) error {
 	localLogTags, err := common.UpdateLogTags(t.LogTags, ctxt)
 	if err != nil {

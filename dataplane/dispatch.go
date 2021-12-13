@@ -11,9 +11,10 @@ import (
 	"gitlab.com/project-nan/httpmq/core"
 )
 
-// MessageDispatcher process a consumer subscription request and dispatch
-// messages to the consumer
+// MessageDispatcher process a consumer subscription request from a client and dispatch
+// messages to that client
 type MessageDispatcher interface {
+	// Start starts operations
 	Start(msgOutput ForwardMessageHandlerCB, errorCB AlertOnErrorCB) error
 }
 

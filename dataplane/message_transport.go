@@ -11,14 +11,15 @@ import (
 	"gitlab.com/project-nan/httpmq/core"
 )
 
-// ForwardMessageHandlerCB callback used to forward new messages
+// ForwardMessageHandlerCB callback used to forward new messages to the next pipeline stage
 type ForwardMessageHandlerCB func(msg *nats.Msg, ctxt context.Context) error
 
 // AlertOnErrorCB callback used to expose internal error to an outer context for handling
 type AlertOnErrorCB func(err error)
 
-// JetStreamPushSubscriber component directly reading from JetStream with push consumer
+// JetStreamPushSubscriber is directly reading from JetStream with a push consumer
 type JetStreamPushSubscriber interface {
+	// StartReading begin reading data from JetStream
 	StartReading(
 		forwardCB ForwardMessageHandlerCB,
 		errorCB AlertOnErrorCB,
@@ -139,8 +140,9 @@ func (r *jetStreamPushSubscriberImpl) StartReading(
 
 // ==============================================================================
 
-// JetStreamPublisher send a new message into JetStream
+// JetStreamPublisher publishes new messages into JetStream
 type JetStreamPublisher interface {
+	// Publish publishes a new message into JetStream on a subject
 	Publish(subject string, msg []byte, ctxt context.Context) error
 }
 
@@ -162,7 +164,7 @@ func GetJetStreamPublisher(
 	}, nil
 }
 
-// Publish publish a message on a subject
+// Publish publishes a new message into JetStream on a subject
 func (s *jetStreamPublisherImpl) Publish(subject string, msg []byte, ctxt context.Context) error {
 	localLogTags, err := common.UpdateLogTags(s.LogTags, ctxt)
 	if err != nil {
