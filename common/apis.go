@@ -6,14 +6,17 @@ import (
 	"github.com/apex/log"
 )
 
-// RequestParam used to add a request parameters into its context
+// RequestParam is a helper object for logging a request's parameters into its context
 type RequestParam struct {
-	ID     string `json:"id"`
-	Method string `json:"method"`
-	URI    string `json:"uri"`
+	// ID is the request ID
+	ID string `json:"id"`
+	// Method is the request method: DELETE, POST, PUT, GET, etc.
+	Method string `json:"method" `
+	// URI is the request URI
+	URI string `json:"uri"`
 }
 
-// UpdateLogTags update Apex log.Fields map with values in this
+// UpdateLogTags updates Apex log.Fields map with values the requests's parameters
 func (i *RequestParam) UpdateLogTags(tags log.Fields) {
 	tags["request_id"] = i.ID
 	tags["request_method"] = i.Method

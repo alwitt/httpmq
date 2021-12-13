@@ -9,33 +9,32 @@ import (
 	"gitlab.com/project-nan/httpmq/common"
 )
 
-// NATSConnectParams NATS connection parameter
+// NATSConnectParams contains NATS connection parameters
 type NATSConnectParams struct {
-	// ServerURI connect to NATS JetStream cluster with URI
+	// connect to NATS JetStream cluster with this URI
 	ServerURI string `validate:"required,uri"`
-	// ConnectTimeout max time to wait for connection
+	// max time to wait for connection in ns
 	ConnectTimeout time.Duration
-	// MaxReconnectAttempt on connection failure, max number of reconnect
-	// attempt. "-1" means infinite
+	// on connection failure, max number of reconnect attempt. "-1" means infinite
 	MaxReconnectAttempt int `validate:"gte=-1"`
-	// ReconnectWait wait duration between reconnect attempts
+	// wait duration between reconnect attempts
 	ReconnectWait time.Duration
-	// OnDisconnectCallback callback on disconnect
+	// callback on client disconnect
 	OnDisconnectCallback func(*nats.Conn, error)
-	// OnReconnectCallback callback on reconnect
+	// callback on client reconnect
 	OnReconnectCallback func(*nats.Conn)
-	// OnCloseCallback callback on close
+	// callback on client connection closed
 	OnCloseCallback func(*nats.Conn)
 }
 
-// NatsClient NATS NatsClient as message broker core
+// NatsClient is a wrapper around NATS client handle objects
 type NatsClient struct {
 	common.Component
 	nc *nats.Conn
 	js nats.JetStreamContext
 }
 
-// Close close a JetStream client
+// Close closes a JetStream client
 func (js *NatsClient) Close(ctxt context.Context) {
 	if err := js.nc.FlushWithContext(ctxt); err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("NATS flush failed")
@@ -44,17 +43,19 @@ func (js *NatsClient) Close(ctxt context.Context) {
 	log.WithFields(js.LogTags).Infof("Close NATS client")
 }
 
-// NATs fetch the NATs client
+// NATs fetches the NATs client handle
 func (js *NatsClient) NATs() *nats.Conn {
 	return js.nc
 }
 
-// JetStream fetch the JetStream client
+// JetStream fetches the JetStream client handle
 func (js *NatsClient) JetStream() nats.JetStreamContext {
 	return js.js
 }
 
-// GetJetStream define a new NATS JetStream core
+// GetJetStream defines a new NATS client object wrapper
+//
+// NOTE: Function will also attempt to connect with NATs server
 func GetJetStream(param NATSConnectParams) (*NatsClient, error) {
 	logTags := log.Fields{
 		"module":    "core",

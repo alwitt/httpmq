@@ -10,20 +10,31 @@ import (
 	"github.com/apex/log"
 )
 
-// TaskHandler a handler function which execute a task based on parameters
+// TaskHandler is the function signature of callback used to process an user task
 type TaskHandler func(taskParam interface{}) error
 
-// TaskProcessor processing module for implementing an event loop model
+// TaskProcessor implements an event loop model where tasks are processed by a daemon thread
 type TaskProcessor interface {
+	// Submit submits a task-parameter to be processed
 	Submit(newTaskParam interface{}, ctx context.Context) error
+	// ProcessNewTaskParam execute a submitted task-parameter
 	ProcessNewTaskParam(newTaskParam interface{}) error
+	// SetTaskExecutionMap update the mapping between task-parameter object and its associated
+	// handler function.
+	//
+	// The task-parameter object contains information need to execute a particular task. When
+	// a user wants to execute a task, the user is submitting a task-parameter object via Submit.
+	// The module finds the associated handler function and calls it with the task-parameter object.
 	SetTaskExecutionMap(newMap map[reflect.Type]TaskHandler) error
+	// AddToTaskExecutionMap add new (task-parameter, handler function) mapping to the existing set.
 	AddToTaskExecutionMap(theType reflect.Type, handler TaskHandler) error
+	// StartEventLoop starts the daemon thread for processing the submitted task-parameters
 	StartEventLoop(wg *sync.WaitGroup) error
+	// StopEventLoop stops the daemon thread
 	StopEventLoop() error
 }
 
-// taskProcessorImpl implement TaskProcessor
+// taskProcessorImpl implements TaskProcessor which uses only one daemon thread
 type taskProcessorImpl struct {
 	Component
 	name             string
@@ -33,7 +44,7 @@ type taskProcessorImpl struct {
 	executionMap     map[reflect.Type]TaskHandler
 }
 
-// GetNewTaskProcessorInstance get instance of TaskProcessor
+// GetNewTaskProcessorInstance get instance of taskProcessorImpl
 func GetNewTaskProcessorInstance(
 	name string, taskBuffer int, ctxt context.Context,
 ) (TaskProcessor, error) {
@@ -57,7 +68,7 @@ func GetNewTaskProcessorInstance(
 	}, nil
 }
 
-// Submit submit a new task parameter for processing
+// Submit submits a task to be processed
 func (p *taskProcessorImpl) Submit(newTaskParam interface{}, ctx context.Context) error {
 	select {
 	case p.newTasks <- newTaskParam:
@@ -69,21 +80,26 @@ func (p *taskProcessorImpl) Submit(newTaskParam interface{}, ctx context.Context
 	}
 }
 
-// SetTaskExecutionMap update the task param to execution mapping
+// SetTaskExecutionMap update the mapping between task-parameter object and it associated
+// handler function.
+//
+// The task-parameter object contains information need to execute a particular task. When
+// a user wants to execute a task, the user is submitting a task-parameter object via Submit.
+// The module finds the associated handler function and calls it with the task-parameter object.
 func (p *taskProcessorImpl) SetTaskExecutionMap(newMap map[reflect.Type]TaskHandler) error {
 	log.WithFields(p.LogTags).Debug("Changing task execution mapping")
 	p.executionMap = newMap
 	return nil
 }
 
-// AddToTaskExecutionMap add a new entry to the task param to execution mapping
+// AddToTaskExecutionMap add new (task-parameter, handler function) mapping to the existing set.
 func (p *taskProcessorImpl) AddToTaskExecutionMap(theType reflect.Type, handler TaskHandler) error {
 	log.WithFields(p.LogTags).Debugf("Appending to task execution mapping for %s", theType)
 	p.executionMap[theType] = handler
 	return nil
 }
 
-// ProcessNewTaskParam process a new task param
+// StartEventLoop starts the daemon thread for processing the submitted task-parameters
 func (p *taskProcessorImpl) ProcessNewTaskParam(newTaskParam interface{}) error {
 	if p.executionMap != nil && len(p.executionMap) > 0 {
 		log.WithFields(p.LogTags).Debugf("Processing new %s", reflect.TypeOf(newTaskParam))
@@ -98,7 +114,7 @@ func (p *taskProcessorImpl) ProcessNewTaskParam(newTaskParam interface{}) error 
 	return fmt.Errorf("[TP %s] No task execution mapping set", p.name)
 }
 
-// StartEventLoop start the event loop
+// StartEventLoop starts the daemon thread for processing the submitted task-parameters
 func (p *taskProcessorImpl) StartEventLoop(wg *sync.WaitGroup) error {
 	log.WithFields(p.LogTags).Info("Starting event loop")
 	wg.Add(1)
@@ -126,7 +142,7 @@ func (p *taskProcessorImpl) StartEventLoop(wg *sync.WaitGroup) error {
 	return nil
 }
 
-// StopEventLoop stop the event loop
+// StopEventLoop stops the daemon thread
 func (p *taskProcessorImpl) StopEventLoop() error {
 	p.contextCancel()
 	return nil
@@ -145,7 +161,7 @@ type taskDemuxProcessorImpl struct {
 	contextCancel    context.CancelFunc
 }
 
-// GetNewTaskDemuxProcessorInstance get instance of TaskDemuxProcessor
+// GetNewTaskDemuxProcessorInstance get instance of taskDemuxProcessorImpl
 func GetNewTaskDemuxProcessorInstance(
 	name string,
 	taskBuffer int,
@@ -191,12 +207,12 @@ func GetNewTaskDemuxProcessorInstance(
 	}, nil
 }
 
-// Submit submit a new task parameter for processing
+// Submit submits a task-parameter to be processed
 func (p *taskDemuxProcessorImpl) Submit(newTaskParam interface{}, ctx context.Context) error {
 	return p.input.Submit(newTaskParam, ctx)
 }
 
-// ProcessNewTaskParam given a new task, process task parameter
+// ProcessNewTaskParam execute a submitted task-parameter
 func (p *taskDemuxProcessorImpl) ProcessNewTaskParam(newTaskParam interface{}) error {
 	if p.workers != nil && len(p.workers) > 0 {
 		log.WithFields(p.LogTags).Debugf("Processing new %s", reflect.TypeOf(newTaskParam))
@@ -206,7 +222,12 @@ func (p *taskDemuxProcessorImpl) ProcessNewTaskParam(newTaskParam interface{}) e
 	return fmt.Errorf("[TDP %s] No workers defined", p.name)
 }
 
-// SetTaskExecutionMap update the task execution map for all workers
+// SetTaskExecutionMap update the mapping between task-parameter object and its associated
+// handler function.
+//
+// The task-parameter object contains information need to execute a particular task. When
+// a user wants to execute a task, the user is submitting a task-parameter object via Submit.
+// The module finds the associated handler function and calls it with the task-parameter object.
 func (p *taskDemuxProcessorImpl) SetTaskExecutionMap(newMap map[reflect.Type]TaskHandler) error {
 	for _, worker := range p.workers {
 		_ = worker.SetTaskExecutionMap(newMap)
@@ -219,7 +240,7 @@ func (p *taskDemuxProcessorImpl) SetTaskExecutionMap(newMap map[reflect.Type]Tas
 	return p.input.SetTaskExecutionMap(inputMap)
 }
 
-// AddToTaskExecutionMap add a new entry to the task param to execution mapping
+// AddToTaskExecutionMap add new (task-parameter, handler function) mapping to the existing set.
 func (p *taskDemuxProcessorImpl) AddToTaskExecutionMap(
 	theType reflect.Type, handler TaskHandler,
 ) error {
@@ -230,7 +251,7 @@ func (p *taskDemuxProcessorImpl) AddToTaskExecutionMap(
 	return p.input.AddToTaskExecutionMap(theType, p.ProcessNewTaskParam)
 }
 
-// StartEventLoop start the event loop
+// StartEventLoop starts the daemon thread for processing the submitted task-parameters
 func (p *taskDemuxProcessorImpl) StartEventLoop(wg *sync.WaitGroup) error {
 	log.WithFields(p.LogTags).Info("Starting event loops")
 	// Start the worker loops first
@@ -241,7 +262,7 @@ func (p *taskDemuxProcessorImpl) StartEventLoop(wg *sync.WaitGroup) error {
 	return p.input.StartEventLoop(wg)
 }
 
-// StopEventLoop stop the event loop
+// StopEventLoop stops the daemon thread
 func (p *taskDemuxProcessorImpl) StopEventLoop() error {
 	p.contextCancel()
 	return nil

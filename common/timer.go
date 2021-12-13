@@ -9,12 +9,15 @@ import (
 	"github.com/apex/log"
 )
 
-// TimeoutHandler handler callback on timeout
+// TimeoutHandler callback function signature called timer timeout
 type TimeoutHandler func() error
 
-// IntervalTimer support class for triggering events at specific intervals
+// IntervalTimer is a support interface for triggering events at specific intervals
 type IntervalTimer interface {
+	// Start starts timer with a specific timeout interval, and the callback to trigger on timeout.
+	// If oneShort, cancel after first timeout.
 	Start(interval time.Duration, handler TimeoutHandler, oneShort bool) error
+	// Stop stops the timer
 	Stop() error
 }
 
@@ -49,7 +52,8 @@ func GetIntervalTimerInstance(
 	}, nil
 }
 
-// Start start the interval timer
+// Start starts timer with a specific timeout interval, and the callback to trigger on timeout.
+// If oneShort, cancel after first timeout.
 func (t *intervalTimerImpl) Start(
 	interval time.Duration, handler TimeoutHandler, oneShot bool,
 ) error {
@@ -80,7 +84,7 @@ func (t *intervalTimerImpl) Start(
 	return nil
 }
 
-// Stop stop the interval timer
+// Stop stops the timer
 func (t *intervalTimerImpl) Stop() error {
 	if t.contextCancel != nil {
 		log.WithFields(t.LogTags).Info("Stopping timer loop")
@@ -90,18 +94,21 @@ func (t *intervalTimerImpl) Stop() error {
 }
 
 // ========================================================================================
-// Sequencer helper object to return a sequence of numbers
+
+// Sequencer is a helper interface for returning a sequence of numbers
 type Sequencer interface {
+	// NextValue returns the next value in the sequence
 	NextValue() float64
 }
 
-// exponentialSequence a helper function for get an exponential sequence from a
+// exponentialSequence is a helper interface to get an exponential sequence from a
 // starting value
 type exponentialSequence struct {
 	current    float64
 	growthRate float64
 }
 
+// NextValue returns the next value in the sequence
 func (s *exponentialSequence) NextValue() float64 {
 	nextValue := s.current * s.growthRate
 	s.current = nextValue

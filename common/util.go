@@ -8,12 +8,13 @@ import (
 	"github.com/apex/log"
 )
 
-// Component base structure for a Component
+// Component is the base structure for all components
 type Component struct {
+	// LogTags the Apex logging message metadata tags
 	LogTags log.Fields
 }
 
-// DeepCopy helper function for performing deep-copy
+// DeepCopy is helper function for performing deep-copy
 //
 // USE ONLY WHEN ABSOLUTELY NEEDED
 func DeepCopy(src, dst interface{}) error {
@@ -24,7 +25,7 @@ func DeepCopy(src, dst interface{}) error {
 	return gob.NewDecoder(bytes.NewBuffer(buf.Bytes())).Decode(dst)
 }
 
-// UpdateLogTags augment the existing log tags with info from Context
+// UpdateLogTags add additional fields to the existing log tags with information from Context
 func UpdateLogTags(original log.Fields, ctxt context.Context) (log.Fields, error) {
 	newLogTags := log.Fields{}
 	if err := DeepCopy(&original, &newLogTags); err != nil {
