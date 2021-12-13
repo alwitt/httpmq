@@ -73,7 +73,7 @@ func GetAPIRestJetStreamDataplaneHandler(
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/data/subject/{subjectName} [post]
 func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, r *http.Request) {
 	restCall := "POST /v1/data/subject/{subjectName}"
@@ -166,7 +166,7 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessageHandler() http.HandlerFu
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/data/stream/{streamName}/consumer/{consumerName}/ack [post]
 func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r *http.Request) {
 	restCall := "POST /v1/data/stream/{streamName}/consumer/{consumerName}/ack"
@@ -265,7 +265,7 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACKHandler() http.HandlerFun
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/data/stream/{streamName}/consumer/{consumerName} [get]
 func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r *http.Request) {
 	restCall := "GET /v1/data/stream/{streamName}/consumer/{consumerName}"

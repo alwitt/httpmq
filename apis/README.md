@@ -205,9 +205,9 @@ Query for the details of all streams
 
 |Status|Header|Type|Format|Description|
 |---|---|---|---|---|
-|200|Httpmq-Request-ID|string||Request ID|
-|400|Httpmq-Request-ID|string||Request ID|
-|500|Httpmq-Request-ID|string||Request ID|
+|200|Httpmq-Request-ID|string||Request ID to match against logs|
+|400|Httpmq-Request-ID|string||Request ID to match against logs|
+|500|Httpmq-Request-ID|string||Request ID to match against logs|
 
 <aside class="success">
 This operation does not require authentication
@@ -269,9 +269,9 @@ Define new JetStream stream
 
 |Status|Header|Type|Format|Description|
 |---|---|---|---|---|
-|200|Httpmq-Request-ID|string||Request ID|
-|400|Httpmq-Request-ID|string||Request ID|
-|500|Httpmq-Request-ID|string||Request ID|
+|200|Httpmq-Request-ID|string||Request ID to match against logs|
+|400|Httpmq-Request-ID|string||Request ID to match against logs|
+|500|Httpmq-Request-ID|string||Request ID to match against logs|
 
 <aside class="success">
 This operation does not require authentication
@@ -316,9 +316,9 @@ Delete a stream
 
 |Status|Header|Type|Format|Description|
 |---|---|---|---|---|
-|200|Httpmq-Request-ID|string||Request ID|
-|400|Httpmq-Request-ID|string||Request ID|
-|500|Httpmq-Request-ID|string||Request ID|
+|200|Httpmq-Request-ID|string||Request ID to match against logs|
+|400|Httpmq-Request-ID|string||Request ID to match against logs|
+|500|Httpmq-Request-ID|string||Request ID to match against logs|
 
 <aside class="success">
 This operation does not require authentication
@@ -388,9 +388,9 @@ Query for the details of one stream
 
 |Status|Header|Type|Format|Description|
 |---|---|---|---|---|
-|200|Httpmq-Request-ID|string||Request ID|
-|400|Httpmq-Request-ID|string||Request ID|
-|500|Httpmq-Request-ID|string||Request ID|
+|200|Httpmq-Request-ID|string||Request ID to match against logs|
+|400|Httpmq-Request-ID|string||Request ID to match against logs|
+|500|Httpmq-Request-ID|string||Request ID to match against logs|
 
 <aside class="success">
 This operation does not require authentication
@@ -495,9 +495,9 @@ Query for the details of all consumers of a stream
 
 |Status|Header|Type|Format|Description|
 |---|---|---|---|---|
-|200|Httpmq-Request-ID|string||Request ID|
-|400|Httpmq-Request-ID|string||Request ID|
-|500|Httpmq-Request-ID|string||Request ID|
+|200|Httpmq-Request-ID|string||Request ID to match against logs|
+|400|Httpmq-Request-ID|string||Request ID to match against logs|
+|500|Httpmq-Request-ID|string||Request ID to match against logs|
 
 <aside class="success">
 This operation does not require authentication
@@ -558,9 +558,9 @@ Create a new consumer on a stream. The stream must already be defined.
 
 |Status|Header|Type|Format|Description|
 |---|---|---|---|---|
-|200|Httpmq-Request-ID|string||Request ID|
-|400|Httpmq-Request-ID|string||Request ID|
-|500|Httpmq-Request-ID|string||Request ID|
+|200|Httpmq-Request-ID|string||Request ID to match against logs|
+|400|Httpmq-Request-ID|string||Request ID to match against logs|
+|500|Httpmq-Request-ID|string||Request ID to match against logs|
 
 <aside class="success">
 This operation does not require authentication
@@ -606,9 +606,9 @@ Delete one consumer of a stream
 
 |Status|Header|Type|Format|Description|
 |---|---|---|---|---|
-|200|Httpmq-Request-ID|string||Request ID|
-|400|Httpmq-Request-ID|string||Request ID|
-|500|Httpmq-Request-ID|string||Request ID|
+|200|Httpmq-Request-ID|string||Request ID to match against logs|
+|400|Httpmq-Request-ID|string||Request ID to match against logs|
+|500|Httpmq-Request-ID|string||Request ID to match against logs|
 
 <aside class="success">
 This operation does not require authentication
@@ -683,9 +683,9 @@ Query for the details of a consumer on a stream
 
 |Status|Header|Type|Format|Description|
 |---|---|---|---|---|
-|200|Httpmq-Request-ID|string||Request ID|
-|400|Httpmq-Request-ID|string||Request ID|
-|500|Httpmq-Request-ID|string||Request ID|
+|200|Httpmq-Request-ID|string||Request ID to match against logs|
+|400|Httpmq-Request-ID|string||Request ID to match against logs|
+|500|Httpmq-Request-ID|string||Request ID to match against logs|
 
 <aside class="success">
 This operation does not require authentication
@@ -744,9 +744,9 @@ Change the data retention limits of a stream
 
 |Status|Header|Type|Format|Description|
 |---|---|---|---|---|
-|200|Httpmq-Request-ID|string||Request ID|
-|400|Httpmq-Request-ID|string||Request ID|
-|500|Httpmq-Request-ID|string||Request ID|
+|200|Httpmq-Request-ID|string||Request ID to match against logs|
+|400|Httpmq-Request-ID|string||Request ID to match against logs|
+|500|Httpmq-Request-ID|string||Request ID to match against logs|
 
 <aside class="success">
 This operation does not require authentication
@@ -802,9 +802,9 @@ Change the list of subjects of interest for a stream
 
 |Status|Header|Type|Format|Description|
 |---|---|---|---|---|
-|200|Httpmq-Request-ID|string||Request ID|
-|400|Httpmq-Request-ID|string||Request ID|
-|500|Httpmq-Request-ID|string||Request ID|
+|200|Httpmq-Request-ID|string||Request ID to match against logs|
+|400|Httpmq-Request-ID|string||Request ID to match against logs|
+|500|Httpmq-Request-ID|string||Request ID to match against logs|
 
 <aside class="success">
 This operation does not require authentication
@@ -855,9 +855,9 @@ Establish a JetStream pull subscribe session for a client. This is a long lived
 
 |Status|Header|Type|Format|Description|
 |---|---|---|---|---|
-|200|Httpmq-Request-ID|string||Request ID|
-|400|Httpmq-Request-ID|string||Request ID|
-|500|Httpmq-Request-ID|string||Request ID|
+|200|Httpmq-Request-ID|string||Request ID to match against logs|
+|400|Httpmq-Request-ID|string||Request ID to match against logs|
+|500|Httpmq-Request-ID|string||Request ID to match against logs|
 
 <aside class="success">
 This operation does not require authentication
@@ -913,9 +913,9 @@ Process JetStream message ACK for a stream / consumer
 
 |Status|Header|Type|Format|Description|
 |---|---|---|---|---|
-|200|Httpmq-Request-ID|string||Request ID|
-|400|Httpmq-Request-ID|string||Request ID|
-|500|Httpmq-Request-ID|string||Request ID|
+|200|Httpmq-Request-ID|string||Request ID to match against logs|
+|400|Httpmq-Request-ID|string||Request ID to match against logs|
+|500|Httpmq-Request-ID|string||Request ID to match against logs|
 
 <aside class="success">
 This operation does not require authentication
@@ -968,9 +968,9 @@ string
 
 |Status|Header|Type|Format|Description|
 |---|---|---|---|---|
-|200|Httpmq-Request-ID|string||Request ID|
-|400|Httpmq-Request-ID|string||Request ID|
-|500|Httpmq-Request-ID|string||Request ID|
+|200|Httpmq-Request-ID|string||Request ID to match against logs|
+|400|Httpmq-Request-ID|string||Request ID to match against logs|
+|500|Httpmq-Request-ID|string||Request ID to match against logs|
 
 <aside class="success">
 This operation does not require authentication

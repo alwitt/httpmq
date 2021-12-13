@@ -231,7 +231,7 @@ func convertConsumerInfo(original *nats.ConsumerInfo) APIRestRespConsumerInfo {
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream [post]
 func (h APIRestJetStreamManagementHandler) CreateStream(w http.ResponseWriter, r *http.Request) {
 	restCall := "POST /v1/admin/stream"
@@ -299,7 +299,7 @@ type APIRestRespAllJetStreams struct {
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream [get]
 func (h APIRestJetStreamManagementHandler) GetAllStreams(w http.ResponseWriter, r *http.Request) {
 	restCall := "GET /v1/admin/stream"
@@ -342,7 +342,7 @@ type APIRestRespOneJetStream struct {
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName} [get]
 func (h APIRestJetStreamManagementHandler) GetStream(w http.ResponseWriter, r *http.Request) {
 	restCall := "GET /v1/admin/stream/{streamName}"
@@ -416,7 +416,7 @@ type APIRestReqStreamSubjects struct {
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName}/subject [put]
 func (h APIRestJetStreamManagementHandler) ChangeStreamSubjects(
 	w http.ResponseWriter, r *http.Request,
@@ -496,7 +496,7 @@ func (h APIRestJetStreamManagementHandler) ChangeStreamSubjectsHandler() http.Ha
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName}/limit [put]
 func (h APIRestJetStreamManagementHandler) UpdateStreamLimits(
 	w http.ResponseWriter, r *http.Request,
@@ -567,7 +567,7 @@ func (h APIRestJetStreamManagementHandler) UpdateStreamLimitsHandler() http.Hand
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName} [delete]
 func (h APIRestJetStreamManagementHandler) DeleteStream(w http.ResponseWriter, r *http.Request) {
 	restCall := "DELETE /v1/admin/stream/{streamName}"
@@ -633,7 +633,7 @@ func (h APIRestJetStreamManagementHandler) DeleteStreamHandler() http.HandlerFun
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName}/consumer [post]
 func (h APIRestJetStreamManagementHandler) CreateConsumer(w http.ResponseWriter, r *http.Request) {
 	restCall := "POST /v1/admin/stream/{streamName}/consumer"
@@ -709,7 +709,7 @@ type APIRestRespAllJetStreamConsumers struct {
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName}/consumer [get]
 func (h APIRestJetStreamManagementHandler) GetAllConsumers(
 	w http.ResponseWriter, r *http.Request,
@@ -778,7 +778,7 @@ type APIRestRespOneJetStreamConsumer struct {
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName}/consumer/{consumerName} [get]
 func (h APIRestJetStreamManagementHandler) GetConsumer(w http.ResponseWriter, r *http.Request) {
 	restCall := "GET /v1/admin/stream/{streamName}/consumer/{consumerName}"
@@ -852,7 +852,7 @@ func (h APIRestJetStreamManagementHandler) GetConsumerHandler() http.HandlerFunc
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID"
+// @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName}/consumer/{consumerName} [delete]
 func (h APIRestJetStreamManagementHandler) DeleteConsumer(w http.ResponseWriter, r *http.Request) {
 	restCall := "DELETE /v1/admin/stream/{streamName}/consumer/{consumerName}"
