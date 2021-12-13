@@ -2,6 +2,13 @@
 
 HTTP/2 based message broker built around NATS JetStream.
 
+See REST API Documentation [here](apis/README.md)
+> Documentation generated with [widdershins](https://github.com/Mermade/widdershins)
+>
+> ```shell
+> $ node widdershins --code --summary=true --search=false /path/to/docs/swagger.yaml -o README.md
+> ```
+
 # Getting Started
 
 Start the local development NATS server with JetStream enabled
