@@ -13,35 +13,55 @@ import (
 	"gitlab.com/project-nan/httpmq/core"
 )
 
-// JSStreamLimits list stream data retention settings
+// JSStreamLimits is the set of stream data retention settings
 type JSStreamLimits struct {
-	MaxConsumers      *int           `json:"max_consumers,omitempty"`
-	MaxMsgs           *int64         `json:"max_msgs,omitempty"`
-	MaxBytes          *int64         `json:"max_bytes,omitempty"`
-	MaxAge            *time.Duration `json:"max_age,omitempty" swaggertype:"primitive,integer"`
-	MaxMsgsPerSubject *int64         `json:"max_msgs_per_subject,omitempty"`
-	MaxMsgSize        *int32         `json:"max_msg_size,omitempty"`
+	// MaxConsumers is the max number of consumers allowed on the stream
+	MaxConsumers *int `json:"max_consumers,omitempty"`
+	// MaxMsgs is the max number of messages the stream will store.
+	//
+	// Oldest messages are removed once limit breached.
+	MaxMsgs *int64 `json:"max_msgs,omitempty"`
+	// MaxBytes is the max number of message bytes the stream will store.
+	//
+	// Oldest messages are removed once limit breached.
+	MaxBytes *int64 `json:"max_bytes,omitempty"`
+	// MaxBytes is the max duration (ns) the stream will store a message
+	//
+	// Messages breaching the limit will be removed.
+	MaxAge *time.Duration `json:"max_age,omitempty" swaggertype:"primitive,integer"`
+	// MaxMsgsPerSubject is the maximum number of subjects allowed on this stream
+	MaxMsgsPerSubject *int64 `json:"max_msgs_per_subject,omitempty"`
+	// MaxMsgSize is the max size of a message allowed in this stream
+	MaxMsgSize *int32 `json:"max_msg_size,omitempty"`
 }
 
-// JSStreamParam list parameters for defining a stream
+// JSStreamParam are the parameters for defining a stream
 type JSStreamParam struct {
 	// Name is the stream name
-	Name     string   `json:"name" validate:"required"`
+	Name string `json:"name" validate:"required"`
+	// Subjects is the list of subjects of interest for this stream
 	Subjects []string `json:"subjects,omitempty"`
+	// JSStreamLimits stream data retention limits
 	JSStreamLimits
 }
 
-// JetStreamConsumerParam list parameters for defining a consumer
+// JetStreamConsumerParam are the parameters for defining a consumer on a stream
 type JetStreamConsumerParam struct {
-	Name  string `json:"name" validate:"required"`
+	// Name is the consumer name
+	Name string `json:"name" validate:"required"`
+	// Notes are descriptions regarding this consumer
 	Notes string `json:"notes,omitempty"`
-	// Set the consumer to filter for subjects matching this regex string
+	// FilterSubject sets the consumer to filter for subjects matching this NATs subject string
+	//
+	// See https://docs.nats.io/running-a-nats-service/nats_admin/jetstream_admin/naming
 	FilterSubject *string `json:"filter_subject,omitempty"`
-	// DeliveryGroup a consumer with non-empty group value can be used
-	// by multiple client instances. For a subject a group listens to,
-	// the messages will shared amongst the members
+	// DeliveryGroup creates a consumer using a delivery group name.
+	//
+	// A consumer using delivery group allows multiple clients to subscribe under the same consumer
+	// and group name tuple. For subjects this consumer listens to, the messages will be shared
+	// amongst the connected clients.
 	DeliveryGroup *string `json:"delivery_group,omitempty"`
-	// MaxInflight max number of un-ACKed message permitted in-flight
+	// MaxInflight is max number of un-ACKed message permitted in-flight (must be >= 1)
 	MaxInflight int `json:"max_inflight" validate:"required,gte=1"`
 	// MaxRetry max number of times an un-ACKed message is resent (-1: infinite)
 	MaxRetry *int `json:"max_retry,omitempty" validate:"omitempty,gte=-1"`
@@ -51,45 +71,49 @@ type JetStreamConsumerParam struct {
 	Mode string `json:"mode" validate:"required,oneof=push pull"`
 }
 
-// JetStreamController manage JetStream
+// JetStreamController is a JetStream controller instance. It proxes the commands to JetStream.
 type JetStreamController interface {
+	// Ready indicates whether the system is considered ready
 	Ready() (bool, error)
 	// ========================================================
 	// Stream related management
-	// CreateStream create a new JS stream given parameters
+
+	// CreateStream creates a new stream given parameters
 	CreateStream(param JSStreamParam, ctxt context.Context) error
-	// GetAllStreams query for info on all available JS stream
+	// GetAllStreams queries for info on all available streams
 	GetAllStreams(ctxt context.Context) map[string]*nats.StreamInfo
-	// GetStream query for info on one JS stream by name
+	// GetStream queries for info on one stream by name
 	GetStream(name string, ctxt context.Context) (*nats.StreamInfo, error)
-	// ChangeStreamSubjects changes the target subjects of a JS stream
+	// ChangeStreamSubjects changes the target subjects of a stream
 	ChangeStreamSubjects(stream string, newSubjects []string, ctxt context.Context) error
-	// UpdateStreamLimits change the data retention limits of the JS stream
+	// UpdateStreamLimits changes the data retention limits of the stream
 	UpdateStreamLimits(stream string, newLimits JSStreamLimits, ctxt context.Context) error
-	// Deletestream delete a JS stream by name
+	// Deletestream deletes a stream by name
 	DeleteStream(name string, ctxt context.Context) error
+
 	// ========================================================
 	// Consumer related management
-	// CreateConsumerForStream create a new consumer on a JS stream
+
+	// CreateConsumerForStream creates a new consumer for a stream
 	CreateConsumerForStream(stream string, param JetStreamConsumerParam, ctxt context.Context) error
-	// GetAllConsumersForStream query for info on all consumers of a JS stream
+	// GetAllConsumersForStream queries for info on all consumers of a stream
 	GetAllConsumersForStream(stream string, ctxt context.Context) map[string]*nats.ConsumerInfo
-	// GetConsumerForStream query for info of a consumer of a JS stream
+	// GetConsumerForStream queries for info of one consumer of a stream
 	GetConsumerForStream(
 		stream, consumerName string, ctxt context.Context,
 	) (*nats.ConsumerInfo, error)
-	// DeleteConsumerOnStream delete consumer of a JS stream
+	// DeleteConsumerOnStream deletes one consumer of a stream
 	DeleteConsumerOnStream(stream, consumerName string, ctxt context.Context) error
 }
 
-// jetStreamControllerImpl manage JetStream
+// jetStreamControllerImpl implements JetStreamController
 type jetStreamControllerImpl struct {
 	common.Component
 	core     *core.NatsClient
 	validate *validator.Validate
 }
 
-// GetJetStreamController define JetStreamController
+// GetJetStreamController define a jetStreamControllerImpl
 func GetJetStreamController(
 	natsCore *core.NatsClient, instance string,
 ) (JetStreamController, error) {
@@ -113,7 +137,7 @@ func (js jetStreamControllerImpl) Ready() (bool, error) {
 // =======================================================================
 // Stream related controls
 
-// GetAllStreams fetch the list of all known stream
+// GetAllStreams queries for info on all available streams
 func (js jetStreamControllerImpl) GetAllStreams(ctxt context.Context) map[string]*nats.StreamInfo {
 	localLogTags, _ := common.UpdateLogTags(js.LogTags, ctxt)
 	readChan := js.core.JetStream().StreamsInfo()
@@ -141,7 +165,7 @@ func (js jetStreamControllerImpl) GetAllStreams(ctxt context.Context) map[string
 	return knownStreams
 }
 
-// GetStream get info on one stream
+// GetStream queries for info on one stream by name
 func (js jetStreamControllerImpl) GetStream(
 	name string, ctxt context.Context,
 ) (*nats.StreamInfo, error) {
@@ -178,7 +202,7 @@ func applyStreamLimits(targetLimit *JSStreamLimits, param *nats.StreamConfig) {
 	}
 }
 
-// CreateStream define a new stream
+// CreateStream creates a new stream given parameters
 func (js jetStreamControllerImpl) CreateStream(param JSStreamParam, ctxt context.Context) error {
 	localLogTags, err := common.UpdateLogTags(js.LogTags, ctxt)
 	if err != nil {
@@ -206,7 +230,7 @@ func (js jetStreamControllerImpl) CreateStream(param JSStreamParam, ctxt context
 	return nil
 }
 
-// DeleteStream delete an existing stream
+// Deletestream deletes a stream by name
 func (js jetStreamControllerImpl) DeleteStream(name string, ctxt context.Context) error {
 	localLogTags, err := common.UpdateLogTags(js.LogTags, ctxt)
 	if err != nil {
@@ -220,7 +244,7 @@ func (js jetStreamControllerImpl) DeleteStream(name string, ctxt context.Context
 	return nil
 }
 
-// ChangeStreamSubjects change the set of subjects the stream collects for
+// ChangeStreamSubjects changes the target subjects of a stream
 func (js jetStreamControllerImpl) ChangeStreamSubjects(
 	stream string, newSubjects []string, ctxt context.Context,
 ) error {
@@ -247,7 +271,7 @@ func (js jetStreamControllerImpl) ChangeStreamSubjects(
 	return err
 }
 
-// UpdateStreamLimits update a stream's data retention limits
+// UpdateStreamLimits changes the data retention limits of the stream
 func (js jetStreamControllerImpl) UpdateStreamLimits(
 	stream string, newLimits JSStreamLimits, ctxt context.Context,
 ) error {
@@ -275,7 +299,7 @@ func (js jetStreamControllerImpl) UpdateStreamLimits(
 // =======================================================================
 // Consumer related controls
 
-// GetAllConsumersForStream fetch the list of all consumers known consumer of a stream
+// GetAllConsumersForStream queries for info on all consumers of a stream
 func (js jetStreamControllerImpl) GetAllConsumersForStream(
 	stream string, ctxt context.Context,
 ) map[string]*nats.ConsumerInfo {
@@ -300,7 +324,7 @@ func (js jetStreamControllerImpl) GetAllConsumersForStream(
 	return knownConsumer
 }
 
-// GetConsumerForStream get info on one consumer of a stream
+// GetConsumerForStream queries for info of one consumer of a stream
 func (js jetStreamControllerImpl) GetConsumerForStream(
 	stream, consumerName string, ctxt context.Context,
 ) (*nats.ConsumerInfo, error) {
@@ -317,7 +341,7 @@ func (js jetStreamControllerImpl) GetConsumerForStream(
 	return info, err
 }
 
-// CreateConsumerForStream define a new consumer for a stream
+// CreateConsumerForStream creates a new consumer for a stream
 func (js jetStreamControllerImpl) CreateConsumerForStream(
 	stream string, param JetStreamConsumerParam, ctxt context.Context,
 ) error {
@@ -380,7 +404,7 @@ func (js jetStreamControllerImpl) CreateConsumerForStream(
 	return nil
 }
 
-// DeleteConsumerOnStream delete consumer from a stream
+// DeleteConsumerOnStream deletes one consumer of a stream
 func (js jetStreamControllerImpl) DeleteConsumerOnStream(
 	stream, consumerName string, ctxt context.Context,
 ) error {
