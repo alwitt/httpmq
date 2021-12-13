@@ -11,31 +11,35 @@ import (
 	"gitlab.com/project-nan/httpmq/common"
 )
 
-// ErrorDetail in case of REST error, the response
+// ErrorDetail is the response detail in case of error
 type ErrorDetail struct {
-	Code int     `json:"code"`
-	Msg  *string `json:"message,omitempty"`
+	// Code is the response code
+	Code int `json:"code"`
+	// Msg is an optional descriptive message
+	Msg *string `json:"message,omitempty"`
 }
 
 // StandardResponse standard REST API response
 type StandardResponse struct {
-	Success bool         `json:"success"`
-	Error   *ErrorDetail `json:"error,omitempty"`
+	// Success indicates whether the request was successful
+	Success bool `json:"success"`
+	// Error are details in case of errors
+	Error *ErrorDetail `json:"error,omitempty"`
 }
 
-// getStdRESTSuccessMsg define a standard success message
+// getStdRESTSuccessMsg defines a standard success message
 func getStdRESTSuccessMsg() StandardResponse {
 	return StandardResponse{Success: true}
 }
 
-// getStdRESTErrorMsg define a standard error message
+// getStdRESTErrorMsg defines a standard error message
 func getStdRESTErrorMsg(code int, message *string) StandardResponse {
 	return StandardResponse{
 		Success: false, Error: &ErrorDetail{Code: code, Msg: message},
 	}
 }
 
-// writeRESTResponse write a REST response
+// writeRESTResponse writes a REST response
 func writeRESTResponse(
 	w http.ResponseWriter, r *http.Request, respCode int, resp interface{},
 ) error {
@@ -63,7 +67,7 @@ func writeRESTResponse(
 // MethodHandlers DICT of method-endpoint handler
 type MethodHandlers map[string]http.HandlerFunc
 
-// RegisterPathPrefix Register new method handler for an end-point
+// RegisterPathPrefix registers new method handler for a path prefix
 func RegisterPathPrefix(
 	parentRouter *mux.Router, pathPrefix string, methodHandlers MethodHandlers,
 ) *mux.Router {

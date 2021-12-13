@@ -64,7 +64,7 @@ func GetAPIRestJetStreamDataplaneHandler(
 // PublishMessage godoc
 // @Summary Publish a message
 // @Description Publish a message to a JetStream subject
-// @tags dataplane,post,publish
+// @tags Dataplane,post,publish
 // @Accept plain
 // @Produce json
 // @Param subjectName path string true "JetStream subject to publish under"
@@ -155,7 +155,7 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessageHandler() http.HandlerFu
 // ReceiveMsgACK godoc
 // @Summary Handle ACK for message
 // @Description Process JetStream message ACK for a stream / consumer
-// @tags dataplane,post,subscribe
+// @tags Dataplane,post,subscribe
 // @Accept json
 // @Produce json
 // @Param streamName path string true "JetStream stream name"
@@ -249,8 +249,8 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACKHandler() http.HandlerFun
 
 // PushSubscribe godoc
 // @Summary Establish a pull subscribe session
-// @Description Establish a JetStream pull subscribe session
-// @tags dataplane,get,subscribe
+// @Description Establish a JetStream pull subscribe session for a client
+// @tags Dataplane,get,subscribe
 // @Produce json
 // @Param streamName path string true "JetStream stream name"
 // @Param consumerName path string true "JetStream consumer name"
@@ -529,8 +529,8 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribeHandler() http.HandlerFun
 
 // Alive godoc
 // @Summary For liveness check
-// @Description For liveness check
-// @tags dataplane,get,health
+// @Description Will return success to indicate REST API module is live
+// @tags Dataplane,get,health
 // @Produce json
 // @Success 200 {object} StandardResponse "success"
 // @Failure 400 {string} string "error"
@@ -553,8 +553,8 @@ func (h APIRestJetStreamDataplaneHandler) AliveHandler() http.HandlerFunc {
 
 // Ready godoc
 // @Summary For readiness check
-// @Description For readiness check
-// @tags dataplane,get,health
+// @Description Will return success if REST API module is ready for use
+// @tags Dataplane,get,health
 // @Produce json
 // @Success 200 {object} StandardResponse "success"
 // @Failure 400 {string} string "error"
