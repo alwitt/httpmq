@@ -23,10 +23,9 @@ jobs:
 
     services:
       nats:
-        image: nats:2.6.2-alpine
+        image: alwitt/nats-js:2.6.2-alpine
         ports:
           - 4222:4222
-        options: -v /tmp/test_nats.conf:/nats-server.conf --name nats
 
     steps:
       - uses: actions/checkout@v2
@@ -43,14 +42,6 @@ jobs:
 
       - name: Build
         run: go build -v -o httpmq.bin .
-
-      - name: Put the real NATS test config into place
-        run: cp -v ${{ github.workspace }}/docker/test_nats.conf /tmp/test_nats.conf
-
-      - name: Restart nats
-        uses: docker://docker
-        with:
-          args: docker restart nats
 
       - name: Test
         run: go test --count 1 -timeout 30s -short ./...

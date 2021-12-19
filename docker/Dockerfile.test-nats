@@ -1,0 +1,7 @@
+FROM nats:2.6.2-alpine
+
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+EXPOSE 4222 6222 8222
+COPY test_nats.conf /nats-server.conf
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD /usr/local/bin/nats-server --config /nats-server.conf
