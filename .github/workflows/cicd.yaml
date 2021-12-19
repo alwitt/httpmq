@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  cicd:
     runs-on: ubuntu-latest
 
     services:
@@ -26,7 +26,7 @@ jobs:
         image: nats:2.6.2-alpine
         ports:
           - 4222:4222
-        options: --entrypoint '/nats-server --config /nats-server.conf --jetstream'
+        options: --entrypoint="/nats-server --config /nats-server.conf --jetstream"
 
     steps:
       - uses: actions/checkout@v2
