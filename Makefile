@@ -17,6 +17,7 @@ all: build
 .PHONY: lint
 lint: .prepare ## Lint the files
 	@go mod tidy
+	@golint ./...
 	@golangci-lint run ./...
 
 .PHONY: compose

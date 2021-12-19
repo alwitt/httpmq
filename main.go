@@ -263,7 +263,7 @@ func startManagementServer(c *cli.Context) error {
 
 	signalRecvSetup(wg, rtCancel)
 
-	return cmd.RunManagementServer(cmdArgs.Management, cmdArgs.Hostname, js, runTimeContext)
+	return cmd.RunManagementServer(runTimeContext, cmdArgs.Management, cmdArgs.Hostname, js)
 }
 
 // ============================================================================
@@ -290,6 +290,6 @@ func startDataplaneServer(c *cli.Context) error {
 	signalRecvSetup(wg, rtCancel)
 
 	return cmd.RunDataplaneServer(
-		cmdArgs.Dataplane, cmdArgs.Hostname, js, runTimeContext, wg,
+		runTimeContext, cmdArgs.Dataplane, cmdArgs.Hostname, js, wg,
 	)
 }

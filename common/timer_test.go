@@ -30,7 +30,7 @@ func TestIntervalTimerOneShot(t *testing.T) {
 	defer wg.Wait()
 	ctxt, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	uut, err := GetIntervalTimerInstance("testing", ctxt, &wg)
+	uut, err := GetIntervalTimerInstance(ctxt, "testing", &wg)
 	assert.Nil(err)
 
 	value := 0

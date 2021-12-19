@@ -26,7 +26,7 @@ import (
 )
 
 // ForwardMessageHandlerCB callback used to forward new messages to the next pipeline stage
-type ForwardMessageHandlerCB func(msg *nats.Msg, ctxt context.Context) error
+type ForwardMessageHandlerCB func(ctxt context.Context, msg *nats.Msg) error
 
 // AlertOnErrorCB callback used to expose internal error to an outer context for handling
 type AlertOnErrorCB func(err error)
@@ -35,10 +35,10 @@ type AlertOnErrorCB func(err error)
 type JetStreamPushSubscriber interface {
 	// StartReading begin reading data from JetStream
 	StartReading(
+		ctxt context.Context,
 		forwardCB ForwardMessageHandlerCB,
 		errorCB AlertOnErrorCB,
 		wg *sync.WaitGroup,
-		ctxt context.Context,
 	) error
 }
 
@@ -91,12 +91,12 @@ func getJetStreamPushSubscriber(
 
 // StartReading begin reading data from JetStream
 func (r *jetStreamPushSubscriberImpl) StartReading(
+	ctxt context.Context,
 	forwardCB ForwardMessageHandlerCB,
 	errorCB AlertOnErrorCB,
 	wg *sync.WaitGroup,
-	ctxt context.Context,
 ) error {
-	localLogTags, err := common.UpdateLogTags(r.LogTags, ctxt)
+	localLogTags, err := common.UpdateLogTags(ctxt, r.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf("Failed to update logtags")
 		return err
@@ -142,7 +142,7 @@ func (r *jetStreamPushSubscriberImpl) StartReading(
 			// Forward the message
 			if newMsg != nil {
 				log.WithFields(localLogTags).Debugf("Received %s", msgToString(newMsg))
-				if err := r.forwardMsg(newMsg, ctxt); err != nil {
+				if err := r.forwardMsg(ctxt, newMsg); err != nil {
 					log.WithError(err).WithFields(localLogTags).Errorf("Unable to forward messages")
 					r.errorCB(err)
 				}
@@ -157,7 +157,7 @@ func (r *jetStreamPushSubscriberImpl) StartReading(
 // JetStreamPublisher publishes new messages into JetStream
 type JetStreamPublisher interface {
 	// Publish publishes a new message into JetStream on a subject
-	Publish(subject string, msg []byte, ctxt context.Context) error
+	Publish(ctxt context.Context, subject string, msg []byte) error
 }
 
 // jetStreamPublisherImpl implements JetStreamPublisher
@@ -179,8 +179,8 @@ func GetJetStreamPublisher(
 }
 
 // Publish publishes a new message into JetStream on a subject
-func (s *jetStreamPublisherImpl) Publish(subject string, msg []byte, ctxt context.Context) error {
-	localLogTags, err := common.UpdateLogTags(s.LogTags, ctxt)
+func (s *jetStreamPublisherImpl) Publish(ctxt context.Context, subject string, msg []byte) error {
+	localLogTags, err := common.UpdateLogTags(ctxt, s.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(s.LogTags).Errorf("Failed to update logtags")
 		return err

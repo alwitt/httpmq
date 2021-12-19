@@ -28,9 +28,9 @@ import (
 // JetStreamInflightMsgProcessor processes inflight JetStream messages awaiting ACK
 type JetStreamInflightMsgProcessor interface {
 	// RecordInflightMessage records a new JetStream message inflight awaiting ACK
-	RecordInflightMessage(msg *nats.Msg, blocking bool, callCtxt context.Context) error
+	RecordInflightMessage(callCtxt context.Context, msg *nats.Msg, blocking bool) error
 	// HandlerMsgACK processes a new message ACK
-	HandlerMsgACK(ack AckIndication, blocking bool, callCtxt context.Context) error
+	HandlerMsgACK(callCtxt context.Context, ack AckIndication, blocking bool) error
 }
 
 // perConsumerInflightMessages set of messages awaiting ACK for a consumer
@@ -53,7 +53,7 @@ type jetStreamInflightMsgProcessorImpl struct {
 
 // getJetStreamInflightMsgProcessor define new JetStreamInflightMsgProcessor
 func getJetStreamInflightMsgProcessor(
-	tp common.TaskProcessor, stream, subject, consumer string, ctxt context.Context,
+	ctxt context.Context, tp common.TaskProcessor, stream, subject, consumer string,
 ) (JetStreamInflightMsgProcessor, error) {
 	logTags := log.Fields{
 		"module":    "dataplane",
@@ -102,7 +102,7 @@ type jsInflightCtrlRecordNewMsg struct {
 
 // RecordInflightMessage records a new JetStream message inflight awaiting ACK
 func (c *jetStreamInflightMsgProcessorImpl) RecordInflightMessage(
-	msg *nats.Msg, blocking bool, callCtxt context.Context,
+	callCtxt context.Context, msg *nats.Msg, blocking bool,
 ) error {
 	resultChan := make(chan error)
 	handler := func(err error) {
@@ -116,7 +116,7 @@ func (c *jetStreamInflightMsgProcessorImpl) RecordInflightMessage(
 		resultCB:  handler,
 	}
 
-	if err := c.tp.Submit(request, callCtxt); err != nil {
+	if err := c.tp.Submit(callCtxt, request); err != nil {
 		log.WithError(err).WithFields(c.LogTags).Errorf("Failed to submit %s", msgToString(msg))
 		return err
 	}
@@ -211,7 +211,7 @@ type jsInflightCtrlRecordACK struct {
 
 // HandlerMsgACK processes a new message ACK
 func (c *jetStreamInflightMsgProcessorImpl) HandlerMsgACK(
-	ack AckIndication, blocking bool, callCtxt context.Context,
+	callCtxt context.Context, ack AckIndication, blocking bool,
 ) error {
 	resultChan := make(chan error)
 	handler := func(err error) {
@@ -225,7 +225,7 @@ func (c *jetStreamInflightMsgProcessorImpl) HandlerMsgACK(
 		resultCB:  handler,
 	}
 
-	if err := c.tp.Submit(request, callCtxt); err != nil {
+	if err := c.tp.Submit(callCtxt, request); err != nil {
 		log.WithError(err).WithFields(c.LogTags).Errorf("Failed to submit %s", ack.String())
 		return err
 	}

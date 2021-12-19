@@ -72,10 +72,10 @@ func GetManagementCLIFlags(args *ManagementCLIArgs) []cli.Flag {
 
 // RunManagementServer run the management server
 func RunManagementServer(
+	runtimeContext context.Context,
 	params ManagementCLIArgs,
 	instance string,
 	natsClient *core.NatsClient,
-	runtimeContext context.Context,
 ) error {
 	logTags := log.Fields{
 		"module":    "cmd",

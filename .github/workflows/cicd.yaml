@@ -46,6 +46,9 @@ jobs:
         with:
           version: v1.29
 
+      - name: golint
+        run: golint ./...
+
       - name: Build
         run: go build -v -o httpmq.bin .
 

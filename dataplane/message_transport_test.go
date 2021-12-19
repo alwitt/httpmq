@@ -90,7 +90,7 @@ func TestMessageTransportPushSub(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(jsCtrl.CreateStream(streamParam, utCtxt))
+		assert.Nil(jsCtrl.CreateStream(utCtxt, streamParam))
 	}
 	consumer1 := uuid.New().String()
 	consumer2 := uuid.New().String()
@@ -99,15 +99,15 @@ func TestMessageTransportPushSub(t *testing.T) {
 		param := management.JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 1, Mode: "push", FilterSubject: &subject1,
 		}
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param, utCtxt))
+		assert.Nil(jsCtrl.CreateConsumerForStream(utCtxt, stream1, param))
 		param = management.JetStreamConsumerParam{
 			Name: consumer2, MaxInflight: 1, Mode: "push", FilterSubject: &subject2,
 		}
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param, utCtxt))
+		assert.Nil(jsCtrl.CreateConsumerForStream(utCtxt, stream1, param))
 		param = management.JetStreamConsumerParam{
 			Name: consumer3, MaxInflight: 1, Mode: "push", FilterSubject: &subject3,
 		}
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param, utCtxt))
+		assert.Nil(jsCtrl.CreateConsumerForStream(utCtxt, stream1, param))
 	}
 	log.Debug("============================= 1 =============================")
 
@@ -126,24 +126,24 @@ func TestMessageTransportPushSub(t *testing.T) {
 
 	// Case 1: start reading messages
 	rxChan1 := make(chan *nats.Msg, 1)
-	msgHandler1 := func(msg *nats.Msg, _ context.Context) error {
+	msgHandler1 := func(_ context.Context, msg *nats.Msg) error {
 		rxChan1 <- msg
 		return nil
 	}
 	rxChan2 := make(chan *nats.Msg, 1)
-	msgHandler2 := func(msg *nats.Msg, _ context.Context) error {
+	msgHandler2 := func(_ context.Context, msg *nats.Msg) error {
 		rxChan2 <- msg
 		return nil
 	}
 	rxChan3 := make(chan *nats.Msg, 1)
-	msgHandler3 := func(msg *nats.Msg, _ context.Context) error {
+	msgHandler3 := func(_ context.Context, msg *nats.Msg) error {
 		rxChan3 <- msg
 		return nil
 	}
-	assert.Nil(rxSub1.StartReading(msgHandler1, internalErrorHandler, &wg, utCtxt))
-	assert.NotNil(rxSub1.StartReading(msgHandler1, internalErrorHandler, &wg, utCtxt))
-	assert.Nil(rxSub2.StartReading(msgHandler2, internalErrorHandler, &wg, utCtxt))
-	assert.Nil(rxSub3.StartReading(msgHandler3, internalErrorHandler, &wg, utCtxt))
+	assert.Nil(rxSub1.StartReading(utCtxt, msgHandler1, internalErrorHandler, &wg))
+	assert.NotNil(rxSub1.StartReading(utCtxt, msgHandler1, internalErrorHandler, &wg))
+	assert.Nil(rxSub2.StartReading(utCtxt, msgHandler2, internalErrorHandler, &wg))
+	assert.Nil(rxSub3.StartReading(utCtxt, msgHandler3, internalErrorHandler, &wg))
 	log.Debug("============================= 3 =============================")
 
 	publisher, err := GetJetStreamPublisher(js, testName)
@@ -154,7 +154,7 @@ func TestMessageTransportPushSub(t *testing.T) {
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
-		assert.Nil(publisher.Publish(subject1, msg2, ctxt))
+		assert.Nil(publisher.Publish(ctxt, subject1, msg2))
 	}
 	// verify receive
 	{
@@ -198,7 +198,7 @@ func TestMessageTransportPushSub(t *testing.T) {
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
-		assert.Nil(publisher.Publish(subject2, msg3, ctxt))
+		assert.Nil(publisher.Publish(ctxt, subject2, msg3))
 	}
 	// verify receive
 	{
@@ -297,7 +297,7 @@ func TestMessageTransportPushSubGroup(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(jsCtrl.CreateStream(streamParam, utCtxt))
+		assert.Nil(jsCtrl.CreateStream(utCtxt, streamParam))
 	}
 	consumer1 := uuid.New().String()
 	group1 := uuid.New().String()
@@ -305,7 +305,7 @@ func TestMessageTransportPushSubGroup(t *testing.T) {
 		param := management.JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 1, Mode: "push", DeliveryGroup: &group1,
 		}
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param, utCtxt))
+		assert.Nil(jsCtrl.CreateConsumerForStream(utCtxt, stream1, param))
 	}
 	log.Debug("============================= 1 =============================")
 
@@ -326,16 +326,16 @@ func TestMessageTransportPushSubGroup(t *testing.T) {
 		id  int
 	}
 	rxChan := make(chan msgTuple, 1)
-	msgHandler1 := func(msg *nats.Msg, _ context.Context) error {
+	msgHandler1 := func(_ context.Context, msg *nats.Msg) error {
 		rxChan <- msgTuple{msg: msg, id: 1}
 		return nil
 	}
-	msgHandler2 := func(msg *nats.Msg, _ context.Context) error {
+	msgHandler2 := func(_ context.Context, msg *nats.Msg) error {
 		rxChan <- msgTuple{msg: msg, id: 2}
 		return nil
 	}
-	assert.Nil(rxSub1.StartReading(msgHandler1, internalErrorHandler, &wg, utCtxt))
-	assert.Nil(rxSub2.StartReading(msgHandler2, internalErrorHandler, &wg, utCtxt))
+	assert.Nil(rxSub1.StartReading(utCtxt, msgHandler1, internalErrorHandler, &wg))
+	assert.Nil(rxSub2.StartReading(utCtxt, msgHandler2, internalErrorHandler, &wg))
 	log.Debug("============================= 3 =============================")
 
 	publisher, err := GetJetStreamPublisher(js1, testName)
@@ -348,7 +348,7 @@ func TestMessageTransportPushSubGroup(t *testing.T) {
 		{
 			ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 			defer cancel()
-			assert.Nil(publisher.Publish(subject1, testMsg, ctxt))
+			assert.Nil(publisher.Publish(ctxt, subject1, testMsg))
 		}
 		{
 			ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
@@ -430,14 +430,14 @@ func TestMessageTranscoding(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(jsCtrl.CreateStream(streamParam, utCtxt))
+		assert.Nil(jsCtrl.CreateStream(utCtxt, streamParam))
 	}
 	consumer1 := uuid.New().String()
 	{
 		param := management.JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 1, Mode: "push", FilterSubject: &subject1,
 		}
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param, utCtxt))
+		assert.Nil(jsCtrl.CreateConsumerForStream(utCtxt, stream1, param))
 	}
 	log.Debug("============================= 1 =============================")
 
@@ -452,11 +452,11 @@ func TestMessageTranscoding(t *testing.T) {
 
 	// Case 1: start reading messages
 	rxChan1 := make(chan *nats.Msg, 1)
-	msgHandler1 := func(msg *nats.Msg, _ context.Context) error {
+	msgHandler1 := func(_ context.Context, msg *nats.Msg) error {
 		rxChan1 <- msg
 		return nil
 	}
-	assert.Nil(rxSub1.StartReading(msgHandler1, internalErrorHandler, &wg, utCtxt))
+	assert.Nil(rxSub1.StartReading(utCtxt, msgHandler1, internalErrorHandler, &wg))
 	log.Debug("============================= 3 =============================")
 
 	publisher, err := GetJetStreamPublisher(js, testName)
@@ -468,7 +468,7 @@ func TestMessageTranscoding(t *testing.T) {
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
-		assert.Nil(publisher.Publish(subject1, msg2, ctxt))
+		assert.Nil(publisher.Publish(ctxt, subject1, msg2))
 	}
 	// verify receive
 	{
