@@ -46,5 +46,5 @@ jobs:
       - name: Test
         run: go test --count 1 -timeout 30s -short ./...
         env:
-          NATS_HOST: nats
+          NATS_HOST: localhost
           NATS_PORT: ${{ job.services.nats.ports[4222] }}
