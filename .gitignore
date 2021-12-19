@@ -5,6 +5,4 @@ tmp
 *mock*
 docs
 out
-etcd_mutex_throughput
-subscription_controller
 *.bin
