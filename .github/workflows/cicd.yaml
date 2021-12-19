@@ -47,7 +47,9 @@ jobs:
           version: v1.29
 
       - name: golint
-        run: golint ./...
+        uses: Jerome1337/golint-action@v1.0.2
+        with:
+          golint-path: "./..."
 
       - name: Build
         run: go build -v -o httpmq.bin .
