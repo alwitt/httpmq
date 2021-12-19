@@ -48,7 +48,7 @@ func TestInflightMessageHandling(t *testing.T) {
 
 	// Define NATS connection params
 	natsParam := core.NATSConnectParams{
-		ServerURI:           "nats://127.0.0.1:4222",
+		ServerURI:           common.GetUnitTestNatsURI(),
 		ConnectTimeout:      time.Second,
 		MaxReconnectAttempt: 0,
 		ReconnectWait:       time.Second,

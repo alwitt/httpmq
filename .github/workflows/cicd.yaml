@@ -20,6 +20,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    services:
+      nats:
+        image: nats:2.6.2-alpine
+        ports:
+          - 4222:4222
+        options: --entrypoint '/nats-server --config /nats-server.conf --jetstream'
+
     steps:
       - uses: actions/checkout@v2
 
@@ -34,4 +42,10 @@ jobs:
           version: v1.29
 
       - name: Build
-        run: go build -v ./...
+        run: go build -v -o httpmq.bin .
+
+      - name: Test
+        run: go test --count 1 -timeout 30s -short ./...
+        env:
+          NATS_HOST: nats
+          NATS_PORT: ${{ job.services.redis.nats[4222] }}

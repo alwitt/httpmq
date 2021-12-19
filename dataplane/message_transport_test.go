@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alwitt/httpmq/common"
 	"github.com/alwitt/httpmq/core"
 	"github.com/alwitt/httpmq/management"
 	"github.com/apex/log"
@@ -48,7 +49,7 @@ func TestMessageTransportPushSub(t *testing.T) {
 
 	// Define NATS connection params
 	natsParam := core.NATSConnectParams{
-		ServerURI:           "nats://127.0.0.1:4222",
+		ServerURI:           common.GetUnitTestNatsURI(),
 		ConnectTimeout:      time.Second,
 		MaxReconnectAttempt: 0,
 		ReconnectWait:       time.Second,
@@ -255,7 +256,7 @@ func TestMessageTransportPushSubGroup(t *testing.T) {
 
 	// Define NATS connection params
 	natsParam := core.NATSConnectParams{
-		ServerURI:           "nats://127.0.0.1:4222",
+		ServerURI:           common.GetUnitTestNatsURI(),
 		ConnectTimeout:      time.Second,
 		MaxReconnectAttempt: 0,
 		ReconnectWait:       time.Second,
@@ -390,7 +391,7 @@ func TestMessageTranscoding(t *testing.T) {
 
 	// Define NATS connection params
 	natsParam := core.NATSConnectParams{
-		ServerURI:           "nats://127.0.0.1:4222",
+		ServerURI:           common.GetUnitTestNatsURI(),
 		ConnectTimeout:      time.Second,
 		MaxReconnectAttempt: 0,
 		ReconnectWait:       time.Second,
