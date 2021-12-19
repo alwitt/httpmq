@@ -43,7 +43,7 @@ type ManagementCLIArgs struct {
 	Endpoints  ManagementRestEndpoints
 }
 
-// GetManagementCLIFlags retreive the set of CMD flags for management server
+// GetManagementCLIFlags retrieve the set of CMD flags for management server
 func GetManagementCLIFlags(args *ManagementCLIArgs) []cli.Flag {
 	return []cli.Flag{
 		&cli.IntFlag{

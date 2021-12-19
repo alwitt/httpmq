@@ -1,13 +1,13 @@
 # HTTP MQ
 
-HTTP/2 based message broker built around NATS JetStream.
+[HTTP/2](https://http2.github.io/) based [message broker](https://en.wikipedia.org/wiki/Message_broker) built around [NATS JetStream](https://nats.io).
 
-See REST API Documentation [here](apis/README.md)
-> Documentation generated with [widdershins](https://github.com/Mermade/widdershins)
->
-> ```shell
-> $ node widdershins --code --summary=true --search=false /path/to/docs/swagger.yaml -o README.md
-> ```
+[![License Apache 2][License-Image]][License-Url] [![Go Report Card][ReportCard-Image]][ReportCard-Url] ![CICD workflow](https://github.com/alwitt/httpmq/actions/workflows/cicd.yaml/badge.svg)
+
+[License-Url]: https://www.apache.org/licenses/LICENSE-2.0
+[License-Image]: https://img.shields.io/badge/License-Apache2-blue.svg
+[ReportCard-Url]: https://goreportcard.com/report/github.com/alwitt/httpmq
+[ReportCard-Image]: https://goreportcard.com/badge/github.com/alwitt/httpmq
 
 # Getting Started
 
@@ -58,12 +58,19 @@ clean                          Clean up DEV ENV
 help                           Display this help screen
 ```
 
-Verify projects builds, and passes unit-tests
+Verify the project builds, and passes unit-tests
 
 ```shell
 $ make
 $ make test
 ```
+
+The REST API documentation can be found here [here](apis/README.md).
+> Documentation generated with [widdershins](https://github.com/Mermade/widdershins)
+>
+> ```shell
+> $ node widdershins --code --summary=true --search=false /path/to/docs/swagger.yaml -o README.md
+> ```
 
 ---
 ## Start Local Test Servers

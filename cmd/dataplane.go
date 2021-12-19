@@ -44,7 +44,7 @@ type DataplaneCLIArgs struct {
 	Endpoints  DataplaneRestEndpoints
 }
 
-// GetDataplaneCLIFlags retreive the set of CMD flags for dataplane server
+// GetDataplaneCLIFlags retrieve the set of CMD flags for dataplane server
 func GetDataplaneCLIFlags(args *DataplaneCLIArgs) []cli.Flag {
 	return []cli.Flag{
 		&cli.IntFlag{
