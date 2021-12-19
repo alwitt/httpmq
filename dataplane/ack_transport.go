@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/alwitt/httpmq/common"
+	"github.com/alwitt/httpmq/core"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
 	"github.com/nats-io/nats.go"
-	"gitlab.com/project-nan/httpmq/common"
-	"gitlab.com/project-nan/httpmq/core"
 )
 
 // AckSeqNum are the sequence numbers of the NATs JetStream message

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/alwitt/httpmq/common"
+	"github.com/alwitt/httpmq/core"
 	"github.com/apex/log"
 	"github.com/nats-io/nats.go"
-	"gitlab.com/project-nan/httpmq/common"
-	"gitlab.com/project-nan/httpmq/core"
 )
 
 // ForwardMessageHandlerCB callback used to forward new messages to the next pipeline stage

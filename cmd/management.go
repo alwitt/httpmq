@@ -6,14 +6,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/alwitt/httpmq/apis"
+	"github.com/alwitt/httpmq/core"
+	"github.com/alwitt/httpmq/management"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/urfave/cli/v2"
-	"gitlab.com/project-nan/httpmq/apis"
-	"gitlab.com/project-nan/httpmq/core"
-	"gitlab.com/project-nan/httpmq/management"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )

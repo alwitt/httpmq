@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alwitt/httpmq/core"
+	"github.com/alwitt/httpmq/management"
 	"github.com/apex/log"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/project-nan/httpmq/core"
-	"gitlab.com/project-nan/httpmq/management"
 )
 
 func TestMessageTransportPushSub(t *testing.T) {
@@ -328,7 +328,7 @@ func TestMessageTransportPushSubGroup(t *testing.T) {
 
 	// Case 2: send messages repeatedly
 	rxID := make(map[int]int)
-	for itr := 0; itr < 10; itr++ {
+	for itr := 0; itr < 20; itr++ {
 		testMsg := []byte(uuid.New().String())
 		{
 			ctxt, cancel := context.WithTimeout(utCtxt, time.Second)

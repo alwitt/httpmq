@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alwitt/httpmq/common"
+	"github.com/alwitt/httpmq/core"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
 	"github.com/nats-io/nats.go"
-	"gitlab.com/project-nan/httpmq/common"
-	"gitlab.com/project-nan/httpmq/core"
 )
 
 // JSStreamLimits is the set of stream data retention settings

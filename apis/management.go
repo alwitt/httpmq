@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/alwitt/httpmq/common"
+	"github.com/alwitt/httpmq/management"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 	"github.com/nats-io/nats.go"
-	"gitlab.com/project-nan/httpmq/common"
-	"gitlab.com/project-nan/httpmq/management"
 )
 
 // APIRestJetStreamManagementHandler REST handler for JetStream management

@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/alwitt/httpmq/common"
 	"github.com/apex/log"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
-	"gitlab.com/project-nan/httpmq/common"
 )
 
 // ErrorDetail is the response detail in case of error

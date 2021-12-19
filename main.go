@@ -8,13 +8,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alwitt/httpmq/cmd"
+	"github.com/alwitt/httpmq/core"
 	"github.com/apex/log"
 	apexJSON "github.com/apex/log/handlers/json"
 	"github.com/go-playground/validator/v10"
 	"github.com/nats-io/nats.go"
 	"github.com/urfave/cli/v2"
-	"gitlab.com/project-nan/httpmq/cmd"
-	"gitlab.com/project-nan/httpmq/core"
 )
 
 type natsArgs struct {

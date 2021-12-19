@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/alwitt/httpmq/common"
+	"github.com/alwitt/httpmq/core"
 	"github.com/apex/log"
 	"github.com/nats-io/nats.go"
-	"gitlab.com/project-nan/httpmq/common"
-	"gitlab.com/project-nan/httpmq/core"
 )
 
 // MessageDispatcher process a consumer subscription request from a client and dispatch

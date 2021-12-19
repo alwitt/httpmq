@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alwitt/httpmq/core"
+	"github.com/alwitt/httpmq/management"
 	"github.com/apex/log"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/project-nan/httpmq/core"
-	"gitlab.com/project-nan/httpmq/management"
 )
 
 func TestPushMessageDispatcher(t *testing.T) {

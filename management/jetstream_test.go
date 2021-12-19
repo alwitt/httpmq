@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alwitt/httpmq/core"
 	"github.com/apex/log"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/project-nan/httpmq/core"
 )
 
 func TestJetStreamControllerStreams(t *testing.T) {

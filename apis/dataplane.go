@@ -11,13 +11,13 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/alwitt/httpmq/common"
+	"github.com/alwitt/httpmq/core"
+	"github.com/alwitt/httpmq/dataplane"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 	"github.com/nats-io/nats.go"
-	"gitlab.com/project-nan/httpmq/common"
-	"gitlab.com/project-nan/httpmq/core"
-	"gitlab.com/project-nan/httpmq/dataplane"
 )
 
 // APIRestJetStreamDataplaneHandler REST handler for JetStream dataplane

@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/alwitt/httpmq/common"
 	"github.com/apex/log"
 	"github.com/nats-io/nats.go"
-	"gitlab.com/project-nan/httpmq/common"
 )
 
 // NATSConnectParams contains NATS connection parameters
