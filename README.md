@@ -1,4 +1,6 @@
 # HTTP MQ
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Falwitt%2Fhttpmq.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Falwitt%2Fhttpmq?ref=badge_shield)
+
 
 HTTP/2 based message broker built around NATS JetStream.
 
@@ -198,3 +200,7 @@ After receiving a message, ACK that message with
 ```shell
 curl -X POST 'http://127.0.0.1:3001/v1/data/stream/test-stream-00/consumer/test-consumer-00/ack' --header 'Content-Type: application/json' --data-raw '{"consumer": 1,"stream": 1}'
 ```
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Falwitt%2Fhttpmq.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Falwitt%2Fhttpmq?ref=badge_large)
