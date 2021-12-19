@@ -18,7 +18,37 @@ on:
   workflow_dispatch:
 
 jobs:
-  cicd:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: v1.29
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+
+      - name: Build
+        run: go build -v -o httpmq.bin .
+
+  test:
     runs-on: ubuntu-latest
 
     services:
@@ -34,14 +64,6 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: 1.17
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
-        with:
-          version: v1.29
-
-      - name: Build
-        run: go build -v -o httpmq.bin .
 
       - name: Test
         run: go test --count 1 -timeout 30s -short ./...
