@@ -18,15 +18,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  cicd:
+  build:
     runs-on: ubuntu-latest
-
-    services:
-      nats:
-        image: nats:2.6.2-alpine
-        ports:
-          - 4222:4222
-        options: --entrypoint="/nats-server --config /nats-server.conf --jetstream"
 
     steps:
       - uses: actions/checkout@v2
@@ -44,8 +37,31 @@ jobs:
       - name: Build
         run: go build -v -o httpmq.bin .
 
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      nats:
+        image: nats:2.6.2-alpine
+        ports:
+          - 4222:4222
+        options: -v ${{ github.workspace }}/docker/test_nats.conf:/nats-server.conf --name nats
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+
+      - name: Restart nats
+        uses: docker://docker
+        with:
+          args: docker restart nats
+
       - name: Test
         run: go test --count 1 -timeout 30s -short ./...
         env:
           NATS_HOST: nats
-          NATS_PORT: ${{ job.services.redis.nats[4222] }}
+          NATS_PORT: ${{ job.services.nats.ports[4222] }}
