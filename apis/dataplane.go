@@ -47,10 +47,10 @@ type APIRestJetStreamDataplaneHandler struct {
 
 // GetAPIRestJetStreamDataplaneHandler define APIRestJetStreamDataplaneHandler
 func GetAPIRestJetStreamDataplaneHandler(
+	baseContext context.Context,
 	client *core.NatsClient,
 	runTimePublisher dataplane.JetStreamPublisher,
 	ackBroadcast dataplane.JetStreamACKBroadcaster,
-	baseContext context.Context,
 	wg *sync.WaitGroup,
 ) (APIRestJetStreamDataplaneHandler, error) {
 	logTags := log.Fields{
@@ -92,7 +92,7 @@ func GetAPIRestJetStreamDataplaneHandler(
 func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, r *http.Request) {
 	restCall := "POST /v1/data/subject/{subjectName}"
 
-	localLogTags, err := common.UpdateLogTags(h.LogTags, r.Context())
+	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
 	if err != nil {
 		msg := "Prep failed"
 		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
@@ -141,7 +141,7 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, 
 	}
 
 	// Publish the message
-	if err := h.publisher.Publish(subjectName, decodedMsg, r.Context()); err != nil {
+	if err := h.publisher.Publish(r.Context(), subjectName, decodedMsg); err != nil {
 		msg := fmt.Sprintf("Unable to publish message to %s", subjectName)
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
 		h.reply(
@@ -185,7 +185,7 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessageHandler() http.HandlerFu
 func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r *http.Request) {
 	restCall := "POST /v1/data/stream/{streamName}/consumer/{consumerName}/ack"
 
-	localLogTags, err := common.UpdateLogTags(h.LogTags, r.Context())
+	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
 	if err != nil {
 		msg := "Prep failed"
 		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
@@ -240,7 +240,7 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 	}
 
 	// Broadcast the ACK
-	if err := h.ackBroadcast.BroadcastACK(ackInfo, r.Context()); err != nil {
+	if err := h.ackBroadcast.BroadcastACK(r.Context(), ackInfo); err != nil {
 		msg := fmt.Sprintf("Failed to broadcast ACK %s", ackInfo.String())
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
@@ -284,7 +284,7 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACKHandler() http.HandlerFun
 func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r *http.Request) {
 	restCall := "GET /v1/data/stream/{streamName}/consumer/{consumerName}"
 
-	localLogTagsInitial, err := common.UpdateLogTags(h.LogTags, r.Context())
+	localLogTagsInitial, err := common.UpdateLogTags(r.Context(), h.LogTags)
 	if err != nil {
 		msg := "Prep failed"
 		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
@@ -413,6 +413,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 	runtimeCtxt, cancel := context.WithCancel(r.Context())
 	defer cancel()
 	dispatcher, err := dataplane.GetPushMessageDispatcher(
+		runtimeCtxt,
 		h.natsClient,
 		streamName,
 		subjectName,
@@ -420,7 +421,6 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		deliveryGroup,
 		maxInflightMsg,
 		h.wg,
-		runtimeCtxt,
 	)
 	if err != nil {
 		msg := "Unable to define dispatcher"
@@ -441,7 +441,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 
 	// Handle messages read from JetStream
 	msgBuffer := make(chan *nats.Msg, maxInflightMsg*2)
-	msgHandler := func(msg *nats.Msg, ctxt context.Context) error {
+	msgHandler := func(ctxt context.Context, msg *nats.Msg) error {
 		select {
 		case msgBuffer <- msg:
 			return nil

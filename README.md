@@ -1,15 +1,13 @@
 # HTTP MQ
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Falwitt%2Fhttpmq.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Falwitt%2Fhttpmq?ref=badge_shield)
 
+[HTTP/2](https://http2.github.io/) based [message broker](https://en.wikipedia.org/wiki/Message_broker) built around [NATS JetStream](https://nats.io).
 
-HTTP/2 based message broker built around NATS JetStream.
+[![License Apache 2][License-Image]][License-Url] [![Go Report Card][ReportCard-Image]][ReportCard-Url] ![CICD workflow](https://github.com/alwitt/httpmq/actions/workflows/cicd.yaml/badge.svg) [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Falwitt%2Fhttpmq.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Falwitt%2Fhttpmq?ref=badge_shield)
 
-See REST API Documentation [here](apis/README.md)
-> Documentation generated with [widdershins](https://github.com/Mermade/widdershins)
->
-> ```shell
-> $ node widdershins --code --summary=true --search=false /path/to/docs/swagger.yaml -o README.md
-> ```
+[License-Url]: https://www.apache.org/licenses/LICENSE-2.0
+[License-Image]: https://img.shields.io/badge/License-Apache2-blue.svg
+[ReportCard-Url]: https://goreportcard.com/report/github.com/alwitt/httpmq
+[ReportCard-Image]: https://goreportcard.com/badge/github.com/alwitt/httpmq
 
 # Getting Started
 
@@ -60,12 +58,85 @@ clean                          Clean up DEV ENV
 help                           Display this help screen
 ```
 
-Verify projects builds, and passes unit-tests
+Verify the project builds, and passes unit-tests
 
 ```shell
 $ make
 $ make test
 ```
+
+By default, the server application is `httpmq.bin`.
+
+```shell
+$ ./httpmq.bin -h
+NAME:
+   httpmq.bin - application entrypoint
+
+USAGE:
+   httpmq.bin [global options] command [command options] [arguments...]
+
+VERSION:
+   v0.1.0
+
+DESCRIPTION:
+   HTTP/2 based message broker built around NATS JetStream
+
+COMMANDS:
+   management  Run the httpmq management server
+   dataplane   Run the httpmq data plane server
+   help, h     Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --json-log, -j                                     Whether to log in JSON format (default: false) [$LOG_AS_JSON]
+   --log-level value, -l value                        Logging level: [debug info warn error] (default: warn) [$LOG_LEVEL]
+   --nats-server-uri value, --nsu value               NATS server URI (default: nats://127.0.0.1:4222) [$NATS_SERVER_URI]
+   --nats-connect-timeout value, --ncto value         NATS connection timeout (default: 15s) [$NATS_CONNECT_TIMEOUT]
+   --nats-reconnect-wait value, --nrcw value          NATS duration between reconnect attempts (default: 15s) [$NATS_RECONNECT_WAIT]
+   --nats-max-reconnect-attempts value, --nmra value  NATS maximum reconnect attempts (default: -1) [$NATS_MAX_RECONNECT_ATTEMPTS]
+   --help, -h                                         show help (default: false)
+   --version, -v                                      print the version (default: false)
+```
+
+```shell
+$ ./httpmq.bin management -h
+NAME:
+   httpmq.bin management - Run the httpmq management server
+
+USAGE:
+   httpmq.bin management [command options] [arguments...]
+
+DESCRIPTION:
+   Serves the REST API for managing JetStream streams and consumers
+
+OPTIONS:
+   --management-server-port value, --msp value              Management server port (default: 3000) [$MANAGEMENT_SERVER_PORT]
+   --management-server-endpoint-prefix value, --msep value  Set the end-point path prefix for the management APIs (default: /) [$MANAGEMENT_SERVER_ENDPOINT_PREFIX]
+   --help, -h                                               show help (default: false)
+```
+
+```shell
+$ ./httpmq.bin dataplane -h
+NAME:
+   httpmq.bin dataplane - Run the httpmq data plane server
+
+USAGE:
+   httpmq.bin dataplane [command options] [arguments...]
+
+DESCRIPTION:
+   Serves the REST API for message publish, and subscribing through JetStream
+
+OPTIONS:
+   --dataplane-server-port value, --dsp value              Dataplane server port (default: 3001) [$DATAPLANE_SERVER_PORT]
+   --dataplane-server-endpoint-prefix value, --dsep value  Set the end-point path prefix for the dataplane APIs (default: /) [$DATAPLANE_SERVER_ENDPOINT_PREFIX]
+   --help, -h                                              show help (default: false)
+```
+
+The REST API documentation can be found here [here](apis/README.md).
+> Documentation generated with [widdershins](https://github.com/Mermade/widdershins)
+>
+> ```shell
+> $ node widdershins --code --summary=true --search=false /path/to/docs/swagger.yaml -o README.md
+> ```
 
 ---
 ## Start Local Test Servers
@@ -113,6 +184,43 @@ curl -X POST 'http://127.0.0.1:3000/v1/admin/stream' \
 ```
 
 Response should be `{"success":true}`.
+
+Verify the stream is defined
+
+```shell
+curl 'http://127.0.0.1:3000/v1/admin/stream/test-stream-00'
+```
+
+```json
+{
+  "success": true,
+  "stream": {
+    "config": {
+      "name": "test-stream-00",
+      "subjects": [
+        "test-subject.00",
+        "test-subject.01"
+      ],
+      "max_consumers": -1,
+      "max_msgs": -1,
+      "max_bytes": -1,
+      "max_age": 600000000000,
+      "max_msgs_per_subject": -1,
+      "max_msg_size": -1
+    },
+    "created": "2021-12-19T23:55:13.785157429Z",
+    "state": {
+      "messages": 0,
+      "bytes": 0,
+      "first_seq": 0,
+      "first_ts": "0001-01-01T00:00:00Z",
+      "last_seq": 0,
+      "last_ts": "0001-01-01T00:00:00Z",
+      "consumer_count": 1
+    }
+  }
+}
+```
 
 Define a consumer for the stream
 
@@ -174,7 +282,7 @@ To publish a message for a subject
 curl -X POST 'http://127.0.0.1:3001/v1/data/subject/test-subject.01' --header 'Content-Type: text/plain' --data-raw "$(echo 'Hello World' | base64)"
 ```
 
-> **IMPORTANT:** The message body is Base64 encoded.
+> **IMPORTANT:** The message body must be Base64 encoded.
 >
 > ```shell
 > $ echo "Hello World" | base64
@@ -195,12 +303,25 @@ $ curl http://127.0.0.1:3001/v1/data/stream/test-stream-00/consumer/test-consume
 {"stream":"test-stream-00","subject":"test-subject.01","consumer":"test-consumer-00","sequence":{"stream":1,"consumer":1},"b64_msg":"SGVsbG8gV29ybGQK"}
 ```
 
-After receiving a message, ACK that message with
+After receiving a message, acknowledge receiving the message with
 
 ```shell
 curl -X POST 'http://127.0.0.1:3001/v1/data/stream/test-stream-00/consumer/test-consumer-00/ack' --header 'Content-Type: application/json' --data-raw '{"consumer": 1,"stream": 1}'
 ```
 
+The `consumer` and `stream` fields are the sequence numbers which came with the message.
 
+If an acknowledgement is not sent within the consumer's configured max ACK wait duration, the message will be sent through this consumer's subscription again. This time, the `stream` sequence number is unchanged, but the `consumer` sequence number is increased by one.
+
+```shell
+{"stream":"test-stream-00","subject":"test-subject.01","consumer":"test-consumer-00","sequence":{"stream":1,"consumer":2},"b64_msg":"SGVsbG8gV29ybGQK"}
+```
+
+When acknowledging this message now, use `'{"consumer": 2,"stream": 1}'` as the payload.
+
+---
 ## License
+
+Unless otherwise noted, the httpmq source files are distributed under the Apache Version 2.0 license found in the LICENSE file.
+
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Falwitt%2Fhttpmq.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Falwitt%2Fhttpmq?ref=badge_large)

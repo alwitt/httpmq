@@ -43,7 +43,7 @@ type ManagementCLIArgs struct {
 	Endpoints  ManagementRestEndpoints
 }
 
-// GetManagementCLIFlags retreive the set of CMD flags for management server
+// GetManagementCLIFlags retrieve the set of CMD flags for management server
 func GetManagementCLIFlags(args *ManagementCLIArgs) []cli.Flag {
 	return []cli.Flag{
 		&cli.IntFlag{
@@ -72,10 +72,10 @@ func GetManagementCLIFlags(args *ManagementCLIArgs) []cli.Flag {
 
 // RunManagementServer run the management server
 func RunManagementServer(
+	runtimeContext context.Context,
 	params ManagementCLIArgs,
 	instance string,
 	natsClient *core.NatsClient,
-	runtimeContext context.Context,
 ) error {
 	logTags := log.Fields{
 		"module":    "cmd",

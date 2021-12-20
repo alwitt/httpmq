@@ -51,12 +51,12 @@ type pushMessageDispatcher struct {
 
 // GetPushMessageDispatcher get a new push MessageDispatcher
 func GetPushMessageDispatcher(
+	ctxt context.Context,
 	natsClient *core.NatsClient,
 	stream, subject, consumer string,
 	deliveryGroup *string,
 	maxInflightMsgs int,
 	wg *sync.WaitGroup,
-	ctxt context.Context,
 ) (MessageDispatcher, error) {
 	instance := fmt.Sprintf("%s@%s/%s", consumer, stream, subject)
 	logTags := log.Fields{
@@ -79,13 +79,13 @@ func GetPushMessageDispatcher(
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define ACK receiver")
 		return nil, err
 	}
-	msgTrackingTP, err := common.GetNewTaskProcessorInstance(instance, maxInflightMsgs*4, ctxt)
+	msgTrackingTP, err := common.GetNewTaskProcessorInstance(ctxt, instance, maxInflightMsgs*4)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define task processor")
 		return nil, err
 	}
 	msgTracking, err := getJetStreamInflightMsgProcessor(
-		msgTrackingTP, stream, subject, consumer, ctxt,
+		ctxt, msgTrackingTP, stream, subject, consumer,
 	)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define MSG tracker")
@@ -131,10 +131,10 @@ func (d *pushMessageDispatcher) Start(
 
 	// Start ACK receiver
 	if err := d.ackWatcher.SubscribeForACKs(
-		d.wg, d.optContext, func(ai AckIndication, ctxt context.Context) {
+		d.optContext, d.wg, func(ctxt context.Context, ai AckIndication) {
 			log.WithFields(d.LogTags).Debugf("Processing %s", ai.String())
 			// Pass to message tracker in non-blocking mode
-			if err := d.msgTracking.HandlerMsgACK(ai, false, ctxt); err != nil {
+			if err := d.msgTracking.HandlerMsgACK(ctxt, ai, false); err != nil {
 				log.WithError(err).WithFields(d.LogTags).Errorf("Failed to submit %s", ai.String())
 			}
 		},
@@ -144,21 +144,23 @@ func (d *pushMessageDispatcher) Start(
 	}
 
 	// Start subscriber
-	if err := d.subscriber.StartReading(func(msg *nats.Msg, ctxt context.Context) error {
-		msgName := msgToString(msg)
-		log.WithFields(d.LogTags).Debugf("Processing %s", msgName)
-		// Forward the message toward consumer
-		if err := msgOutput(msg, ctxt); err != nil {
-			log.WithError(err).WithFields(d.LogTags).Errorf("Unable to forward %s", msgName)
-			return err
-		}
-		// Pass to message tracker in non-blocking mode
-		if err := d.msgTracking.RecordInflightMessage(msg, false, ctxt); err != nil {
-			log.WithError(err).WithFields(d.LogTags).Errorf("Unable to record %s", msgName)
-			return err
-		}
-		return nil
-	}, errorCB, d.wg, d.optContext); err != nil {
+	if err := d.subscriber.StartReading(
+		d.optContext,
+		func(ctxt context.Context, msg *nats.Msg) error {
+			msgName := msgToString(msg)
+			log.WithFields(d.LogTags).Debugf("Processing %s", msgName)
+			// Forward the message toward consumer
+			if err := msgOutput(ctxt, msg); err != nil {
+				log.WithError(err).WithFields(d.LogTags).Errorf("Unable to forward %s", msgName)
+				return err
+			}
+			// Pass to message tracker in non-blocking mode
+			if err := d.msgTracking.RecordInflightMessage(ctxt, msg, false); err != nil {
+				log.WithError(err).WithFields(d.LogTags).Errorf("Unable to record %s", msgName)
+				return err
+			}
+			return nil
+		}, errorCB, d.wg); err != nil {
 		log.WithError(err).WithFields(d.LogTags).Errorf("Failed to start MSG subscriber")
 		return err
 	}

@@ -30,7 +30,7 @@ type TaskHandler func(taskParam interface{}) error
 // TaskProcessor implements an event loop model where tasks are processed by a daemon thread
 type TaskProcessor interface {
 	// Submit submits a task-parameter to be processed
-	Submit(newTaskParam interface{}, ctx context.Context) error
+	Submit(ctx context.Context, newTaskParam interface{}) error
 	// ProcessNewTaskParam execute a submitted task-parameter
 	ProcessNewTaskParam(newTaskParam interface{}) error
 	// SetTaskExecutionMap update the mapping between task-parameter object and its associated
@@ -60,7 +60,7 @@ type taskProcessorImpl struct {
 
 // GetNewTaskProcessorInstance get instance of taskProcessorImpl
 func GetNewTaskProcessorInstance(
-	name string, taskBuffer int, ctxt context.Context,
+	ctxt context.Context, name string, taskBuffer int,
 ) (TaskProcessor, error) {
 	logTags := log.Fields{
 		"module": "common", "component": "task-processor", "instance": name,
@@ -83,7 +83,7 @@ func GetNewTaskProcessorInstance(
 }
 
 // Submit submits a task to be processed
-func (p *taskProcessorImpl) Submit(newTaskParam interface{}, ctx context.Context) error {
+func (p *taskProcessorImpl) Submit(ctx context.Context, newTaskParam interface{}) error {
 	select {
 	case p.newTasks <- newTaskParam:
 		return nil
@@ -177,14 +177,14 @@ type taskDemuxProcessorImpl struct {
 
 // GetNewTaskDemuxProcessorInstance get instance of taskDemuxProcessorImpl
 func GetNewTaskDemuxProcessorInstance(
+	ctxt context.Context,
 	name string,
 	taskBuffer int,
 	workerNum int,
 	passTimeout time.Duration,
-	ctxt context.Context,
 ) (TaskProcessor, error) {
 	inputTP, err := GetNewTaskProcessorInstance(
-		fmt.Sprintf("%s.input", name), taskBuffer, ctxt,
+		ctxt, fmt.Sprintf("%s.input", name), taskBuffer,
 	)
 	if err != nil {
 		return nil, err
@@ -193,7 +193,7 @@ func GetNewTaskDemuxProcessorInstance(
 	workers := make([]TaskProcessor, workerNum)
 	for itr := 0; itr < workerNum; itr++ {
 		workerTP, err := GetNewTaskProcessorInstance(
-			fmt.Sprintf("%s.worker.%d", name, itr), taskBuffer, optCtxt,
+			optCtxt, fmt.Sprintf("%s.worker.%d", name, itr), taskBuffer,
 		)
 		if err != nil {
 			cancel()
@@ -222,8 +222,8 @@ func GetNewTaskDemuxProcessorInstance(
 }
 
 // Submit submits a task-parameter to be processed
-func (p *taskDemuxProcessorImpl) Submit(newTaskParam interface{}, ctx context.Context) error {
-	return p.input.Submit(newTaskParam, ctx)
+func (p *taskDemuxProcessorImpl) Submit(ctx context.Context, newTaskParam interface{}) error {
+	return p.input.Submit(ctx, newTaskParam)
 }
 
 // ProcessNewTaskParam execute a submitted task-parameter
@@ -231,7 +231,7 @@ func (p *taskDemuxProcessorImpl) ProcessNewTaskParam(newTaskParam interface{}) e
 	if p.workers != nil && len(p.workers) > 0 {
 		log.WithFields(p.LogTags).Debugf("Processing new %s", reflect.TypeOf(newTaskParam))
 		defer func() { p.routeIdx = (p.routeIdx + 1) % len(p.workers) }()
-		return p.workers[p.routeIdx].Submit(newTaskParam, p.operationContext)
+		return p.workers[p.routeIdx].Submit(p.operationContext, newTaskParam)
 	}
 	return fmt.Errorf("[TDP %s] No workers defined", p.name)
 }

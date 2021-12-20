@@ -31,7 +31,7 @@ func TestTaskParamProcessing(t *testing.T) {
 
 	ctxt, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	uut, err := GetNewTaskProcessorInstance("testing", 4, ctxt)
+	uut, err := GetNewTaskProcessorInstance(ctxt, "testing", 4)
 	defer func() {
 		assert.Nil(uut.StopEventLoop())
 	}()
@@ -92,7 +92,7 @@ func TestTaskDemuxProcessing(t *testing.T) {
 	defer wg.Wait()
 	ctxt, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	uut, err := GetNewTaskDemuxProcessorInstance("testing", 4, 3, time.Second, ctxt)
+	uut, err := GetNewTaskDemuxProcessorInstance(ctxt, "testing", 4, 3, time.Second)
 	defer func() {
 		assert.Nil(uut.StopEventLoop())
 	}()
@@ -142,7 +142,7 @@ func TestTaskDemuxProcessing(t *testing.T) {
 	{
 		testWG.Add(1)
 		useContext, cancel := context.WithTimeout(context.Background(), time.Second)
-		assert.Nil(uut.Submit(testStruct1{}, useContext))
+		assert.Nil(uut.Submit(useContext, testStruct1{}))
 		cancel()
 		testWG.Wait()
 		assert.Equal(1, path1)
@@ -153,7 +153,7 @@ func TestTaskDemuxProcessing(t *testing.T) {
 	{
 		testWG.Add(1)
 		useContext, cancel := context.WithTimeout(context.Background(), time.Second)
-		assert.Nil(uut.Submit(testStruct1{}, useContext))
+		assert.Nil(uut.Submit(useContext, testStruct1{}))
 		cancel()
 		testWG.Wait()
 		assert.Equal(2, path1)
@@ -164,10 +164,10 @@ func TestTaskDemuxProcessing(t *testing.T) {
 	{
 		testWG.Add(2)
 		useContext, cancel := context.WithTimeout(context.Background(), time.Second)
-		assert.Nil(uut.Submit(testStruct2{}, useContext))
+		assert.Nil(uut.Submit(useContext, testStruct2{}))
 		cancel()
 		useContext, cancel = context.WithTimeout(context.Background(), time.Second)
-		assert.Nil(uut.Submit(testStruct3{}, useContext))
+		assert.Nil(uut.Submit(useContext, testStruct3{}))
 		cancel()
 		testWG.Wait()
 		assert.Equal(1, path2)

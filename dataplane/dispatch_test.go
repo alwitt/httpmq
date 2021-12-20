@@ -86,7 +86,7 @@ func TestPushMessageDispatcher(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(jsCtrl.CreateStream(streamParam, utCtxt))
+		assert.Nil(jsCtrl.CreateStream(utCtxt, streamParam))
 	}
 	consumer1 := uuid.New().String()
 	maxInflight := 2
@@ -94,12 +94,12 @@ func TestPushMessageDispatcher(t *testing.T) {
 		param := management.JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: maxInflight, Mode: "push", FilterSubject: &subject1,
 		}
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param, utCtxt))
+		assert.Nil(jsCtrl.CreateConsumerForStream(utCtxt, stream1, param))
 	}
 	log.Debug("============================= 1 =============================")
 
 	msgRxChan := make(chan *nats.Msg, maxInflight)
-	msgHandler := func(msg *nats.Msg, _ context.Context) error {
+	msgHandler := func(_ context.Context, msg *nats.Msg) error {
 		msgRxChan <- msg
 		return nil
 	}
@@ -110,7 +110,7 @@ func TestPushMessageDispatcher(t *testing.T) {
 
 	// Case 0: start a new dispatcher
 	uut, err := GetPushMessageDispatcher(
-		js, stream1, subject1, consumer1, nil, maxInflight, &wg, utCtxt,
+		utCtxt, js, stream1, subject1, consumer1, nil, maxInflight, &wg,
 	)
 	assert.Nil(err)
 	assert.Nil(uut.Start(msgHandler, internalErrorHandler))
@@ -126,7 +126,7 @@ func TestPushMessageDispatcher(t *testing.T) {
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
-		assert.Nil(publisher.Publish(subject1, msg1, ctxt))
+		assert.Nil(publisher.Publish(ctxt, subject1, msg1))
 	}
 	log.Debug("============================= 3 =============================")
 	msg1SeqNum := AckSeqNum{}
@@ -153,7 +153,7 @@ func TestPushMessageDispatcher(t *testing.T) {
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
-		assert.Nil(publisher.Publish(subject1, msg2, ctxt))
+		assert.Nil(publisher.Publish(ctxt, subject1, msg2))
 	}
 	log.Debug("============================= 5 =============================")
 	// verify reception
@@ -175,7 +175,7 @@ func TestPushMessageDispatcher(t *testing.T) {
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
-		assert.Nil(publisher.Publish(subject1, msg3, ctxt))
+		assert.Nil(publisher.Publish(ctxt, subject1, msg3))
 	}
 	log.Debug("============================= 7 =============================")
 	// verify nothing came
@@ -193,7 +193,7 @@ func TestPushMessageDispatcher(t *testing.T) {
 
 	// Case 4: ACK the first message
 	assert.Nil(ackSend.BroadcastACK(
-		AckIndication{Stream: stream1, Consumer: consumer1, SeqNum: msg1SeqNum}, utCtxt,
+		utCtxt, AckIndication{Stream: stream1, Consumer: consumer1, SeqNum: msg1SeqNum},
 	))
 	log.Debug("============================= 9 =============================")
 	// The third message should come now

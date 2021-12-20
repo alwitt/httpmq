@@ -81,13 +81,13 @@ func TestAckTransport(t *testing.T) {
 
 	// Case 0: start subscription on uutRX1
 	rxChan1 := make(chan AckIndication, 1)
-	ackHandler1 := func(ack AckIndication, _ context.Context) {
+	ackHandler1 := func(_ context.Context, ack AckIndication) {
 		rxChan1 <- ack
 	}
-	err = uutRX1.SubscribeForACKs(&wg, utCtxt, ackHandler1)
+	err = uutRX1.SubscribeForACKs(utCtxt, &wg, ackHandler1)
 	assert.Nil(err)
 	// subscribe again
-	err = uutRX1.SubscribeForACKs(&wg, utCtxt, ackHandler1)
+	err = uutRX1.SubscribeForACKs(utCtxt, &wg, ackHandler1)
 	assert.NotNil(err)
 
 	// Case 1: send an ACK
@@ -99,7 +99,7 @@ func TestAckTransport(t *testing.T) {
 			Consumer: 10,
 		},
 	}
-	assert.Nil(uutTX.BroadcastACK(ack1, utCtxt))
+	assert.Nil(uutTX.BroadcastACK(utCtxt, ack1))
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
@@ -115,10 +115,10 @@ func TestAckTransport(t *testing.T) {
 	uutRX2, err := getJetStreamACKReceiver(js, testStream, dummySubject, testConsumer1)
 	assert.Nil(err)
 	rxChan2 := make(chan AckIndication, 1)
-	ackHandler2 := func(ack AckIndication, _ context.Context) {
+	ackHandler2 := func(_ context.Context, ack AckIndication) {
 		rxChan2 <- ack
 	}
-	err = uutRX2.SubscribeForACKs(&wg, utCtxt, ackHandler2)
+	err = uutRX2.SubscribeForACKs(utCtxt, &wg, ackHandler2)
 	assert.Nil(err)
 
 	// Case 2: test with two instances
@@ -130,7 +130,7 @@ func TestAckTransport(t *testing.T) {
 			Consumer: 12,
 		},
 	}
-	assert.Nil(uutTX.BroadcastACK(ack2, utCtxt))
+	assert.Nil(uutTX.BroadcastACK(utCtxt, ack2))
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Second)
 		defer cancel()
@@ -153,10 +153,10 @@ func TestAckTransport(t *testing.T) {
 	uutRX3, err := getJetStreamACKReceiver(js, testStream, dummySubject, testConsumer2)
 	assert.Nil(err)
 	rxChan3 := make(chan AckIndication, 1)
-	ackHandler3 := func(ack AckIndication, _ context.Context) {
+	ackHandler3 := func(_ context.Context, ack AckIndication) {
 		rxChan3 <- ack
 	}
-	err = uutRX3.SubscribeForACKs(&wg, utCtxt, ackHandler3)
+	err = uutRX3.SubscribeForACKs(utCtxt, &wg, ackHandler3)
 	assert.Nil(err)
 
 	// Case 3: test with different consumer
@@ -168,7 +168,7 @@ func TestAckTransport(t *testing.T) {
 			Consumer: 32,
 		},
 	}
-	assert.Nil(uutTX.BroadcastACK(ack3, utCtxt))
+	assert.Nil(uutTX.BroadcastACK(utCtxt, ack3))
 	{
 		ctxt, cancel := context.WithTimeout(utCtxt, time.Millisecond*150)
 		defer cancel()

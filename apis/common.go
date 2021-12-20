@@ -78,6 +78,7 @@ func writeRESTResponse(
 }
 
 // ========================================================================================
+
 // MethodHandlers DICT of method-endpoint handler
 type MethodHandlers map[string]http.HandlerFunc
 
@@ -103,7 +104,7 @@ type APIRestHandler struct {
 func (h APIRestHandler) reply(
 	w http.ResponseWriter, respCode int, resp interface{}, restCall string, r *http.Request,
 ) {
-	localLogTags, _ := common.UpdateLogTags(h.LogTags, r.Context())
+	localLogTags, _ := common.UpdateLogTags(r.Context(), h.LogTags)
 	if err := writeRESTResponse(w, r, respCode, &resp); err != nil {
 		log.WithError(err).WithFields(localLogTags).Errorf(
 			"Failed to write REST response for %s", restCall,
@@ -120,7 +121,7 @@ func (h APIRestHandler) Write(p []byte) (n int, err error) {
 // attachRequestID middleware function to attach a request ID to a API request
 func (h APIRestHandler) attachRequestID(next http.HandlerFunc) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		localLogTags, _ := common.UpdateLogTags(h.LogTags, r.Context())
+		localLogTags, _ := common.UpdateLogTags(r.Context(), h.LogTags)
 		// use provided request id from incoming request if any
 		reqID := r.Header.Get("Httpmq-Request-ID")
 		if reqID == "" {

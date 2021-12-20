@@ -40,7 +40,7 @@ func DeepCopy(src, dst interface{}) error {
 }
 
 // UpdateLogTags add additional fields to the existing log tags with information from Context
-func UpdateLogTags(original log.Fields, ctxt context.Context) (log.Fields, error) {
+func UpdateLogTags(ctxt context.Context, original log.Fields) (log.Fields, error) {
 	newLogTags := log.Fields{}
 	if err := DeepCopy(&original, &newLogTags); err != nil {
 		log.WithError(err).WithFields(original).Errorf("Failed to deep-copy logtags")

@@ -250,7 +250,7 @@ func convertConsumerInfo(original *nats.ConsumerInfo) APIRestRespConsumerInfo {
 func (h APIRestJetStreamManagementHandler) CreateStream(w http.ResponseWriter, r *http.Request) {
 	restCall := "POST /v1/admin/stream"
 
-	localLogTags, err := common.UpdateLogTags(h.LogTags, r.Context())
+	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
 	if err != nil {
 		msg := "Prep failed"
 		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
@@ -273,7 +273,7 @@ func (h APIRestJetStreamManagementHandler) CreateStream(w http.ResponseWriter, r
 		return
 	}
 
-	if err := h.core.CreateStream(params, r.Context()); err != nil {
+	if err := h.core.CreateStream(r.Context(), params); err != nil {
 		msg := "Failed to create new stream"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
@@ -361,7 +361,7 @@ type APIRestRespOneJetStream struct {
 func (h APIRestJetStreamManagementHandler) GetStream(w http.ResponseWriter, r *http.Request) {
 	restCall := "GET /v1/admin/stream/{streamName}"
 
-	localLogTags, err := common.UpdateLogTags(h.LogTags, r.Context())
+	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
 	if err != nil {
 		msg := "Prep failed"
 		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
@@ -384,7 +384,7 @@ func (h APIRestJetStreamManagementHandler) GetStream(w http.ResponseWriter, r *h
 		return
 	}
 
-	streamInfo, err := h.core.GetStream(streamName, r.Context())
+	streamInfo, err := h.core.GetStream(r.Context(), streamName)
 	if err != nil {
 		msg := fmt.Sprintf("Unable fetch stream %s info", streamName)
 		log.WithError(err).WithFields(localLogTags).Error(msg)
@@ -437,7 +437,7 @@ func (h APIRestJetStreamManagementHandler) ChangeStreamSubjects(
 ) {
 	restCall := "PUT /v1/admin/stream/{streamName}/subject"
 
-	localLogTags, err := common.UpdateLogTags(h.LogTags, r.Context())
+	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
 	if err != nil {
 		msg := "Prep failed"
 		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
@@ -475,7 +475,7 @@ func (h APIRestJetStreamManagementHandler) ChangeStreamSubjects(
 		return
 	}
 
-	if err := h.core.ChangeStreamSubjects(streamName, subjects.Subjects, r.Context()); err != nil {
+	if err := h.core.ChangeStreamSubjects(r.Context(), streamName, subjects.Subjects); err != nil {
 		msg := fmt.Sprintf("Failed to change stream %s subjects", streamName)
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
@@ -517,7 +517,7 @@ func (h APIRestJetStreamManagementHandler) UpdateStreamLimits(
 ) {
 	restCall := "PUT /v1/admin/stream/{streamName}/limit"
 
-	localLogTags, err := common.UpdateLogTags(h.LogTags, r.Context())
+	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
 	if err != nil {
 		msg := "Prep failed"
 		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
@@ -548,7 +548,7 @@ func (h APIRestJetStreamManagementHandler) UpdateStreamLimits(
 		return
 	}
 
-	if err := h.core.UpdateStreamLimits(streamName, limits, r.Context()); err != nil {
+	if err := h.core.UpdateStreamLimits(r.Context(), streamName, limits); err != nil {
 		msg := fmt.Sprintf("Failed to change stream %s limits", streamName)
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
@@ -586,7 +586,7 @@ func (h APIRestJetStreamManagementHandler) UpdateStreamLimitsHandler() http.Hand
 func (h APIRestJetStreamManagementHandler) DeleteStream(w http.ResponseWriter, r *http.Request) {
 	restCall := "DELETE /v1/admin/stream/{streamName}"
 
-	localLogTags, err := common.UpdateLogTags(h.LogTags, r.Context())
+	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
 	if err != nil {
 		msg := "Prep failed"
 		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
@@ -609,7 +609,7 @@ func (h APIRestJetStreamManagementHandler) DeleteStream(w http.ResponseWriter, r
 		return
 	}
 
-	if err := h.core.DeleteStream(streamName, r.Context()); err != nil {
+	if err := h.core.DeleteStream(r.Context(), streamName); err != nil {
 		msg := fmt.Sprintf("Failed to delete stream %s", streamName)
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
@@ -652,7 +652,7 @@ func (h APIRestJetStreamManagementHandler) DeleteStreamHandler() http.HandlerFun
 func (h APIRestJetStreamManagementHandler) CreateConsumer(w http.ResponseWriter, r *http.Request) {
 	restCall := "POST /v1/admin/stream/{streamName}/consumer"
 
-	localLogTags, err := common.UpdateLogTags(h.LogTags, r.Context())
+	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
 	if err != nil {
 		msg := "Prep failed"
 		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
@@ -683,7 +683,7 @@ func (h APIRestJetStreamManagementHandler) CreateConsumer(w http.ResponseWriter,
 		return
 	}
 
-	if err := h.core.CreateConsumerForStream(streamName, params, r.Context()); err != nil {
+	if err := h.core.CreateConsumerForStream(r.Context(), streamName, params); err != nil {
 		msg := fmt.Sprintf("Failed to create consumer on stream %s", streamName)
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
@@ -730,7 +730,7 @@ func (h APIRestJetStreamManagementHandler) GetAllConsumers(
 ) {
 	restCall := "GET /v1/admin/stream/{streamName}/consumer"
 
-	localLogTags, err := common.UpdateLogTags(h.LogTags, r.Context())
+	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
 	if err != nil {
 		msg := "Prep failed"
 		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
@@ -753,7 +753,7 @@ func (h APIRestJetStreamManagementHandler) GetAllConsumers(
 		return
 	}
 
-	consumers := h.core.GetAllConsumersForStream(streamName, r.Context())
+	consumers := h.core.GetAllConsumersForStream(r.Context(), streamName)
 	converted := make(map[string]APIRestRespConsumerInfo)
 	for consumerName, consumerInfo := range consumers {
 		converted[consumerName] = convertConsumerInfo(consumerInfo)
@@ -797,7 +797,7 @@ type APIRestRespOneJetStreamConsumer struct {
 func (h APIRestJetStreamManagementHandler) GetConsumer(w http.ResponseWriter, r *http.Request) {
 	restCall := "GET /v1/admin/stream/{streamName}/consumer/{consumerName}"
 
-	localLogTags, err := common.UpdateLogTags(h.LogTags, r.Context())
+	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
 	if err != nil {
 		msg := "Prep failed"
 		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
@@ -827,7 +827,7 @@ func (h APIRestJetStreamManagementHandler) GetConsumer(w http.ResponseWriter, r 
 		return
 	}
 
-	info, err := h.core.GetConsumerForStream(streamName, consumerName, r.Context())
+	info, err := h.core.GetConsumerForStream(r.Context(), streamName, consumerName)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to read consumer %s on stream %s", consumerName, streamName)
 		log.WithError(err).WithFields(localLogTags).Error(msg)
@@ -871,7 +871,7 @@ func (h APIRestJetStreamManagementHandler) GetConsumerHandler() http.HandlerFunc
 func (h APIRestJetStreamManagementHandler) DeleteConsumer(w http.ResponseWriter, r *http.Request) {
 	restCall := "DELETE /v1/admin/stream/{streamName}/consumer/{consumerName}"
 
-	localLogTags, err := common.UpdateLogTags(h.LogTags, r.Context())
+	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
 	if err != nil {
 		msg := "Prep failed"
 		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
@@ -901,7 +901,7 @@ func (h APIRestJetStreamManagementHandler) DeleteConsumer(w http.ResponseWriter,
 		return
 	}
 
-	if err := h.core.DeleteConsumerOnStream(streamName, consumerName, r.Context()); err != nil {
+	if err := h.core.DeleteConsumerOnStream(r.Context(), streamName, consumerName); err != nil {
 		msg := fmt.Sprintf("Failed to delete consumer %s on stream %s", consumerName, streamName)
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(

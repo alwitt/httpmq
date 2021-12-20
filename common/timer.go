@@ -46,7 +46,7 @@ type intervalTimerImpl struct {
 
 // GetIntervalTimerInstance create new interval timer instance
 func GetIntervalTimerInstance(
-	name string, rootCtxt context.Context, wg *sync.WaitGroup,
+	rootCtxt context.Context, name string, wg *sync.WaitGroup,
 ) (IntervalTimer, error) {
 	logTags := log.Fields{
 		"module": "common", "component": "interval-timer", "instance": name,

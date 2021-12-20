@@ -58,13 +58,13 @@ func defineACKBroadcastSubject(stream, consumer string) string {
 }
 
 // JetStreamAckHandler is the function signature for callback processing a JetStream ACK
-type JetStreamAckHandler func(AckIndication, context.Context)
+type JetStreamAckHandler func(context.Context, AckIndication)
 
 // JetStreamACKReceiver processes JetStream message ACKs being broadcast through NATs subjects
 type JetStreamACKReceiver interface {
 	// SubscribeForACKs start receiving JetStream message ACKs
 	SubscribeForACKs(
-		wg *sync.WaitGroup, opContext context.Context, handler JetStreamAckHandler,
+		opContext context.Context, wg *sync.WaitGroup, handler JetStreamAckHandler,
 	) error
 }
 
@@ -104,7 +104,7 @@ func getJetStreamACKReceiver(
 
 // SubscribeForACKs start receiving JetStream message ACKs
 func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
-	wg *sync.WaitGroup, opContext context.Context, handler JetStreamAckHandler,
+	opContext context.Context, wg *sync.WaitGroup, handler JetStreamAckHandler,
 ) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -112,7 +112,7 @@ func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 	if r.subscribed {
 		return fmt.Errorf("already instructed to subscribe to %s", r.ackSubject)
 	}
-	localLogTags, err := common.UpdateLogTags(r.LogTags, opContext)
+	localLogTags, err := common.UpdateLogTags(opContext, r.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(r.LogTags).Errorf("Failed to update logtags")
 		return err
@@ -137,7 +137,7 @@ func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 		}
 		// Forward the message
 		log.WithFields(localLogTags).Debugf("Received %s", ackInfo.String())
-		handler(ackInfo, opContext)
+		handler(opContext, ackInfo)
 	})
 	if err != nil {
 		log.WithError(err).WithFields(localLogTags).Errorf(
@@ -167,7 +167,7 @@ func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 // JetStreamACKBroadcaster broadcasts JetStream message ACK through NATs subjects
 type JetStreamACKBroadcaster interface {
 	// BroadcastACK broadcast a JetStream message ACK
-	BroadcastACK(ack AckIndication, ctxt context.Context) error
+	BroadcastACK(ctxt context.Context, ack AckIndication) error
 }
 
 // jetStreamACKBroadcasterImpl implements JetStreamACKBroadcaster
@@ -194,8 +194,8 @@ func GetJetStreamACKBroadcaster(
 }
 
 // BroadcastACK broadcast a JetStream message ACK
-func (t *jetStreamACKBroadcasterImpl) BroadcastACK(ack AckIndication, ctxt context.Context) error {
-	localLogTags, err := common.UpdateLogTags(t.LogTags, ctxt)
+func (t *jetStreamACKBroadcasterImpl) BroadcastACK(ctxt context.Context, ack AckIndication) error {
+	localLogTags, err := common.UpdateLogTags(ctxt, t.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(t.LogTags).Errorf("Failed to update logtags")
 		return err

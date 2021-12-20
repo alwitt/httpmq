@@ -44,7 +44,7 @@ type DataplaneCLIArgs struct {
 	Endpoints  DataplaneRestEndpoints
 }
 
-// GetDataplaneCLIFlags retreive the set of CMD flags for dataplane server
+// GetDataplaneCLIFlags retrieve the set of CMD flags for dataplane server
 func GetDataplaneCLIFlags(args *DataplaneCLIArgs) []cli.Flag {
 	return []cli.Flag{
 		&cli.IntFlag{
@@ -73,10 +73,10 @@ func GetDataplaneCLIFlags(args *DataplaneCLIArgs) []cli.Flag {
 
 // RunDataplaneServer run the dataplane server
 func RunDataplaneServer(
+	runTimeContext context.Context,
 	params DataplaneCLIArgs,
 	instance string,
 	natsClient *core.NatsClient,
-	runTimeContext context.Context,
 	wg *sync.WaitGroup,
 ) error {
 	logTags := log.Fields{
@@ -106,7 +106,7 @@ func RunDataplaneServer(
 	localCtxt, lclCancel := context.WithCancel(runTimeContext)
 	defer lclCancel()
 	httpHandler, err := apis.GetAPIRestJetStreamDataplaneHandler(
-		natsClient, msgPub, ackPub, localCtxt, wg,
+		localCtxt, natsClient, msgPub, ackPub, wg,
 	)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define HTTP handler")

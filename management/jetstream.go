@@ -93,31 +93,31 @@ type JetStreamController interface {
 	// Stream related management
 
 	// CreateStream creates a new stream given parameters
-	CreateStream(param JSStreamParam, ctxt context.Context) error
+	CreateStream(ctxt context.Context, param JSStreamParam) error
 	// GetAllStreams queries for info on all available streams
 	GetAllStreams(ctxt context.Context) map[string]*nats.StreamInfo
 	// GetStream queries for info on one stream by name
-	GetStream(name string, ctxt context.Context) (*nats.StreamInfo, error)
+	GetStream(ctxt context.Context, name string) (*nats.StreamInfo, error)
 	// ChangeStreamSubjects changes the target subjects of a stream
-	ChangeStreamSubjects(stream string, newSubjects []string, ctxt context.Context) error
+	ChangeStreamSubjects(ctxt context.Context, stream string, newSubjects []string) error
 	// UpdateStreamLimits changes the data retention limits of the stream
-	UpdateStreamLimits(stream string, newLimits JSStreamLimits, ctxt context.Context) error
+	UpdateStreamLimits(ctxt context.Context, stream string, newLimits JSStreamLimits) error
 	// Deletestream deletes a stream by name
-	DeleteStream(name string, ctxt context.Context) error
+	DeleteStream(ctxt context.Context, name string) error
 
 	// ========================================================
 	// Consumer related management
 
 	// CreateConsumerForStream creates a new consumer for a stream
-	CreateConsumerForStream(stream string, param JetStreamConsumerParam, ctxt context.Context) error
+	CreateConsumerForStream(ctxt context.Context, stream string, param JetStreamConsumerParam) error
 	// GetAllConsumersForStream queries for info on all consumers of a stream
-	GetAllConsumersForStream(stream string, ctxt context.Context) map[string]*nats.ConsumerInfo
+	GetAllConsumersForStream(ctxt context.Context, stream string) map[string]*nats.ConsumerInfo
 	// GetConsumerForStream queries for info of one consumer of a stream
 	GetConsumerForStream(
-		stream, consumerName string, ctxt context.Context,
+		ctxt context.Context, stream, consumerName string,
 	) (*nats.ConsumerInfo, error)
 	// DeleteConsumerOnStream deletes one consumer of a stream
-	DeleteConsumerOnStream(stream, consumerName string, ctxt context.Context) error
+	DeleteConsumerOnStream(ctxt context.Context, stream, consumerName string) error
 }
 
 // jetStreamControllerImpl implements JetStreamController
@@ -153,7 +153,7 @@ func (js jetStreamControllerImpl) Ready() (bool, error) {
 
 // GetAllStreams queries for info on all available streams
 func (js jetStreamControllerImpl) GetAllStreams(ctxt context.Context) map[string]*nats.StreamInfo {
-	localLogTags, _ := common.UpdateLogTags(js.LogTags, ctxt)
+	localLogTags, _ := common.UpdateLogTags(ctxt, js.LogTags)
 	readChan := js.core.JetStream().StreamsInfo()
 	knownStreams := map[string]*nats.StreamInfo{}
 	readAll := false
@@ -181,9 +181,9 @@ func (js jetStreamControllerImpl) GetAllStreams(ctxt context.Context) map[string
 
 // GetStream queries for info on one stream by name
 func (js jetStreamControllerImpl) GetStream(
-	name string, ctxt context.Context,
+	ctxt context.Context, name string,
 ) (*nats.StreamInfo, error) {
-	localLogTags, err := common.UpdateLogTags(js.LogTags, ctxt)
+	localLogTags, err := common.UpdateLogTags(ctxt, js.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Failed to update logtags")
 	}
@@ -217,8 +217,8 @@ func applyStreamLimits(targetLimit *JSStreamLimits, param *nats.StreamConfig) {
 }
 
 // CreateStream creates a new stream given parameters
-func (js jetStreamControllerImpl) CreateStream(param JSStreamParam, ctxt context.Context) error {
-	localLogTags, err := common.UpdateLogTags(js.LogTags, ctxt)
+func (js jetStreamControllerImpl) CreateStream(ctxt context.Context, param JSStreamParam) error {
+	localLogTags, err := common.UpdateLogTags(ctxt, js.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Failed to update logtags")
 	}
@@ -245,8 +245,8 @@ func (js jetStreamControllerImpl) CreateStream(param JSStreamParam, ctxt context
 }
 
 // Deletestream deletes a stream by name
-func (js jetStreamControllerImpl) DeleteStream(name string, ctxt context.Context) error {
-	localLogTags, err := common.UpdateLogTags(js.LogTags, ctxt)
+func (js jetStreamControllerImpl) DeleteStream(ctxt context.Context, name string) error {
+	localLogTags, err := common.UpdateLogTags(ctxt, js.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Failed to update logtags")
 	}
@@ -260,9 +260,9 @@ func (js jetStreamControllerImpl) DeleteStream(name string, ctxt context.Context
 
 // ChangeStreamSubjects changes the target subjects of a stream
 func (js jetStreamControllerImpl) ChangeStreamSubjects(
-	stream string, newSubjects []string, ctxt context.Context,
+	ctxt context.Context, stream string, newSubjects []string,
 ) error {
-	localLogTags, err := common.UpdateLogTags(js.LogTags, ctxt)
+	localLogTags, err := common.UpdateLogTags(ctxt, js.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Failed to update logtags")
 	}
@@ -287,9 +287,9 @@ func (js jetStreamControllerImpl) ChangeStreamSubjects(
 
 // UpdateStreamLimits changes the data retention limits of the stream
 func (js jetStreamControllerImpl) UpdateStreamLimits(
-	stream string, newLimits JSStreamLimits, ctxt context.Context,
+	ctxt context.Context, stream string, newLimits JSStreamLimits,
 ) error {
-	localLogTags, err := common.UpdateLogTags(js.LogTags, ctxt)
+	localLogTags, err := common.UpdateLogTags(ctxt, js.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Failed to update logtags")
 	}
@@ -315,9 +315,9 @@ func (js jetStreamControllerImpl) UpdateStreamLimits(
 
 // GetAllConsumersForStream queries for info on all consumers of a stream
 func (js jetStreamControllerImpl) GetAllConsumersForStream(
-	stream string, ctxt context.Context,
+	ctxt context.Context, stream string,
 ) map[string]*nats.ConsumerInfo {
-	localLogTags, _ := common.UpdateLogTags(js.LogTags, ctxt)
+	localLogTags, _ := common.UpdateLogTags(ctxt, js.LogTags)
 	readChan := js.core.JetStream().ConsumersInfo(stream)
 	knownConsumer := map[string]*nats.ConsumerInfo{}
 	readAll := false
@@ -340,9 +340,9 @@ func (js jetStreamControllerImpl) GetAllConsumersForStream(
 
 // GetConsumerForStream queries for info of one consumer of a stream
 func (js jetStreamControllerImpl) GetConsumerForStream(
-	stream, consumerName string, ctxt context.Context,
+	ctxt context.Context, stream, consumerName string,
 ) (*nats.ConsumerInfo, error) {
-	localLogTags, err := common.UpdateLogTags(js.LogTags, ctxt)
+	localLogTags, err := common.UpdateLogTags(ctxt, js.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Failed to update logtags")
 	}
@@ -357,9 +357,9 @@ func (js jetStreamControllerImpl) GetConsumerForStream(
 
 // CreateConsumerForStream creates a new consumer for a stream
 func (js jetStreamControllerImpl) CreateConsumerForStream(
-	stream string, param JetStreamConsumerParam, ctxt context.Context,
+	ctxt context.Context, stream string, param JetStreamConsumerParam,
 ) error {
-	localLogTags, err := common.UpdateLogTags(js.LogTags, ctxt)
+	localLogTags, err := common.UpdateLogTags(ctxt, js.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Failed to update logtags")
 	}
@@ -420,9 +420,9 @@ func (js jetStreamControllerImpl) CreateConsumerForStream(
 
 // DeleteConsumerOnStream deletes one consumer of a stream
 func (js jetStreamControllerImpl) DeleteConsumerOnStream(
-	stream, consumerName string, ctxt context.Context,
+	ctxt context.Context, stream, consumerName string,
 ) error {
-	localLogTags, err := common.UpdateLogTags(js.LogTags, ctxt)
+	localLogTags, err := common.UpdateLogTags(ctxt, js.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Failed to update logtags")
 	}

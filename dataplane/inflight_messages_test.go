@@ -71,7 +71,7 @@ func TestInflightMessageHandling(t *testing.T) {
 	assert.Nil(err)
 	defer js.Close(utCtxt)
 
-	tp, err := common.GetNewTaskProcessorInstance(testName, 4, utCtxt)
+	tp, err := common.GetNewTaskProcessorInstance(utCtxt, testName, 4)
 	assert.Nil(err)
 
 	jsCtrl, err := management.GetJetStreamController(js, testName)
@@ -91,7 +91,7 @@ func TestInflightMessageHandling(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(jsCtrl.CreateStream(streamParam, utCtxt))
+		assert.Nil(jsCtrl.CreateStream(utCtxt, streamParam))
 		streamParam = management.JSStreamParam{
 			Name:     stream2,
 			Subjects: []string{subjects2},
@@ -99,7 +99,7 @@ func TestInflightMessageHandling(t *testing.T) {
 				MaxAge: &maxAge,
 			},
 		}
-		assert.Nil(jsCtrl.CreateStream(streamParam, utCtxt))
+		assert.Nil(jsCtrl.CreateStream(utCtxt, streamParam))
 	}
 	consumer1 := uuid.New().String()
 	var consumer1Sub1 *nats.Subscription
@@ -108,8 +108,8 @@ func TestInflightMessageHandling(t *testing.T) {
 		param := management.JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 2, Mode: "push",
 		}
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream1, param, utCtxt))
-		assert.Nil(jsCtrl.CreateConsumerForStream(stream2, param, utCtxt))
+		assert.Nil(jsCtrl.CreateConsumerForStream(utCtxt, stream1, param))
+		assert.Nil(jsCtrl.CreateConsumerForStream(utCtxt, stream2, param))
 		s, err := js.JetStream().SubscribeSync(subjects1, nats.Durable(consumer1))
 		assert.Nil(err)
 		consumer1Sub1 = s
@@ -119,7 +119,7 @@ func TestInflightMessageHandling(t *testing.T) {
 	}
 	log.Debug("============================= 1 =============================")
 
-	uut, err := getJetStreamInflightMsgProcessor(tp, stream1, subjects1, consumer1, utCtxt)
+	uut, err := getJetStreamInflightMsgProcessor(utCtxt, tp, stream1, subjects1, consumer1)
 	assert.Nil(err)
 
 	// Start the task processor
@@ -131,11 +131,11 @@ func TestInflightMessageHandling(t *testing.T) {
 		defer cancel()
 		assert.NotNil(
 			uut.HandlerMsgACK(
-				AckIndication{
+				ctxt, AckIndication{
 					Stream:   uuid.New().String(),
 					Consumer: testName,
 					SeqNum:   AckSeqNum{Stream: 12, Consumer: 2},
-				}, true, ctxt,
+				}, true,
 			),
 		)
 	}
@@ -159,7 +159,7 @@ func TestInflightMessageHandling(t *testing.T) {
 		assert.Nil(err)
 		testMsg1Seq = meta.Sequence
 		// Cache message for later ACK
-		assert.Nil(uut.RecordInflightMessage(rxMsg, true, ctxt))
+		assert.Nil(uut.RecordInflightMessage(ctxt, rxMsg, true))
 	}
 	log.Debug("============================= 3 =============================")
 
@@ -169,11 +169,11 @@ func TestInflightMessageHandling(t *testing.T) {
 		defer cancel()
 		assert.Nil(
 			uut.HandlerMsgACK(
-				AckIndication{
+				ctxt, AckIndication{
 					Stream:   stream1,
 					Consumer: consumer1,
 					SeqNum:   AckSeqNum{Stream: testMsg1Seq.Stream, Consumer: testMsg1Seq.Consumer},
-				}, true, ctxt,
+				}, true,
 			),
 		)
 	}
@@ -197,7 +197,7 @@ func TestInflightMessageHandling(t *testing.T) {
 		assert.Nil(err)
 		testMsg3Seq = meta.Sequence
 		// Cache message for later ACK
-		assert.Nil(uut.RecordInflightMessage(rxMsg, true, ctxt))
+		assert.Nil(uut.RecordInflightMessage(ctxt, rxMsg, true))
 	}
 	log.Debug("============================= 5 =============================")
 
@@ -207,11 +207,11 @@ func TestInflightMessageHandling(t *testing.T) {
 		defer cancel()
 		assert.NotNil(
 			uut.HandlerMsgACK(
-				AckIndication{
+				ctxt, AckIndication{
 					Stream:   stream2,
 					Consumer: consumer1,
 					SeqNum:   AckSeqNum{Stream: testMsg3Seq.Stream + 2, Consumer: testMsg3Seq.Consumer},
-				}, true, ctxt,
+				}, true,
 			),
 		)
 	}
@@ -223,11 +223,11 @@ func TestInflightMessageHandling(t *testing.T) {
 		defer cancel()
 		assert.Nil(
 			uut.HandlerMsgACK(
-				AckIndication{
+				ctxt, AckIndication{
 					Stream:   stream2,
 					Consumer: consumer1,
 					SeqNum:   AckSeqNum{Stream: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer},
-				}, true, ctxt,
+				}, true,
 			),
 		)
 	}
@@ -239,11 +239,11 @@ func TestInflightMessageHandling(t *testing.T) {
 		defer cancel()
 		assert.NotNil(
 			uut.HandlerMsgACK(
-				AckIndication{
+				ctxt, AckIndication{
 					Stream:   stream2,
 					Consumer: consumer1,
 					SeqNum:   AckSeqNum{Stream: testMsg3Seq.Stream, Consumer: testMsg3Seq.Consumer},
-				}, true, ctxt,
+				}, true,
 			),
 		)
 	}
