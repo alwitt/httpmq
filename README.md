@@ -65,6 +65,72 @@ $ make
 $ make test
 ```
 
+By default, the server application is `httpmq.bin`.
+
+```shell
+$ ./httpmq.bin -h
+NAME:
+   httpmq.bin - application entrypoint
+
+USAGE:
+   httpmq.bin [global options] command [command options] [arguments...]
+
+VERSION:
+   v0.1.0
+
+DESCRIPTION:
+   HTTP/2 based message broker built around NATS JetStream
+
+COMMANDS:
+   management  Run the httpmq management server
+   dataplane   Run the httpmq data plane server
+   help, h     Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --json-log, -j                                     Whether to log in JSON format (default: false) [$LOG_AS_JSON]
+   --log-level value, -l value                        Logging level: [debug info warn error] (default: warn) [$LOG_LEVEL]
+   --nats-server-uri value, --nsu value               NATS server URI (default: nats://127.0.0.1:4222) [$NATS_SERVER_URI]
+   --nats-connect-timeout value, --ncto value         NATS connection timeout (default: 15s) [$NATS_CONNECT_TIMEOUT]
+   --nats-reconnect-wait value, --nrcw value          NATS duration between reconnect attempts (default: 15s) [$NATS_RECONNECT_WAIT]
+   --nats-max-reconnect-attempts value, --nmra value  NATS maximum reconnect attempts (default: -1) [$NATS_MAX_RECONNECT_ATTEMPTS]
+   --help, -h                                         show help (default: false)
+   --version, -v                                      print the version (default: false)
+```
+
+```shell
+$ ./httpmq.bin management -h
+NAME:
+   httpmq.bin management - Run the httpmq management server
+
+USAGE:
+   httpmq.bin management [command options] [arguments...]
+
+DESCRIPTION:
+   Serves the REST API for managing JetStream streams and consumers
+
+OPTIONS:
+   --management-server-port value, --msp value              Management server port (default: 3000) [$MANAGEMENT_SERVER_PORT]
+   --management-server-endpoint-prefix value, --msep value  Set the end-point path prefix for the management APIs (default: /) [$MANAGEMENT_SERVER_ENDPOINT_PREFIX]
+   --help, -h                                               show help (default: false)
+```
+
+```shell
+$ ./httpmq.bin dataplane -h
+NAME:
+   httpmq.bin dataplane - Run the httpmq data plane server
+
+USAGE:
+   httpmq.bin dataplane [command options] [arguments...]
+
+DESCRIPTION:
+   Serves the REST API for message publish, and subscribing through JetStream
+
+OPTIONS:
+   --dataplane-server-port value, --dsp value              Dataplane server port (default: 3001) [$DATAPLANE_SERVER_PORT]
+   --dataplane-server-endpoint-prefix value, --dsep value  Set the end-point path prefix for the dataplane APIs (default: /) [$DATAPLANE_SERVER_ENDPOINT_PREFIX]
+   --help, -h                                              show help (default: false)
+```
+
 The REST API documentation can be found here [here](apis/README.md).
 > Documentation generated with [widdershins](https://github.com/Mermade/widdershins)
 >
@@ -118,6 +184,39 @@ curl -X POST 'http://127.0.0.1:3000/v1/admin/stream' \
 ```
 
 Response should be `{"success":true}`.
+
+Verify the stream is defined
+
+```json
+{
+  "success": true,
+  "stream": {
+    "config": {
+      "name": "test-stream-00",
+      "subjects": [
+        "test-subject.00",
+        "test-subject.01"
+      ],
+      "max_consumers": -1,
+      "max_msgs": -1,
+      "max_bytes": -1,
+      "max_age": 600000000000,
+      "max_msgs_per_subject": -1,
+      "max_msg_size": -1
+    },
+    "created": "2021-12-19T23:55:13.785157429Z",
+    "state": {
+      "messages": 0,
+      "bytes": 0,
+      "first_seq": 0,
+      "first_ts": "0001-01-01T00:00:00Z",
+      "last_seq": 0,
+      "last_ts": "0001-01-01T00:00:00Z",
+      "consumer_count": 1
+    }
+  }
+}
+```
 
 Define a consumer for the stream
 

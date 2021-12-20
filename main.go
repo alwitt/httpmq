@@ -72,6 +72,9 @@ func main() {
 	}
 
 	app := &cli.App{
+		Version:     "v0.1.0",
+		Usage:       "application entrypoint",
+		Description: "HTTP/2 based message broker built around NATS JetStream",
 		Flags: []cli.Flag{
 			// LOGGING
 			&cli.BoolFlag{
@@ -139,16 +142,18 @@ func main() {
 		// Components
 		Commands: []*cli.Command{
 			{
-				Name:   "management",
-				Usage:  "Run the httpmq management server",
-				Flags:  cmd.GetManagementCLIFlags(&cmdArgs.Management),
-				Action: startManagementServer,
+				Name:        "management",
+				Usage:       "Run the httpmq management server",
+				Description: "Serves the REST API for managing JetStream streams and consumers",
+				Flags:       cmd.GetManagementCLIFlags(&cmdArgs.Management),
+				Action:      startManagementServer,
 			},
 			{
-				Name:   "dataplane",
-				Usage:  "Run the httpmq dataplane server",
-				Flags:  cmd.GetDataplaneCLIFlags(&cmdArgs.Dataplane),
-				Action: startDataplaneServer,
+				Name:        "dataplane",
+				Usage:       "Run the httpmq data plane server",
+				Description: "Serves the REST API for message publish, and subscribing through JetStream",
+				Flags:       cmd.GetDataplaneCLIFlags(&cmdArgs.Dataplane),
+				Action:      startDataplaneServer,
 			},
 		},
 	}
