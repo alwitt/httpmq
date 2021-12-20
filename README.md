@@ -187,6 +187,10 @@ Response should be `{"success":true}`.
 
 Verify the stream is defined
 
+```shell
+curl 'http://127.0.0.1:3000/v1/admin/stream/test-stream-00'
+```
+
 ```json
 {
   "success": true,
@@ -278,7 +282,7 @@ To publish a message for a subject
 curl -X POST 'http://127.0.0.1:3001/v1/data/subject/test-subject.01' --header 'Content-Type: text/plain' --data-raw "$(echo 'Hello World' | base64)"
 ```
 
-> **IMPORTANT:** The message body is Base64 encoded.
+> **IMPORTANT:** The message body must be Base64 encoded.
 >
 > ```shell
 > $ echo "Hello World" | base64
@@ -299,8 +303,18 @@ $ curl http://127.0.0.1:3001/v1/data/stream/test-stream-00/consumer/test-consume
 {"stream":"test-stream-00","subject":"test-subject.01","consumer":"test-consumer-00","sequence":{"stream":1,"consumer":1},"b64_msg":"SGVsbG8gV29ybGQK"}
 ```
 
-After receiving a message, ACK that message with
+After receiving a message, acknowledge receiving the message with
 
 ```shell
 curl -X POST 'http://127.0.0.1:3001/v1/data/stream/test-stream-00/consumer/test-consumer-00/ack' --header 'Content-Type: application/json' --data-raw '{"consumer": 1,"stream": 1}'
 ```
+
+The `consumer` and `stream` fields are the sequence numbers which came with the message.
+
+If an acknowledgement is not sent within the consumer's configured max ACK wait duration, the message will be sent through this consumer's subscription again. This time, the `stream` sequence number is unchanged, but the `consumer` sequence number is increased by one.
+
+```shell
+{"stream":"test-stream-00","subject":"test-subject.01","consumer":"test-consumer-00","sequence":{"stream":1,"consumer":2},"b64_msg":"SGVsbG8gV29ybGQK"}
+```
+
+When acknowledging this message now, use `'{"consumer": 2,"stream": 1}'` as the payload.
