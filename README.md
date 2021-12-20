@@ -9,6 +9,15 @@
 [ReportCard-Url]: https://goreportcard.com/report/github.com/alwitt/httpmq
 [ReportCard-Image]: https://goreportcard.com/badge/github.com/alwitt/httpmq
 
+# Documentation
+
+The REST API documentation can be found in here: [httpmq-api](https://github.com/alwitt/httpmq-api/blob/main/README.md).
+
+<!-- Documentation generated with [widdershins](https://github.com/Mermade/widdershins)
+```shell
+$ node widdershins --code --summary=true --search=false /path/to/docs/swagger.yaml -o README.md
+``` -->
+
 # Getting Started
 
 Start the local development NATS server with JetStream enabled
@@ -130,14 +139,6 @@ OPTIONS:
    --dataplane-server-endpoint-prefix value, --dsep value  Set the end-point path prefix for the dataplane APIs (default: /) [$DATAPLANE_SERVER_ENDPOINT_PREFIX]
    --help, -h                                              show help (default: false)
 ```
-
-The REST API documentation can be found in this repository, [httpmq-api](https://github.com/alwitt/httpmq-api/blob/main/README.md).
-
-> Documentation generated with [widdershins](https://github.com/Mermade/widdershins)
->
-> ```shell
-> $ node widdershins --code --summary=true --search=false /path/to/docs/swagger.yaml -o README.md
-> ```
 
 ---
 ## Start Local Test Servers
@@ -320,8 +321,7 @@ If an acknowledgement is not sent within the consumer's configured max ACK wait 
 
 When acknowledging this message now, use `'{"consumer": 2,"stream": 1}'` as the payload.
 
----
-## License
+# License
 
 Unless otherwise noted, the httpmq source files are distributed under the Apache Version 2.0 license found in the LICENSE file.
 
