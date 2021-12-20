@@ -39,7 +39,7 @@ type JSStreamLimits struct {
 	//
 	// Oldest messages are removed once limit breached.
 	MaxBytes *int64 `json:"max_bytes,omitempty"`
-	// MaxBytes is the max duration (ns) the stream will store a message
+	// MaxAge is the max duration (ns) the stream will store a message
 	//
 	// Messages breaching the limit will be removed.
 	MaxAge *time.Duration `json:"max_age,omitempty" swaggertype:"primitive,integer"`

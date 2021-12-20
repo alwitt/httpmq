@@ -131,7 +131,8 @@ OPTIONS:
    --help, -h                                              show help (default: false)
 ```
 
-The REST API documentation can be found here [here](apis/README.md).
+The REST API documentation can be found in this repository, [httpmq-api](https://github.com/alwitt/httpmq-api/blob/main/README.md).
+
 > Documentation generated with [widdershins](https://github.com/Mermade/widdershins)
 >
 > ```shell

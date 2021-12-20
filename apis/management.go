@@ -190,7 +190,7 @@ type APIRestRespConsumerInfo struct {
 	NumAckPending int `json:"num_ack_pending"`
 	// NumRedelivered is the number of messages redelivered
 	NumRedelivered int `json:"num_redelivered"`
-	// NumWaiting is the number of message in-flight / ACK pending
+	// NumWaiting NATS JetStream does not clearly document this
 	NumWaiting int `json:"num_waiting"`
 	// NumPending is the number of message to be delivered for this consumer
 	NumPending uint64 `json:"num_pending"`
