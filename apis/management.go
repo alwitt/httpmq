@@ -53,27 +53,27 @@ func GetAPIRestJetStreamManagementHandler(
 // APIRestRespStreamConfig adhoc structure for persenting nats.StreamConfig
 type APIRestRespStreamConfig struct {
 	// Name is the stream name
-	Name string `json:"name"`
+	Name string `json:"name" validate:"required"`
 	// Description is an optional description of the stream
 	Description string `json:"description,omitempty"`
 	// Subjects is the list subjects this stream is listening on
 	Subjects []string `json:"subjects,omitempty"`
 	// MaxConsumers is the max number of consumers allowed on the stream
-	MaxConsumers int `json:"max_consumers"`
+	MaxConsumers int `json:"max_consumers" validate:"required"`
 	// MaxMsgs is the max number of messages the stream will store.
 	//
 	// Oldest messages are removed once limit breached.
-	MaxMsgs int64 `json:"max_msgs"`
+	MaxMsgs int64 `json:"max_msgs" validate:"required"`
 	// MaxBytes is the max number of message bytes the stream will store.
 	//
 	// Oldest messages are removed once limit breached.
-	MaxBytes int64 `json:"max_bytes"`
+	MaxBytes int64 `json:"max_bytes" validate:"required"`
 	// MaxBytes is the max duration (ns) the stream will store a message
 	//
 	// Messages breaching the limit will be removed.
-	MaxAge time.Duration `json:"max_age" swaggertype:"primitive,integer"`
+	MaxAge time.Duration `json:"max_age" swaggertype:"primitive,integer" validate:"required"`
 	// MaxMsgsPerSubject is the maximum number of subjects allowed on this stream
-	MaxMsgsPerSubject int64 `json:"max_msgs_per_subject"`
+	MaxMsgsPerSubject int64 `json:"max_msgs_per_subject" validate:"required"`
 	// MaxMsgSize is the max size of a message allowed in this stream
 	MaxMsgSize int32 `json:"max_msg_size,omitempty"`
 }
@@ -81,29 +81,29 @@ type APIRestRespStreamConfig struct {
 // APIRestRespStreamState adhoc structure for persenting nats.StreamState
 type APIRestRespStreamState struct {
 	// Msgs is the number of messages in the stream
-	Msgs uint64 `json:"messages"`
+	Msgs uint64 `json:"messages" validate:"required"`
 	// Bytes is the number of message bytes in the stream
-	Bytes uint64 `json:"bytes"`
+	Bytes uint64 `json:"bytes" validate:"required"`
 	// FirstSeq is the oldest message sequence number on the stream
-	FirstSeq uint64 `json:"first_seq"`
+	FirstSeq uint64 `json:"first_seq" validate:"required"`
 	// FirstTime is the oldest message timestamp on the stream
-	FirstTime time.Time `json:"first_ts"`
+	FirstTime time.Time `json:"first_ts" validate:"required"`
 	// LastSeq is the newest message sequence number on the stream
-	LastSeq uint64 `json:"last_seq"`
+	LastSeq uint64 `json:"last_seq" validate:"required"`
 	// LastTime is the newest message timestamp on the stream
-	LastTime time.Time `json:"last_ts"`
+	LastTime time.Time `json:"last_ts" validate:"required"`
 	// Consumers number of consumers on the stream
-	Consumers int `json:"consumer_count"`
+	Consumers int `json:"consumer_count" validate:"required"`
 }
 
 // APIRestRespStreamInfo adhoc structure for persenting nats.StreamInfo
 type APIRestRespStreamInfo struct {
 	// Config is the stream config parameters
-	Config APIRestRespStreamConfig `json:"config"`
+	Config APIRestRespStreamConfig `json:"config" validate:"required"`
 	// Created is the stream creation timestamp
-	Created time.Time `json:"created"`
+	Created time.Time `json:"created" validate:"required"`
 	// State is the stream current state
-	State APIRestRespStreamState `json:"state"`
+	State APIRestRespStreamState `json:"state" validate:"required"`
 }
 
 // convertStreamInfo convert *nats.StreamInfo into APIRestRespStreamInfo
@@ -148,7 +148,7 @@ type APIRestRespConsumerConfig struct {
 	// MaxDeliver max number of times a message can be deliveried (including retry) to this consumer
 	MaxDeliver int `json:"max_deliver,omitempty"`
 	// AckWait duration (ns) to wait for an ACK for the delivery of a message
-	AckWait time.Duration `json:"ack_wait" swaggertype:"primitive,integer"`
+	AckWait time.Duration `json:"ack_wait" swaggertype:"primitive,integer" validate:"required"`
 	// FilterSubject sets the consumer to filter for subjects matching this NATs subject string
 	//
 	// See https://docs.nats.io/running-a-nats-service/nats_admin/jetstream_admin/naming
@@ -162,9 +162,9 @@ type APIRestRespConsumerConfig struct {
 // APIRestRespSequenceInfo adhoc structure for persenting nats.SequenceInfo
 type APIRestRespSequenceInfo struct {
 	// Consumer is consumer level sequence number
-	Consumer uint64 `json:"consumer_seq"`
+	Consumer uint64 `json:"consumer_seq" validate:"required"`
 	// Stream is stream level sequence number
-	Stream uint64 `json:"stream_seq"`
+	Stream uint64 `json:"stream_seq" validate:"required"`
 	// Last timestamp when these values updated
 	Last *time.Time `json:"last_active,omitempty"`
 }
@@ -172,28 +172,28 @@ type APIRestRespSequenceInfo struct {
 // APIRestRespConsumerInfo adhoc structure for persenting nats.ConsumerInfo
 type APIRestRespConsumerInfo struct {
 	// Stream is the name of the stream
-	Stream string `json:"stream_name"`
+	Stream string `json:"stream_name" validate:"required"`
 	// Name is the name of the consumer
-	Name string `json:"name"`
+	Name string `json:"name" validate:"required"`
 	// Created is when this consumer was defined
-	Created time.Time `json:"created"`
+	Created time.Time `json:"created" validate:"required"`
 	// Config are the consumer config parameters
-	Config APIRestRespConsumerConfig `json:"config"`
+	Config APIRestRespConsumerConfig `json:"config" validate:"required"`
 	// Delivered is the sequence number of the last message delivered
-	Delivered APIRestRespSequenceInfo `json:"delivered"`
+	Delivered APIRestRespSequenceInfo `json:"delivered" validate:"required"`
 	// AckFloor is the sequence number of the last received ACKed
 	//
 	// For messages which failed to be ACKed (retry limit reached), the floor moves up to
 	// include these message sequence numbers indicating these messages will not be retried.
-	AckFloor APIRestRespSequenceInfo `json:"ack_floor"`
+	AckFloor APIRestRespSequenceInfo `json:"ack_floor" validate:"required"`
 	// NumAckPending is the number of ACK pending / messages in-flight
-	NumAckPending int `json:"num_ack_pending"`
+	NumAckPending int `json:"num_ack_pending" validate:"required"`
 	// NumRedelivered is the number of messages redelivered
-	NumRedelivered int `json:"num_redelivered"`
+	NumRedelivered int `json:"num_redelivered" validate:"required"`
 	// NumWaiting NATS JetStream does not clearly document this
-	NumWaiting int `json:"num_waiting"`
+	NumWaiting int `json:"num_waiting" validate:"required"`
 	// NumPending is the number of message to be delivered for this consumer
-	NumPending uint64 `json:"num_pending"`
+	NumPending uint64 `json:"num_pending" validate:"required"`
 }
 
 // convertConsumerInfo convert *nats.ConsumerInfo into APIRestRespConsumerInfo
@@ -237,7 +237,7 @@ func convertConsumerInfo(original *nats.ConsumerInfo) APIRestRespConsumerInfo {
 // CreateStream godoc
 // @Summary Define new stream
 // @Description Define new JetStream stream
-// @tags Management,post,stream
+// @tags Management
 // @Accept json
 // @Produce json
 // @Param setting body management.JSStreamParam true "JetStream stream setting"
@@ -306,7 +306,7 @@ type APIRestRespAllJetStreams struct {
 // GetAllStreams godoc
 // @Summary Query for info on all streams
 // @Description Query for the details of all streams
-// @tags Management,get,stream
+// @tags Management
 // @Produce json
 // @Param setting body management.JSStreamParam true "JetStream stream setting"
 // @Success 200 {object} APIRestRespAllJetStreams "success"
@@ -349,7 +349,7 @@ type APIRestRespOneJetStream struct {
 // GetStream godoc
 // @Summary Query for info on one stream
 // @Description Query for the details of one stream
-// @tags Management,get,stream
+// @tags Management
 // @Produce json
 // @Param streamName path string true "JetStream stream name"
 // @Success 200 {object} APIRestRespOneJetStream "success"
@@ -421,7 +421,7 @@ type APIRestReqStreamSubjects struct {
 // ChangeStreamSubjects godoc
 // @Summary Change subjects of a stream
 // @Description Change the list of subjects of interest for a stream
-// @tags Management,put,stream
+// @tags Management
 // @Accept json
 // @Produce json
 // @Param streamName path string true "JetStream stream name"
@@ -501,7 +501,7 @@ func (h APIRestJetStreamManagementHandler) ChangeStreamSubjectsHandler() http.Ha
 // UpdateStreamLimits godoc
 // @Summary Change limits a stream
 // @Description Change the data retention limits of a stream
-// @tags Management,put,stream
+// @tags Management
 // @Accept json
 // @Produce json
 // @Param streamName path string true "JetStream stream name"
@@ -574,7 +574,7 @@ func (h APIRestJetStreamManagementHandler) UpdateStreamLimitsHandler() http.Hand
 // DeleteStream godoc
 // @Summary Delete a stream
 // @Description Delete a stream
-// @tags Management,delete,stream
+// @tags Management
 // @Produce json
 // @Param streamName path string true "JetStream stream name"
 // @Success 200 {object} StandardResponse "success"
@@ -638,7 +638,7 @@ func (h APIRestJetStreamManagementHandler) DeleteStreamHandler() http.HandlerFun
 // CreateConsumer godoc
 // @Summary Create a consumer on a stream
 // @Description Create a new consumer on a stream. The stream must already be defined.
-// @tags Management,post,consumer
+// @tags Management
 // @Accept json
 // @Produce json
 // @Param streamName path string true "JetStream stream name"
@@ -716,7 +716,7 @@ type APIRestRespAllJetStreamConsumers struct {
 // GetAllConsumers godoc
 // @Summary Get all consumers of a stream
 // @Description Query for the details of all consumers of a stream
-// @tags Management,get,consumer
+// @tags Management
 // @Produce json
 // @Param streamName path string true "JetStream stream name"
 // @Success 200 {object} APIRestRespAllJetStreamConsumers "success"
@@ -784,7 +784,7 @@ type APIRestRespOneJetStreamConsumer struct {
 // GetConsumer godoc
 // @Summary Get one consumer of a stream
 // @Description Query for the details of a consumer on a stream
-// @tags Management,get,consumer
+// @tags Management
 // @Produce json
 // @Param streamName path string true "JetStream stream name"
 // @Param consumerName path string true "JetStream consumer name"
@@ -858,7 +858,7 @@ func (h APIRestJetStreamManagementHandler) GetConsumerHandler() http.HandlerFunc
 // DeleteConsumer godoc
 // @Summary Delete one consumer of a stream
 // @Description Delete one consumer of a stream
-// @tags Management,delete,consumer
+// @tags Management
 // @Produce json
 // @Param streamName path string true "JetStream stream name"
 // @Param consumerName path string true "JetStream consumer name"
@@ -930,7 +930,7 @@ func (h APIRestJetStreamManagementHandler) DeleteConsumerHandler() http.HandlerF
 // Alive godoc
 // @Summary For liveness check
 // @Description Will return success to indicate REST API module is live
-// @tags Management,get,health
+// @tags Management
 // @Produce json
 // @Success 200 {object} StandardResponse "success"
 // @Failure 400 {string} string "error"
@@ -954,7 +954,7 @@ func (h APIRestJetStreamManagementHandler) AliveHandler() http.HandlerFunc {
 // Ready godoc
 // @Summary For readiness check
 // @Description Will return success if REST API module is ready for use
-// @tags Management,get,health
+// @tags Management
 // @Produce json
 // @Success 200 {object} StandardResponse "success"
 // @Failure 400 {string} string "error"

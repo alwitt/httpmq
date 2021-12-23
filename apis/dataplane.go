@@ -78,7 +78,7 @@ func GetAPIRestJetStreamDataplaneHandler(
 // PublishMessage godoc
 // @Summary Publish a message
 // @Description Publish a Base64 encoded message to a JetStream subject
-// @tags Dataplane,post,publish
+// @tags Dataplane
 // @Accept plain
 // @Produce json
 // @Param subjectName path string true "JetStream subject to publish under"
@@ -170,7 +170,7 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessageHandler() http.HandlerFu
 // ReceiveMsgACK godoc
 // @Summary Handle ACK for message
 // @Description Process JetStream message ACK for a stream / consumer
-// @tags Dataplane,post,subscribe
+// @tags Dataplane
 // @Accept json
 // @Produce json
 // @Param streamName path string true "JetStream stream name"
@@ -268,7 +268,7 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACKHandler() http.HandlerFun
 // @Description Establish a JetStream pull subscribe session for a client. This is a long lived
 // server send event stream. The stream will close on client disconnect, server shutdown, or
 // server internal error.
-// @tags Dataplane,get,subscribe
+// @tags Dataplane
 // @Produce json
 // @Param streamName path string true "JetStream stream name"
 // @Param consumerName path string true "JetStream consumer name"
@@ -549,7 +549,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribeHandler() http.HandlerFun
 // Alive godoc
 // @Summary For liveness check
 // @Description Will return success to indicate REST API module is live
-// @tags Dataplane,get,health
+// @tags Dataplane
 // @Produce json
 // @Success 200 {object} StandardResponse "success"
 // @Failure 400 {string} string "error"
@@ -573,7 +573,7 @@ func (h APIRestJetStreamDataplaneHandler) AliveHandler() http.HandlerFunc {
 // Ready godoc
 // @Summary For readiness check
 // @Description Will return success if REST API module is ready for use
-// @tags Dataplane,get,health
+// @tags Dataplane
 // @Produce json
 // @Success 200 {object} StandardResponse "success"
 // @Failure 400 {string} string "error"

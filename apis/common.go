@@ -29,7 +29,7 @@ import (
 // ErrorDetail is the response detail in case of error
 type ErrorDetail struct {
 	// Code is the response code
-	Code int `json:"code"`
+	Code int `json:"code" validate:"required"`
 	// Msg is an optional descriptive message
 	Msg *string `json:"message,omitempty"`
 }
@@ -37,7 +37,7 @@ type ErrorDetail struct {
 // StandardResponse standard REST API response
 type StandardResponse struct {
 	// Success indicates whether the request was successful
-	Success bool `json:"success"`
+	Success bool `json:"success" validate:"required"`
 	// Error are details in case of errors
 	Error *ErrorDetail `json:"error,omitempty"`
 }
