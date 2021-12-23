@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/alwitt/httpmq/common"
 	"github.com/apex/log"
@@ -109,7 +110,22 @@ func (h APIRestHandler) reply(
 		log.WithError(err).WithFields(localLogTags).Errorf(
 			"Failed to write REST response for %s", restCall,
 		)
+		return
 	}
+	// Produce a final log logging all aspects of the request
+	localLogTags["response_code"] = respCode
+	{
+		t, _ := json.Marshal(&resp)
+		localLogTags["response_size"] = len(t)
+	}
+	localLogTags["response_timestamp"] = time.Now().UTC().Format(time.RFC3339Nano)
+	// Request params
+	for headerField, headerValues := range r.Header {
+		localLogTags[headerField] = headerValues
+	}
+	localLogTags["host"] = r.Host
+	localLogTags["referer"] = r.Referer()
+	log.WithFields(localLogTags).Warn("Request complete")
 }
 
 // Write logging support
@@ -129,7 +145,9 @@ func (h APIRestHandler) attachRequestID(next http.HandlerFunc) http.HandlerFunc 
 			reqID = uuid.New().String()
 		}
 		// Construct new request param tracking
-		params := common.RequestParam{ID: reqID, Method: r.Method, URI: r.URL.String()}
+		params := common.RequestParam{
+			ID: reqID, Method: r.Method, URI: r.URL.String(), Timestamp: time.Now(),
+		}
 		log.WithFields(localLogTags).Debugf("New request ID %s", reqID)
 		ctx := context.WithValue(r.Context(), common.RequestParam{}, params)
 

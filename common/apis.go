@@ -16,6 +16,7 @@ package common
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/apex/log"
 )
@@ -28,6 +29,8 @@ type RequestParam struct {
 	Method string `json:"method" `
 	// URI is the request URI
 	URI string `json:"uri"`
+	// Timestamp is when the request is first received
+	Timestamp time.Time
 }
 
 // UpdateLogTags updates Apex log.Fields map with values the requests's parameters
@@ -35,4 +38,5 @@ func (i *RequestParam) UpdateLogTags(tags log.Fields) {
 	tags["request_id"] = i.ID
 	tags["request_method"] = i.Method
 	tags["request_uri"] = fmt.Sprintf("'%s'", i.URI)
+	tags["request_timestamp"] = i.Timestamp.UTC().Format(time.RFC3339Nano)
 }

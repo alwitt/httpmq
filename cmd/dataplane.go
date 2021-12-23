@@ -26,7 +26,6 @@ import (
 	"github.com/alwitt/httpmq/dataplane"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/net/http2"
@@ -146,11 +145,6 @@ func RunDataplaneServer(
 	})
 	_ = apis.RegisterPathPrefix(mainRouter, "/ready", map[string]http.HandlerFunc{
 		"get": httpHandler.ReadyHandler(),
-	})
-
-	// Add logging
-	router.Use(func(next http.Handler) http.Handler {
-		return handlers.CombinedLoggingHandler(httpHandler, next)
 	})
 
 	serverListen := fmt.Sprintf(":%d", params.ServerPort)
