@@ -308,7 +308,6 @@ type APIRestRespAllJetStreams struct {
 // @Description Query for the details of all streams
 // @tags Management
 // @Produce json
-// @Param setting body management.JSStreamParam true "JetStream stream setting"
 // @Success 200 {object} APIRestRespAllJetStreams "success"
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
