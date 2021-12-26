@@ -39,10 +39,11 @@ type natsArgs struct {
 }
 
 type cliArgs struct {
-	JSONLog  bool
-	LogLevel string   `validate:"required,oneof=debug info warn error"`
-	NATS     natsArgs `validate:"required,dive"`
-	Hostname string
+	JSONLog     bool
+	LogLevel    string   `validate:"required,oneof=debug info warn error"`
+	NATS        natsArgs `validate:"required,dive"`
+	Hostname    string
+	IdleTimeout time.Duration
 	// For various subcommands
 	Management cmd.ManagementCLIArgs `validate:"-"`
 	Dataplane  cmd.DataplaneCLIArgs  `validate:"-"`
@@ -53,7 +54,7 @@ var cmdArgs cliArgs
 var logTags log.Fields
 
 // @title httpmq
-// @version v0.1.2
+// @version v0.1.3
 // @description HTTP/2 based message broker built around NATS JetStream
 
 // @host localhost:3000
@@ -72,7 +73,7 @@ func main() {
 	}
 
 	app := &cli.App{
-		Version:     "v0.1.2",
+		Version:     "v0.1.3",
 		Usage:       "application entrypoint",
 		Description: "HTTP/2 based message broker built around NATS JetStream",
 		Flags: []cli.Flag{
@@ -95,6 +96,17 @@ func main() {
 				Value:       "warn",
 				DefaultText: "warn",
 				Destination: &cmdArgs.LogLevel,
+				Required:    false,
+			},
+			// General
+			&cli.DurationFlag{
+				Name:        "http-idle-timeout",
+				Usage:       "HTTP connection idle timeout",
+				Aliases:     []string{"t"},
+				EnvVars:     []string{"HTTP_CONNECTION_IDLE_TIMEOUT"},
+				Value:       time.Hour,
+				DefaultText: "1h",
+				Destination: &cmdArgs.IdleTimeout,
 				Required:    false,
 			},
 			// NATs
@@ -268,7 +280,9 @@ func startManagementServer(c *cli.Context) error {
 
 	signalRecvSetup(wg, rtCancel)
 
-	return cmd.RunManagementServer(runTimeContext, cmdArgs.Management, cmdArgs.Hostname, js)
+	return cmd.RunManagementServer(
+		runTimeContext, cmdArgs.Management, cmdArgs.IdleTimeout, cmdArgs.Hostname, js,
+	)
 }
 
 // ============================================================================
@@ -295,6 +309,6 @@ func startDataplaneServer(c *cli.Context) error {
 	signalRecvSetup(wg, rtCancel)
 
 	return cmd.RunDataplaneServer(
-		runTimeContext, cmdArgs.Dataplane, cmdArgs.Hostname, js, wg,
+		runTimeContext, cmdArgs.Dataplane, cmdArgs.IdleTimeout, cmdArgs.Hostname, js, wg,
 	)
 }

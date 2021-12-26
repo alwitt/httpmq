@@ -74,6 +74,7 @@ func GetDataplaneCLIFlags(args *DataplaneCLIArgs) []cli.Flag {
 func RunDataplaneServer(
 	runTimeContext context.Context,
 	params DataplaneCLIArgs,
+	idleTimeout time.Duration,
 	instance string,
 	natsClient *core.NatsClient,
 	wg *sync.WaitGroup,
@@ -151,6 +152,8 @@ func RunDataplaneServer(
 	httpSrv := &http.Server{
 		Addr:         serverListen,
 		WriteTimeout: time.Second * 60,
+		ReadTimeout:  time.Second * 60,
+		IdleTimeout:  idleTimeout,
 		Handler:      h2c.NewHandler(router, &http2.Server{}),
 	}
 

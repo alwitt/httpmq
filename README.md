@@ -77,7 +77,7 @@ $ make test
 By default, the server application is `httpmq.bin`.
 
 ```shell
-$ ./httpmq.bin -h
+$ ./httpmq.bin --help
 NAME:
    httpmq.bin - application entrypoint
 
@@ -85,7 +85,7 @@ USAGE:
    httpmq.bin [global options] command [command options] [arguments...]
 
 VERSION:
-   v0.1.0
+   v0.1.3
 
 DESCRIPTION:
    HTTP/2 based message broker built around NATS JetStream
@@ -98,6 +98,7 @@ COMMANDS:
 GLOBAL OPTIONS:
    --json-log, -j                                     Whether to log in JSON format (default: false) [$LOG_AS_JSON]
    --log-level value, -l value                        Logging level: [debug info warn error] (default: warn) [$LOG_LEVEL]
+   --http-idle-timeout value, -t value                HTTP connection idle timeout (default: 1h) [$HTTP_CONNECTION_IDLE_TIMEOUT]
    --nats-server-uri value, --nsu value               NATS server URI (default: nats://127.0.0.1:4222) [$NATS_SERVER_URI]
    --nats-connect-timeout value, --ncto value         NATS connection timeout (default: 15s) [$NATS_CONNECT_TIMEOUT]
    --nats-reconnect-wait value, --nrcw value          NATS duration between reconnect attempts (default: 15s) [$NATS_RECONNECT_WAIT]

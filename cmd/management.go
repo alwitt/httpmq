@@ -73,6 +73,7 @@ func GetManagementCLIFlags(args *ManagementCLIArgs) []cli.Flag {
 func RunManagementServer(
 	runtimeContext context.Context,
 	params ManagementCLIArgs,
+	idleTimeout time.Duration,
 	instance string,
 	natsClient *core.NatsClient,
 ) error {
@@ -153,6 +154,7 @@ func RunManagementServer(
 		Addr:         serverListen,
 		WriteTimeout: time.Second * 60,
 		ReadTimeout:  time.Second * 60,
+		IdleTimeout:  idleTimeout,
 		Handler:      h2c.NewHandler(router, &http2.Server{}),
 	}
 
