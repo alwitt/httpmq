@@ -263,6 +263,12 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACKHandler() http.HandlerFun
 
 // -----------------------------------------------------------------------
 
+// APIRestRespDataMessage wrapper object for one message from a stream
+type APIRestRespDataMessage struct {
+	StandardResponse
+	dataplane.MsgToDeliver
+}
+
 // PushSubscribe godoc
 // @Summary Establish a pull subscribe session
 // @Description Establish a JetStream pull subscribe session for a client. This is a long lived
@@ -275,7 +281,7 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACKHandler() http.HandlerFun
 // @Param subject_name query string true "JetStream subject to subscribe to"
 // @Param max_msg_inflight query integer false "Max number of inflight messages (DEFAULT: 1)"
 // @Param delivery_group query string false "Needed if consumer uses delivery groups"
-// @Success 200 {object} StandardResponse "success"
+// @Success 200 {object} APIRestRespDataMessage "success"
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
@@ -492,7 +498,10 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 			// Request closed
 			complete = true
 			log.WithFields(logTags).Info("Terminating PUSH subscription on request end")
-			h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
+			resp := APIRestRespDataMessage{
+				StandardResponse: getStdRESTSuccessMsg(),
+			}
+			h.reply(w, http.StatusOK, resp, restCall, r)
 		case err, ok := <-internalError:
 			// Internal system error
 			if ok {
@@ -510,8 +519,12 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 					onError(err, "Failed to convert message for transmission")
 					break
 				}
+				resp := APIRestRespDataMessage{
+					StandardResponse: StandardResponse{Success: true},
+					MsgToDeliver:     converted,
+				}
 				// Serialize as JSON
-				serialize, err := json.Marshal(&converted)
+				serialize, err := json.Marshal(&resp)
 				if err != nil {
 					onError(err, "Failed to serialize message for transmission")
 					break

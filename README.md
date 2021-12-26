@@ -302,7 +302,7 @@ curl http://127.0.0.1:3001/v1/data/stream/test-stream-00/consumer/test-consumer-
 
 ```shell
 $ curl http://127.0.0.1:3001/v1/data/stream/test-stream-00/consumer/test-consumer-00?subject_name=test-subject.01 --http2-prior-knowledge
-{"stream":"test-stream-00","subject":"test-subject.01","consumer":"test-consumer-00","sequence":{"stream":1,"consumer":1},"b64_msg":"SGVsbG8gV29ybGQK"}
+{"success":true,"stream":"test-stream-00","subject":"test-subject.01","consumer":"test-consumer-00","sequence":{"stream":1,"consumer":1},"b64_msg":"SGVsbG8gV29ybGQK"}
 ```
 
 After receiving a message, acknowledge receiving the message with
@@ -316,7 +316,7 @@ The `consumer` and `stream` fields are the sequence numbers which came with the 
 If an acknowledgement is not sent within the consumer's configured max ACK wait duration, the message will be sent through this consumer's subscription again. This time, the `stream` sequence number is unchanged, but the `consumer` sequence number is increased by one.
 
 ```shell
-{"stream":"test-stream-00","subject":"test-subject.01","consumer":"test-consumer-00","sequence":{"stream":1,"consumer":2},"b64_msg":"SGVsbG8gV29ybGQK"}
+{"success":true,"stream":"test-stream-00","subject":"test-subject.01","consumer":"test-consumer-00","sequence":{"stream":1,"consumer":2},"b64_msg":"SGVsbG8gV29ybGQK"}
 ```
 
 When acknowledging this message now, use `'{"consumer": 2,"stream": 1}'` as the payload.
