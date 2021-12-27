@@ -52,7 +52,7 @@ type JSStreamLimits struct {
 // JSStreamParam are the parameters for defining a stream
 type JSStreamParam struct {
 	// Name is the stream name
-	Name string `json:"name" validate:"required,alphaunicode|uuid"`
+	Name string `json:"name" validate:"required,alphanum|uuid"`
 	// Subjects is the list of subjects of interest for this stream
 	Subjects []string `json:"subjects,omitempty"`
 	// JSStreamLimits stream data retention limits
@@ -62,7 +62,7 @@ type JSStreamParam struct {
 // JetStreamConsumerParam are the parameters for defining a consumer on a stream
 type JetStreamConsumerParam struct {
 	// Name is the consumer name
-	Name string `json:"name" validate:"required,alphaunicode|uuid"`
+	Name string `json:"name" validate:"required,alphanum|uuid"`
 	// Notes are descriptions regarding this consumer
 	Notes string `json:"notes,omitempty"`
 	// FilterSubject sets the consumer to filter for subjects matching this NATs subject string
@@ -74,7 +74,7 @@ type JetStreamConsumerParam struct {
 	// A consumer using delivery group allows multiple clients to subscribe under the same consumer
 	// and group name tuple. For subjects this consumer listens to, the messages will be shared
 	// amongst the connected clients.
-	DeliveryGroup *string `json:"delivery_group,omitempty" validate:"omitempty,alphaunicode|uuid"`
+	DeliveryGroup *string `json:"delivery_group,omitempty" validate:"omitempty,alphanum|uuid"`
 	// MaxInflight is max number of un-ACKed message permitted in-flight (must be >= 1)
 	MaxInflight int `json:"max_inflight" validate:"required,gte=1"`
 	// MaxRetry max number of times an un-ACKed message is resent (-1: infinite)

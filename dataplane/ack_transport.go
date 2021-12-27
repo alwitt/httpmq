@@ -38,9 +38,9 @@ type AckSeqNum struct {
 // AckIndication is the ACK of a NATs JetStream message which contains its key parameters
 type AckIndication struct {
 	// Stream is the name of the stream
-	Stream string `json:"stream" validate:"required,alphaunicode|uuid"`
+	Stream string `json:"stream" validate:"required,alphanum|uuid"`
 	// Consumer is the name of the consumer
-	Consumer string `json:"consumer" validate:"required,alphaunicode|uuid"`
+	Consumer string `json:"consumer" validate:"required,alphanum|uuid"`
 	// SeqNum is the sequence number of the JetStream message
 	SeqNum AckSeqNum `json:"seq_num" validate:"required,dive"`
 }

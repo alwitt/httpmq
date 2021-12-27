@@ -41,9 +41,9 @@ func msgToString(msg *nats.Msg) string {
 
 // wrapperForValidation a helper structure used for validation naming tuples
 type wrapperForValidation struct {
-	Stream        string  `validate:"alphaunicode|uuid"`
-	Consumer      string  `validate:"alphaunicode|uuid"`
-	DeliveryGroup *string `validate:"omitempty,alphaunicode|uuid"`
+	Stream        string  `validate:"alphanum|uuid"`
+	Consumer      string  `validate:"alphanum|uuid"`
+	DeliveryGroup *string `validate:"omitempty,alphanum|uuid"`
 	Subject       *string
 }
 
@@ -71,11 +71,11 @@ type MsgToDeliverSeq struct {
 // MsgToDeliver a structure for representing a message to send out to a subscribing client
 type MsgToDeliver struct {
 	// Stream is the name of the stream
-	Stream string `json:"stream" validate:"required,alphaunicode|uuid"`
+	Stream string `json:"stream" validate:"required,alphanum|uuid"`
 	// Subject is the name of the subject / subject filter
 	Subject string `json:"subject" validate:"required"`
 	// Consumer is the name of the consumer
-	Consumer string `json:"consumer" validate:"required,alphaunicode|uuid"`
+	Consumer string `json:"consumer" validate:"required,alphanum|uuid"`
 	// Sequence is the sequence numbers for this JetStream message
 	Sequence MsgToDeliverSeq `json:"sequence" validate:"required,dive"`
 	// Message is the message body

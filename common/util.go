@@ -64,7 +64,7 @@ func UpdateLogTags(ctxt context.Context, original log.Fields) (log.Fields, error
 //  * not include illegal characters
 func ValidateTopLevelEntityName(name string, validate *validator.Validate) error {
 	type nameWrapper struct {
-		Name string `validate:"alphaunicode|uuid"`
+		Name string `validate:"alphanum|uuid"`
 	}
 	t := nameWrapper{Name: name}
 

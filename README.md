@@ -177,7 +177,7 @@ Start by defining a JetStream stream
 curl -X POST 'http://127.0.0.1:3000/v1/admin/stream' \
 --header 'Content-Type: application/json' \
 --data-raw '{
-    "name": "test-stream-00",
+    "name": "testStream00",
     "max_age": 300000000000,
     "subjects": [
         "test-subject.00",
@@ -191,7 +191,7 @@ Response should be `{"success":true}`.
 Verify the stream is defined
 
 ```shell
-curl 'http://127.0.0.1:3000/v1/admin/stream/test-stream-00'
+curl 'http://127.0.0.1:3000/v1/admin/stream/testStream00'
 ```
 
 ```json
@@ -199,7 +199,7 @@ curl 'http://127.0.0.1:3000/v1/admin/stream/test-stream-00'
   "success": true,
   "stream": {
     "config": {
-      "name": "test-stream-00",
+      "name": "testStream00",
       "subjects": [
         "test-subject.00",
         "test-subject.01"
@@ -207,11 +207,11 @@ curl 'http://127.0.0.1:3000/v1/admin/stream/test-stream-00'
       "max_consumers": -1,
       "max_msgs": -1,
       "max_bytes": -1,
-      "max_age": 600000000000,
+      "max_age": 300000000000,
       "max_msgs_per_subject": -1,
       "max_msg_size": -1
     },
-    "created": "2021-12-19T23:55:13.785157429Z",
+    "created": "2021-12-27T18:26:48.419816409Z",
     "state": {
       "messages": 0,
       "bytes": 0,
@@ -219,7 +219,7 @@ curl 'http://127.0.0.1:3000/v1/admin/stream/test-stream-00'
       "first_ts": "0001-01-01T00:00:00Z",
       "last_seq": 0,
       "last_ts": "0001-01-01T00:00:00Z",
-      "consumer_count": 1
+      "consumer_count": 0
     }
   }
 }
@@ -228,12 +228,12 @@ curl 'http://127.0.0.1:3000/v1/admin/stream/test-stream-00'
 Define a consumer for the stream
 
 ```shell
-curl -X POST 'http://127.0.0.1:3000/v1/admin/stream/test-stream-00/consumer' \
+curl -X POST 'http://127.0.0.1:3000/v1/admin/stream/testStream00/consumer' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "max_inflight": 4,
     "mode": "push",
-    "name": "test-consumer-00",
+    "name": "testConsumer00",
     "filter_subject": "test-subject.01"
 }'
 ```
@@ -243,36 +243,36 @@ Response should be `{"success":true}`.
 Verify the consumer is defined
 
 ```shell
-curl 'http://127.0.0.1:3000/v1/admin/stream/test-stream-00/consumer/test-consumer-00'
+curl 'http://127.0.0.1:3000/v1/admin/stream/testStream00/consumer/testConsumer00'
 ```
 
 ```json
 {
-    "success": true,
-    "consumer": {
-        "stream_name": "test-stream-00",
-        "name": "test-consumer-00",
-        "created": "2021-12-08T18:28:39.508206919Z",
-        "config": {
-            "deliver_subject": "_INBOX.bw26u2OqnVvhimXiT6RTeg",
-            "max_deliver": -1,
-            "ack_wait": 30000000000,
-            "filter_subject": "test-subject.01",
-            "max_ack_pending": 4
-        },
-        "delivered": {
-            "consumer_seq": 0,
-            "stream_seq": 0
-        },
-        "ack_floor": {
-            "consumer_seq": 0,
-            "stream_seq": 0
-        },
-        "num_ack_pending": 0,
-        "num_redelivered": 0,
-        "num_waiting": 0,
-        "num_pending": 0
-    }
+  "success": true,
+  "consumer": {
+    "stream_name": "testStream00",
+    "name": "testConsumer00",
+    "created": "2021-12-27T18:27:58.055568398Z",
+    "config": {
+      "deliver_subject": "_INBOX.NZbAf8BCfeTA5s4Yxwnxnh",
+      "max_deliver": -1,
+      "ack_wait": 30000000000,
+      "filter_subject": "test-subject.01",
+      "max_ack_pending": 4
+    },
+    "delivered": {
+      "consumer_seq": 0,
+      "stream_seq": 0
+    },
+    "ack_floor": {
+      "consumer_seq": 0,
+      "stream_seq": 0
+    },
+    "num_ack_pending": 0,
+    "num_redelivered": 0,
+    "num_waiting": 0,
+    "num_pending": 0
+  }
 }
 ```
 
@@ -298,18 +298,18 @@ curl -X POST 'http://127.0.0.1:3001/v1/data/subject/test-subject.01' --header 'C
 To subscribe to messages for a consumer on a stream
 
 ```shell
-curl http://127.0.0.1:3001/v1/data/stream/test-stream-00/consumer/test-consumer-00?subject_name=test-subject.01 --http2-prior-knowledge
+curl http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testConsumer00?subject_name=test-subject.01 --http2-prior-knowledge
 ```
 
 ```shell
-$ curl http://127.0.0.1:3001/v1/data/stream/test-stream-00/consumer/test-consumer-00?subject_name=test-subject.01 --http2-prior-knowledge
-{"success":true,"stream":"test-stream-00","subject":"test-subject.01","consumer":"test-consumer-00","sequence":{"stream":1,"consumer":1},"b64_msg":"SGVsbG8gV29ybGQK"}
+$ curl http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testConsumer00?subject_name=test-subject.01 --http2-prior-knowledge
+{"success":true,"stream":"testStream00","subject":"test-subject.01","consumer":"testConsumer00","sequence":{"stream":1,"consumer":1},"b64_msg":"SGVsbG8gV29ybGQK"}
 ```
 
 After receiving a message, acknowledge receiving the message with
 
 ```shell
-curl -X POST 'http://127.0.0.1:3001/v1/data/stream/test-stream-00/consumer/test-consumer-00/ack' --header 'Content-Type: application/json' --data-raw '{"consumer": 1,"stream": 1}'
+curl -X POST 'http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testConsumer00/ack' --header 'Content-Type: application/json' --data-raw '{"consumer": 1,"stream": 1}'
 ```
 
 The `consumer` and `stream` fields are the sequence numbers which came with the message.
@@ -317,7 +317,7 @@ The `consumer` and `stream` fields are the sequence numbers which came with the 
 If an acknowledgement is not sent within the consumer's configured max ACK wait duration, the message will be sent through this consumer's subscription again. This time, the `stream` sequence number is unchanged, but the `consumer` sequence number is increased by one.
 
 ```shell
-{"success":true,"stream":"test-stream-00","subject":"test-subject.01","consumer":"test-consumer-00","sequence":{"stream":1,"consumer":2},"b64_msg":"SGVsbG8gV29ybGQK"}
+{"success":true,"stream":"testStream00","subject":"test-subject.01","consumer":"testConsumer00","sequence":{"stream":1,"consumer":2},"b64_msg":"SGVsbG8gV29ybGQK"}
 ```
 
 When acknowledging this message now, use `'{"consumer": 2,"stream": 1}'` as the payload.
