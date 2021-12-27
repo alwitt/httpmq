@@ -30,29 +30,29 @@ import (
 // JSStreamLimits is the set of stream data retention settings
 type JSStreamLimits struct {
 	// MaxConsumers is the max number of consumers allowed on the stream
-	MaxConsumers *int `json:"max_consumers,omitempty"`
+	MaxConsumers *int `json:"max_consumers,omitempty" validate:"omitempty,gte=-1"`
 	// MaxMsgs is the max number of messages the stream will store.
 	//
 	// Oldest messages are removed once limit breached.
-	MaxMsgs *int64 `json:"max_msgs,omitempty"`
+	MaxMsgs *int64 `json:"max_msgs,omitempty" validate:"omitempty,gte=-1"`
 	// MaxBytes is the max number of message bytes the stream will store.
 	//
 	// Oldest messages are removed once limit breached.
-	MaxBytes *int64 `json:"max_bytes,omitempty"`
+	MaxBytes *int64 `json:"max_bytes,omitempty" validate:"omitempty,gte=-1"`
 	// MaxAge is the max duration (ns) the stream will store a message
 	//
 	// Messages breaching the limit will be removed.
 	MaxAge *time.Duration `json:"max_age,omitempty" swaggertype:"primitive,integer"`
 	// MaxMsgsPerSubject is the maximum number of subjects allowed on this stream
-	MaxMsgsPerSubject *int64 `json:"max_msgs_per_subject,omitempty"`
+	MaxMsgsPerSubject *int64 `json:"max_msgs_per_subject,omitempty" validate:"omitempty,gte=-1"`
 	// MaxMsgSize is the max size of a message allowed in this stream
-	MaxMsgSize *int32 `json:"max_msg_size,omitempty"`
+	MaxMsgSize *int32 `json:"max_msg_size,omitempty" validate:"omitempty,gte=-1"`
 }
 
 // JSStreamParam are the parameters for defining a stream
 type JSStreamParam struct {
 	// Name is the stream name
-	Name string `json:"name" validate:"required"`
+	Name string `json:"name" validate:"required,alphaunicode|uuid"`
 	// Subjects is the list of subjects of interest for this stream
 	Subjects []string `json:"subjects,omitempty"`
 	// JSStreamLimits stream data retention limits
@@ -62,7 +62,7 @@ type JSStreamParam struct {
 // JetStreamConsumerParam are the parameters for defining a consumer on a stream
 type JetStreamConsumerParam struct {
 	// Name is the consumer name
-	Name string `json:"name" validate:"required"`
+	Name string `json:"name" validate:"required,alphaunicode|uuid"`
 	// Notes are descriptions regarding this consumer
 	Notes string `json:"notes,omitempty"`
 	// FilterSubject sets the consumer to filter for subjects matching this NATs subject string
@@ -74,7 +74,7 @@ type JetStreamConsumerParam struct {
 	// A consumer using delivery group allows multiple clients to subscribe under the same consumer
 	// and group name tuple. For subjects this consumer listens to, the messages will be shared
 	// amongst the connected clients.
-	DeliveryGroup *string `json:"delivery_group,omitempty"`
+	DeliveryGroup *string `json:"delivery_group,omitempty" validate:"omitempty,alphaunicode|uuid"`
 	// MaxInflight is max number of un-ACKed message permitted in-flight (must be >= 1)
 	MaxInflight int `json:"max_inflight" validate:"required,gte=1"`
 	// MaxRetry max number of times an un-ACKed message is resent (-1: infinite)
@@ -187,6 +187,12 @@ func (js jetStreamControllerImpl) GetStream(
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Failed to update logtags")
 	}
+	if err := common.ValidateTopLevelEntityName(name, js.validate); err != nil {
+		log.WithError(err).WithFields(localLogTags).Errorf(
+			"Unable to query for stream '%s'", name,
+		)
+		return nil, err
+	}
 	info, err := js.core.JetStream().StreamInfo(name)
 	if err != nil {
 		log.WithError(err).WithFields(localLogTags).Errorf("Unable to get stream %s info", name)
@@ -227,6 +233,14 @@ func (js jetStreamControllerImpl) CreateStream(ctxt context.Context, param JSStr
 		log.WithError(err).WithFields(localLogTags).Error("Stream create parameters invalid")
 		return err
 	}
+	for _, subject := range param.Subjects {
+		if err := common.ValidateSubjectName(subject); err != nil {
+			log.WithError(err).WithFields(localLogTags).Errorf(
+				"Unable to define new stream %s", param.Name,
+			)
+			return err
+		}
+	}
 
 	// Convert to JetStream structure
 	jsParams := nats.StreamConfig{
@@ -250,6 +264,12 @@ func (js jetStreamControllerImpl) DeleteStream(ctxt context.Context, name string
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Failed to update logtags")
 	}
+	if err := common.ValidateTopLevelEntityName(name, js.validate); err != nil {
+		log.WithError(err).WithFields(localLogTags).Errorf(
+			"Unable to delete stream '%s'", name,
+		)
+		return err
+	}
 	if err := js.core.JetStream().DeleteStream(name); err != nil {
 		log.WithError(err).WithFields(localLogTags).Errorf("Unable to delete stream %s", name)
 		return err
@@ -265,6 +285,20 @@ func (js jetStreamControllerImpl) ChangeStreamSubjects(
 	localLogTags, err := common.UpdateLogTags(ctxt, js.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Failed to update logtags")
+	}
+	if err := common.ValidateTopLevelEntityName(stream, js.validate); err != nil {
+		log.WithError(err).WithFields(localLogTags).Errorf(
+			"Unable to update stream '%s' subjects", stream,
+		)
+		return err
+	}
+	for _, subject := range newSubjects {
+		if err := common.ValidateSubjectName(subject); err != nil {
+			log.WithError(err).WithFields(localLogTags).Errorf(
+				"Unable to update stream %s target subjects", stream,
+			)
+			return err
+		}
 	}
 	info, err := js.core.JetStream().StreamInfo(stream)
 	if err != nil {
@@ -293,6 +327,18 @@ func (js jetStreamControllerImpl) UpdateStreamLimits(
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Failed to update logtags")
 	}
+	if err := common.ValidateTopLevelEntityName(stream, js.validate); err != nil {
+		log.WithError(err).WithFields(localLogTags).Errorf(
+			"Unable to update stream '%s' retention limits", stream,
+		)
+		return err
+	}
+	if err := js.validate.Struct(&newLimits); err != nil {
+		log.WithError(err).WithFields(localLogTags).Errorf(
+			"Unable to update stream '%s' retention limits", stream,
+		)
+		return err
+	}
 	info, err := js.core.JetStream().StreamInfo(stream)
 	if err != nil {
 		log.WithError(err).WithFields(localLogTags).Errorf("Unable to get stream %s info", stream)
@@ -318,6 +364,12 @@ func (js jetStreamControllerImpl) GetAllConsumersForStream(
 	ctxt context.Context, stream string,
 ) map[string]*nats.ConsumerInfo {
 	localLogTags, _ := common.UpdateLogTags(ctxt, js.LogTags)
+	if err := common.ValidateTopLevelEntityName(stream, js.validate); err != nil {
+		log.WithError(err).WithFields(localLogTags).Errorf(
+			"Unable to list consumers of stream '%s'", stream,
+		)
+		return nil
+	}
 	readChan := js.core.JetStream().ConsumersInfo(stream)
 	knownConsumer := map[string]*nats.ConsumerInfo{}
 	readAll := false
@@ -346,6 +398,18 @@ func (js jetStreamControllerImpl) GetConsumerForStream(
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Failed to update logtags")
 	}
+	if err := common.ValidateTopLevelEntityName(stream, js.validate); err != nil {
+		log.WithError(err).WithFields(localLogTags).Errorf(
+			"Unable to list consumers of stream '%s'", stream,
+		)
+		return nil, err
+	}
+	if err := common.ValidateTopLevelEntityName(consumerName, js.validate); err != nil {
+		log.WithError(err).WithFields(localLogTags).Errorf(
+			"Unable to fetch consumer '%s' of stream '%s'", consumerName, stream,
+		)
+		return nil, err
+	}
 	info, err := js.core.JetStream().ConsumerInfo(stream, consumerName)
 	if err != nil {
 		log.WithError(err).WithFields(localLogTags).Errorf(
@@ -367,6 +431,18 @@ func (js jetStreamControllerImpl) CreateConsumerForStream(
 	if err := js.validate.Struct(&param); err != nil {
 		log.WithError(err).WithFields(localLogTags).Errorf(
 			"Unable to define new consumer %s for stream %s", param.Name, stream,
+		)
+		return err
+	}
+	if err := common.ValidateTopLevelEntityName(stream, js.validate); err != nil {
+		log.WithError(err).WithFields(localLogTags).Errorf(
+			"Unable to define consumers on stream '%s'", stream,
+		)
+		return err
+	}
+	if err := common.ValidateTopLevelEntityName(param.Name, js.validate); err != nil {
+		log.WithError(err).WithFields(localLogTags).Errorf(
+			"Unable to define consumer '%s' on stream '%s'", param.Name, stream,
 		)
 		return err
 	}
@@ -425,6 +501,18 @@ func (js jetStreamControllerImpl) DeleteConsumerOnStream(
 	localLogTags, err := common.UpdateLogTags(ctxt, js.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(js.LogTags).Errorf("Failed to update logtags")
+	}
+	if err := common.ValidateTopLevelEntityName(stream, js.validate); err != nil {
+		log.WithError(err).WithFields(localLogTags).Errorf(
+			"Unable to delete consumers on stream '%s'", stream,
+		)
+		return err
+	}
+	if err := common.ValidateTopLevelEntityName(consumerName, js.validate); err != nil {
+		log.WithError(err).WithFields(localLogTags).Errorf(
+			"Unable to delete consumer '%s' on stream '%s'", consumerName, stream,
+		)
+		return err
 	}
 	if err := js.core.JetStream().DeleteConsumer(stream, consumerName); err != nil {
 		log.WithError(err).WithFields(localLogTags).Errorf(

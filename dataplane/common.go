@@ -17,6 +17,8 @@ package dataplane
 import (
 	"fmt"
 
+	"github.com/alwitt/httpmq/common"
+	"github.com/go-playground/validator/v10"
 	"github.com/nats-io/nats.go"
 )
 
@@ -37,26 +39,47 @@ func msgToString(msg *nats.Msg) string {
 
 // ==============================================================================
 
+// wrapperForValidation a helper structure used for validation naming tuples
+type wrapperForValidation struct {
+	Stream        string  `validate:"alphaunicode|uuid"`
+	Consumer      string  `validate:"alphaunicode|uuid"`
+	DeliveryGroup *string `validate:"omitempty,alphaunicode|uuid"`
+	Subject       *string
+}
+
+// Validate perform the validation
+func (w wrapperForValidation) Validate(validate *validator.Validate) error {
+	if err := validate.Struct(&w); err != nil {
+		return err
+	}
+	if w.Subject != nil {
+		return common.ValidateSubjectName(*w.Subject)
+	}
+	return nil
+}
+
+// ==============================================================================
+
 // MsgToDeliverSeq sequence numbers for a JetStream message
 type MsgToDeliverSeq struct {
 	// Stream is the message sequence number within the stream
-	Stream uint64 `json:"stream" validate:"gte=0"`
+	Stream uint64 `json:"stream" validate:"required,gte=0"`
 	// Consumer is the message sequence number for this consumer
-	Consumer uint64 `json:"consumer" validate:"gte=0"`
+	Consumer uint64 `json:"consumer" validate:"required,gte=0"`
 }
 
 // MsgToDeliver a structure for representing a message to send out to a subscribing client
 type MsgToDeliver struct {
 	// Stream is the name of the stream
-	Stream string `json:"stream" validate:"required"`
+	Stream string `json:"stream" validate:"required,alphaunicode|uuid"`
 	// Subject is the name of the subject / subject filter
 	Subject string `json:"subject" validate:"required"`
 	// Consumer is the name of the consumer
-	Consumer string `json:"consumer" validate:"required"`
+	Consumer string `json:"consumer" validate:"required,alphaunicode|uuid"`
 	// Sequence is the sequence numbers for this JetStream message
 	Sequence MsgToDeliverSeq `json:"sequence" validate:"required,dive"`
 	// Message is the message body
-	Message []byte `json:"b64_msg" validate:"required"`
+	Message []byte `json:"b64_msg" validate:"required" swaggertype:"string" format:"base64" example:"SGVsbG8gV29ybGQK"`
 }
 
 // ConvertJSMessageDeliver convert a JetStream message for delivery

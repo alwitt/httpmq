@@ -22,6 +22,7 @@ import (
 	"github.com/alwitt/httpmq/common"
 	"github.com/alwitt/httpmq/core"
 	"github.com/apex/log"
+	"github.com/go-playground/validator/v10"
 	"github.com/nats-io/nats.go"
 )
 
@@ -35,7 +36,6 @@ type AlertOnErrorCB func(err error)
 type JetStreamPushSubscriber interface {
 	// StartReading begin reading data from JetStream
 	StartReading(
-		ctxt context.Context,
 		forwardCB ForwardMessageHandlerCB,
 		errorCB AlertOnErrorCB,
 		wg *sync.WaitGroup,
@@ -51,11 +51,15 @@ type jetStreamPushSubscriberImpl struct {
 	forwardMsg ForwardMessageHandlerCB
 	errorCB    AlertOnErrorCB
 	lock       *sync.Mutex
+	ctxt       context.Context
 }
 
 // getJetStreamPushSubscriber define new JetStreamPushSubscriber
 func getJetStreamPushSubscriber(
-	natsClient *core.NatsClient, stream, subject, consumer string, deliveryGroup *string,
+	ctxt context.Context,
+	natsClient *core.NatsClient,
+	stream, subject, consumer string,
+	deliveryGroup *string,
 ) (JetStreamPushSubscriber, error) {
 	logTags := log.Fields{
 		"module":    "dataplane",
@@ -64,9 +68,23 @@ func getJetStreamPushSubscriber(
 		"subject":   subject,
 		"consumer":  consumer,
 	}
+	logTags, err := common.UpdateLogTags(ctxt, logTags)
+	if err != nil {
+		log.WithError(err).WithFields(logTags).Errorf("Failed to update logtags")
+		return nil, err
+	}
+	{
+		validate := validator.New()
+		t := wrapperForValidation{
+			Stream: stream, Consumer: consumer, Subject: &subject,
+		}
+		if err := t.Validate(validate); err != nil {
+			log.WithError(err).WithFields(logTags).Error("Unable to define message transport")
+			return nil, err
+		}
+	}
 	// Create the subscription now
 	var s *nats.Subscription
-	var err error
 	// Build the subscription based on whether deliveryGroup is defined
 	if deliveryGroup != nil {
 		s, err = natsClient.JetStream().QueueSubscribeSync(
@@ -86,27 +104,22 @@ func getJetStreamPushSubscriber(
 		forwardMsg: nil,
 		errorCB:    nil,
 		lock:       &sync.Mutex{},
+		ctxt:       ctxt,
 	}, nil
 }
 
 // StartReading begin reading data from JetStream
 func (r *jetStreamPushSubscriberImpl) StartReading(
-	ctxt context.Context,
 	forwardCB ForwardMessageHandlerCB,
 	errorCB AlertOnErrorCB,
 	wg *sync.WaitGroup,
 ) error {
-	localLogTags, err := common.UpdateLogTags(ctxt, r.LogTags)
-	if err != nil {
-		log.WithError(err).WithFields(r.LogTags).Errorf("Failed to update logtags")
-		return err
-	}
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	// Already reading
 	if r.reading {
 		err := fmt.Errorf("already reading")
-		log.WithError(err).WithFields(localLogTags).Error("Unable to start reading")
+		log.WithError(err).WithFields(r.LogTags).Error("Unable to start reading")
 		return err
 	}
 	wg.Add(1)
@@ -116,34 +129,34 @@ func (r *jetStreamPushSubscriberImpl) StartReading(
 	// Start reading from JetStream
 	go func() {
 		defer wg.Done()
-		log.WithFields(localLogTags).Infof("Starting reading from JetStream")
-		defer log.WithFields(localLogTags).Infof("Stopping JetStream read loop")
+		log.WithFields(r.LogTags).Infof("Starting reading from JetStream")
+		defer log.WithFields(r.LogTags).Infof("Stopping JetStream read loop")
 		defer func() {
 			if err := r.sub.Unsubscribe(); err != nil {
-				log.WithError(err).WithFields(localLogTags).Error("Unsubscribe failed")
+				log.WithError(err).WithFields(r.LogTags).Error("Unsubscribe failed")
 			} else {
-				log.WithFields(localLogTags).Infof("Unsubscribed from subject")
+				log.WithFields(r.LogTags).Infof("Unsubscribed from subject")
 			}
 		}()
 		defer func() {
 			if err := r.sub.Drain(); err != nil {
-				log.WithError(err).WithFields(localLogTags).Error("Drain failed")
+				log.WithError(err).WithFields(r.LogTags).Error("Drain failed")
 			} else {
-				log.WithFields(localLogTags).Infof("Drained subscription")
+				log.WithFields(r.LogTags).Infof("Drained subscription")
 			}
 		}()
 		for {
-			newMsg, err := r.sub.NextMsgWithContext(ctxt)
+			newMsg, err := r.sub.NextMsgWithContext(r.ctxt)
 			if err != nil {
-				log.WithError(err).WithFields(localLogTags).Errorf("Read failure")
+				log.WithError(err).WithFields(r.LogTags).Errorf("Read failure")
 				r.errorCB(err)
 				break
 			}
 			// Forward the message
 			if newMsg != nil {
-				log.WithFields(localLogTags).Debugf("Received %s", msgToString(newMsg))
-				if err := r.forwardMsg(ctxt, newMsg); err != nil {
-					log.WithError(err).WithFields(localLogTags).Errorf("Unable to forward messages")
+				log.WithFields(r.LogTags).Debugf("Received %s", msgToString(newMsg))
+				if err := r.forwardMsg(r.ctxt, newMsg); err != nil {
+					log.WithError(err).WithFields(r.LogTags).Errorf("Unable to forward messages")
 					r.errorCB(err)
 				}
 			}
@@ -183,6 +196,10 @@ func (s *jetStreamPublisherImpl) Publish(ctxt context.Context, subject string, m
 	localLogTags, err := common.UpdateLogTags(ctxt, s.LogTags)
 	if err != nil {
 		log.WithError(err).WithFields(s.LogTags).Errorf("Failed to update logtags")
+		return err
+	}
+	if err := common.ValidateSubjectName(subject); err != nil {
+		log.WithError(err).WithFields(localLogTags).Errorf("Unable to send message")
 		return err
 	}
 	ack, err := s.nats.JetStream().PublishAsync(subject, msg)

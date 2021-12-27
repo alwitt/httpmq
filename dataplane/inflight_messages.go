@@ -22,6 +22,7 @@ import (
 
 	"github.com/alwitt/httpmq/common"
 	"github.com/apex/log"
+	"github.com/go-playground/validator/v10"
 	"github.com/nats-io/nats.go"
 )
 
@@ -49,6 +50,7 @@ type jetStreamInflightMsgProcessorImpl struct {
 	subject, consumer string
 	tp                common.TaskProcessor
 	inflightPerStream map[string]*perStreamInflightMessages
+	validate          *validator.Validate
 }
 
 // getJetStreamInflightMsgProcessor define new JetStreamInflightMsgProcessor
@@ -68,12 +70,23 @@ func getJetStreamInflightMsgProcessor(
 			v.UpdateLogTags(logTags)
 		}
 	}
+	validate := validator.New()
+	{
+		t := wrapperForValidation{
+			Stream: stream, Consumer: consumer, Subject: &subject,
+		}
+		if err := t.Validate(validate); err != nil {
+			log.WithError(err).WithFields(logTags).Error("Unable to define message processor")
+			return nil, err
+		}
+	}
 	instance := jetStreamInflightMsgProcessorImpl{
 		Component:         common.Component{LogTags: logTags},
 		subject:           subject,
 		consumer:          consumer,
 		tp:                tp,
 		inflightPerStream: make(map[string]*perStreamInflightMessages),
+		validate:          validate,
 	}
 	// Add handlers
 	if err := tp.AddToTaskExecutionMap(
@@ -213,6 +226,11 @@ type jsInflightCtrlRecordACK struct {
 func (c *jetStreamInflightMsgProcessorImpl) HandlerMsgACK(
 	callCtxt context.Context, ack AckIndication, blocking bool,
 ) error {
+	if err := c.validate.Struct(&ack); err != nil {
+		log.WithError(err).WithFields(c.LogTags).Errorf("Failed to submit %s", ack.String())
+		return err
+	}
+
 	resultChan := make(chan error)
 	handler := func(err error) {
 		resultChan <- err

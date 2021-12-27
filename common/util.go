@@ -18,8 +18,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
+	"fmt"
+	"strings"
 
 	"github.com/apex/log"
+	"github.com/go-playground/validator/v10"
 )
 
 // Component is the base structure for all components
@@ -53,4 +56,30 @@ func UpdateLogTags(ctxt context.Context, original log.Fields) (log.Fields, error
 		}
 	}
 	return newLogTags, nil
+}
+
+// ValidateTopLevelEntityName performs validation of stream and consumer names.
+//
+// A valid name must
+//  * not include illegal characters
+func ValidateTopLevelEntityName(name string, validate *validator.Validate) error {
+	type nameWrapper struct {
+		Name string `validate:"alphaunicode|uuid"`
+	}
+	t := nameWrapper{Name: name}
+
+	return validate.Struct(&t)
+}
+
+// ValidateSubjectName performs validation of subject names
+//
+// A valid name must
+//  * not include illegal characters
+func ValidateSubjectName(subject string) error {
+	const illegalChars = " \t>\n\r`~!@#$%^&()_+=[]{}\\|;:'\",<>/?"
+
+	if strings.ContainsAny(subject, illegalChars) {
+		return fmt.Errorf("subject '%s' contains illegal characters", subject)
+	}
+	return nil
 }

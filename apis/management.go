@@ -240,6 +240,7 @@ func convertConsumerInfo(original *nats.ConsumerInfo) APIRestRespConsumerInfo {
 // @tags Management
 // @Accept json
 // @Produce json
+// @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param setting body management.JSStreamParam true "JetStream stream setting"
 // @Success 200 {object} StandardResponse "success"
 // @Failure 400 {object} StandardResponse "error"
@@ -308,6 +309,7 @@ type APIRestRespAllJetStreams struct {
 // @Description Query for the details of all streams
 // @tags Management
 // @Produce json
+// @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Success 200 {object} APIRestRespAllJetStreams "success"
 // @Failure 400 {object} StandardResponse "error"
 // @Failure 404 {string} string "error"
@@ -350,6 +352,7 @@ type APIRestRespOneJetStream struct {
 // @Description Query for the details of one stream
 // @tags Management
 // @Produce json
+// @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Success 200 {object} APIRestRespOneJetStream "success"
 // @Failure 400 {object} StandardResponse "error"
@@ -379,6 +382,12 @@ func (h APIRestJetStreamManagementHandler) GetStream(w http.ResponseWriter, r *h
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
+	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
+		msg := "Invalid stream name"
+		log.WithError(err).WithFields(localLogTags).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
@@ -423,6 +432,7 @@ type APIRestReqStreamSubjects struct {
 // @tags Management
 // @Accept json
 // @Produce json
+// @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Param subjects body APIRestReqStreamSubjects true "List of new subjects"
 // @Success 200 {object} StandardResponse "success"
@@ -455,6 +465,12 @@ func (h APIRestJetStreamManagementHandler) ChangeStreamSubjects(
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
+	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
+		msg := "Invalid stream name"
+		log.WithError(err).WithFields(localLogTags).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
@@ -503,6 +519,7 @@ func (h APIRestJetStreamManagementHandler) ChangeStreamSubjectsHandler() http.Ha
 // @tags Management
 // @Accept json
 // @Produce json
+// @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Param limits body management.JSStreamLimits true "New stream limits"
 // @Success 200 {object} StandardResponse "success"
@@ -535,6 +552,12 @@ func (h APIRestJetStreamManagementHandler) UpdateStreamLimits(
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
+	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
+		msg := "Invalid stream name"
+		log.WithError(err).WithFields(localLogTags).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
@@ -575,6 +598,7 @@ func (h APIRestJetStreamManagementHandler) UpdateStreamLimitsHandler() http.Hand
 // @Description Delete a stream
 // @tags Management
 // @Produce json
+// @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Success 200 {object} StandardResponse "success"
 // @Failure 400 {object} StandardResponse "error"
@@ -604,6 +628,12 @@ func (h APIRestJetStreamManagementHandler) DeleteStream(w http.ResponseWriter, r
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
+	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
+		msg := "Invalid stream name"
+		log.WithError(err).WithFields(localLogTags).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
@@ -640,6 +670,7 @@ func (h APIRestJetStreamManagementHandler) DeleteStreamHandler() http.HandlerFun
 // @tags Management
 // @Accept json
 // @Produce json
+// @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Param consumerParam body management.JetStreamConsumerParam true "Consumer parameters"
 // @Success 200 {object} StandardResponse "success"
@@ -670,6 +701,12 @@ func (h APIRestJetStreamManagementHandler) CreateConsumer(w http.ResponseWriter,
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
+	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
+		msg := "Invalid stream name"
+		log.WithError(err).WithFields(localLogTags).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
@@ -717,6 +754,7 @@ type APIRestRespAllJetStreamConsumers struct {
 // @Description Query for the details of all consumers of a stream
 // @tags Management
 // @Produce json
+// @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Success 200 {object} APIRestRespAllJetStreamConsumers "success"
 // @Failure 400 {object} StandardResponse "error"
@@ -748,6 +786,12 @@ func (h APIRestJetStreamManagementHandler) GetAllConsumers(
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
+	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
+		msg := "Invalid stream name"
+		log.WithError(err).WithFields(localLogTags).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
@@ -785,6 +829,7 @@ type APIRestRespOneJetStreamConsumer struct {
 // @Description Query for the details of a consumer on a stream
 // @tags Management
 // @Produce json
+// @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Param consumerName path string true "JetStream consumer name"
 // @Success 200 {object} APIRestRespOneJetStreamConsumer "success"
@@ -818,10 +863,22 @@ func (h APIRestJetStreamManagementHandler) GetConsumer(w http.ResponseWriter, r 
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
+	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
+		msg := "Invalid stream name"
+		log.WithError(err).WithFields(localLogTags).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
 	consumerName, ok := vars["consumerName"]
 	if !ok {
 		msg := "No consumer name provided"
 		log.WithFields(localLogTags).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
+	if err := common.ValidateTopLevelEntityName(consumerName, h.validate); err != nil {
+		msg := "Invalid consumer name"
+		log.WithError(err).WithFields(localLogTags).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
@@ -859,6 +916,7 @@ func (h APIRestJetStreamManagementHandler) GetConsumerHandler() http.HandlerFunc
 // @Description Delete one consumer of a stream
 // @tags Management
 // @Produce json
+// @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Param consumerName path string true "JetStream consumer name"
 // @Success 200 {object} StandardResponse "success"
@@ -892,10 +950,22 @@ func (h APIRestJetStreamManagementHandler) DeleteConsumer(w http.ResponseWriter,
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
+	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
+		msg := "Invalid stream name"
+		log.WithError(err).WithFields(localLogTags).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
 	consumerName, ok := vars["consumerName"]
 	if !ok {
 		msg := "No consumer name provided"
 		log.WithFields(localLogTags).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
+	if err := common.ValidateTopLevelEntityName(consumerName, h.validate); err != nil {
+		msg := "Invalid consumer name"
+		log.WithError(err).WithFields(localLogTags).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
@@ -927,17 +997,17 @@ func (h APIRestJetStreamManagementHandler) DeleteConsumerHandler() http.HandlerF
 // -----------------------------------------------------------------------
 
 // Alive godoc
-// @Summary For liveness check
-// @Description Will return success to indicate REST API module is live
+// @Summary For management REST API liveness check
+// @Description Will return success to indicate management REST API module is live
 // @tags Management
 // @Produce json
 // @Success 200 {object} StandardResponse "success"
 // @Failure 400 {string} string "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Router /alive [get]
+// @Router /v1/admin/alive [get]
 func (h APIRestJetStreamManagementHandler) Alive(w http.ResponseWriter, r *http.Request) {
-	restCall := "GET /alive"
+	restCall := "GET /v1/admin/alive"
 	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
 }
 
@@ -951,17 +1021,17 @@ func (h APIRestJetStreamManagementHandler) AliveHandler() http.HandlerFunc {
 // -----------------------------------------------------------------------
 
 // Ready godoc
-// @Summary For readiness check
-// @Description Will return success if REST API module is ready for use
+// @Summary For management REST API readiness check
+// @Description Will return success if management REST API module is ready for use
 // @tags Management
 // @Produce json
 // @Success 200 {object} StandardResponse "success"
 // @Failure 400 {string} string "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Router /ready [get]
+// @Router /v1/admin/ready [get]
 func (h APIRestJetStreamManagementHandler) Ready(w http.ResponseWriter, r *http.Request) {
-	restCall := "GET /ready"
+	restCall := "GET /v1/admin/ready"
 	msg := "not ready"
 	if ready, err := h.core.Ready(); err != nil {
 		h.reply(

@@ -72,14 +72,14 @@ func TestJetStreamControllerStreams(t *testing.T) {
 
 	// Case 0: no streams in system
 	{
-		dummyStream := fmt.Sprintf("%s-00", testName)
+		dummyStream := uuid.New().String()
 		_, err := uut.GetStream(utCtxt, dummyStream)
 		assert.NotNil(err)
 		assert.NotNil(uut.DeleteStream(utCtxt, dummyStream))
 	}
 
 	// Case 1: create stream
-	stream1 := fmt.Sprintf("%s-01", testName)
+	stream1 := uuid.New().String()
 	subjects1 := []string{
 		fmt.Sprintf("%s-1-0", testName),
 		fmt.Sprintf("%s-1-1", testName),
@@ -118,7 +118,7 @@ func TestJetStreamControllerStreams(t *testing.T) {
 	}
 
 	// Case 3: change stream param
-	stream3 := fmt.Sprintf("%s-03", testName)
+	stream3 := uuid.New().String()
 	subjects3 := []string{fmt.Sprintf("%s-3-0", testName), fmt.Sprintf("%s-3-1", testName)}
 	{
 		maxAge := time.Second * 30
@@ -160,7 +160,7 @@ func TestJetStreamControllerStreams(t *testing.T) {
 	// Case 5: create multiple streams
 	stream5s := []string{}
 	for itr := 0; itr < 3; itr++ {
-		stream5s = append(stream5s, fmt.Sprintf("%s-05-%d", testName, itr))
+		stream5s = append(stream5s, uuid.New().String())
 	}
 	topics5s := map[string][]string{}
 	for idx, streamName := range stream5s {
@@ -245,13 +245,13 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 	}
 
 	// Define two streams for operating
-	stream1 := fmt.Sprintf("%s-01", testName)
+	stream1 := uuid.New().String()
 	subjects1 := []string{
 		fmt.Sprintf("%s-1-0", testName),
 		fmt.Sprintf("%s-1-1", testName),
 		fmt.Sprintf("%s-1-2", testName),
 	}
-	stream2 := fmt.Sprintf("%s-02", testName)
+	stream2 := uuid.New().String()
 	subjects2 := []string{fmt.Sprintf("%s-2-0", testName), fmt.Sprintf("%s-2-1", testName)}
 	{
 		maxAge := time.Second
@@ -355,5 +355,96 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 			Name: consumer8, MaxInflight: 1, Mode: "pull", DeliveryGroup: &group,
 		}
 		assert.NotNil(uut.CreateConsumerForStream(utCtxt, stream2, param))
+	}
+}
+
+func TestNameWithNoneStandardCharacters(t *testing.T) {
+	assert := assert.New(t)
+	log.SetLevel(log.DebugLevel)
+	testName := uuid.New().String()
+
+	utCtxt, utCtxtCancel := context.WithCancel(context.Background())
+	defer utCtxtCancel()
+
+	logTags := log.Fields{
+		"module":    "management_test",
+		"component": "JetStreamController",
+		"instance":  "name-character-check",
+	}
+
+	// Define NATS connection params
+	natsParam := core.NATSConnectParams{
+		ServerURI:           common.GetUnitTestNatsURI(),
+		ConnectTimeout:      time.Second,
+		MaxReconnectAttempt: 0,
+		ReconnectWait:       time.Second,
+		OnDisconnectCallback: func(_ *nats.Conn, e error) {
+			if e != nil {
+				log.WithError(e).WithFields(logTags).Error(
+					"Disconnect callback triggered with failure",
+				)
+			}
+		},
+		OnReconnectCallback: func(_ *nats.Conn) {
+			log.WithFields(logTags).Debug("Reconnected with NATs server")
+		},
+		OnCloseCallback: func(_ *nats.Conn) {
+			log.WithFields(logTags).Debug("Disconnected from NATs server")
+		},
+	}
+
+	js, err := core.GetJetStream(natsParam)
+	assert.Nil(err)
+	defer js.Close(utCtxt)
+
+	uut, err := GetJetStreamController(js, testName)
+	assert.Nil(err)
+
+	// Case 0: define stream with " "
+	stream0 := fmt.Sprintf("%s 00", testName)
+	subjects0 := []string{fmt.Sprintf("%s-0-0", testName)}
+	{
+		maxAge := time.Second
+		streamParam := JSStreamParam{
+			Name:     stream0,
+			Subjects: subjects0,
+			JSStreamLimits: JSStreamLimits{
+				MaxAge: &maxAge,
+			},
+		}
+		assert.NotNil(uut.CreateStream(utCtxt, streamParam))
+	}
+
+	// Case 1: define stream
+	stream1 := uuid.New().String()
+	subjects1 := []string{fmt.Sprintf("%s-1-0", testName)}
+	{
+		maxAge := time.Second
+		streamParam := JSStreamParam{
+			Name:     stream1,
+			Subjects: subjects1,
+			JSStreamLimits: JSStreamLimits{
+				MaxAge: &maxAge,
+			},
+		}
+		assert.Nil(uut.CreateStream(utCtxt, streamParam))
+	}
+
+	// Case 2: define consumer with " "
+	consumer2 := fmt.Sprintf("%s 02", uuid.New().String())
+	{
+		param := JetStreamConsumerParam{
+			Name: consumer2, MaxInflight: 1, Mode: "push",
+		}
+		assert.NotNil(uut.CreateConsumerForStream(utCtxt, stream1, param))
+	}
+
+	// Case 3: define consumer, but specify stream with " "
+	consumer3 := uuid.New().String()
+	{
+		param := JetStreamConsumerParam{
+			Name: consumer3, MaxInflight: 1, Mode: "push",
+		}
+		assert.NotNil(uut.CreateConsumerForStream(utCtxt, fmt.Sprintf("%s 01", testName), param))
 	}
 }

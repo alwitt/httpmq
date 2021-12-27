@@ -22,6 +22,7 @@ import (
 	"github.com/alwitt/httpmq/common"
 	"github.com/alwitt/httpmq/core"
 	"github.com/apex/log"
+	"github.com/go-playground/validator/v10"
 	"github.com/nats-io/nats.go"
 )
 
@@ -73,8 +74,22 @@ func GetPushMessageDispatcher(
 		}
 	}
 
+	// Initial validation
+	{
+		validate := validator.New()
+		t := wrapperForValidation{
+			Stream: stream, Consumer: consumer, DeliveryGroup: deliveryGroup, Subject: &subject,
+		}
+		if err := t.Validate(validate); err != nil {
+			log.WithError(err).WithFields(logTags).Error(
+				"Unable to define dispatch due to parameter errors",
+			)
+			return nil, err
+		}
+	}
+
 	// Define components
-	ackReceiver, err := getJetStreamACKReceiver(natsClient, stream, subject, consumer)
+	ackReceiver, err := getJetStreamACKReceiver(ctxt, natsClient, stream, subject, consumer)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define ACK receiver")
 		return nil, err
@@ -92,7 +107,7 @@ func GetPushMessageDispatcher(
 		return nil, err
 	}
 	subscriber, err := getJetStreamPushSubscriber(
-		natsClient, stream, subject, consumer, deliveryGroup,
+		ctxt, natsClient, stream, subject, consumer, deliveryGroup,
 	)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define MSG subscriber")
@@ -131,7 +146,7 @@ func (d *pushMessageDispatcher) Start(
 
 	// Start ACK receiver
 	if err := d.ackWatcher.SubscribeForACKs(
-		d.optContext, d.wg, func(ctxt context.Context, ai AckIndication) {
+		d.wg, func(ctxt context.Context, ai AckIndication) {
 			log.WithFields(d.LogTags).Debugf("Processing %s", ai.String())
 			// Pass to message tracker in non-blocking mode
 			if err := d.msgTracking.HandlerMsgACK(ctxt, ai, false); err != nil {
@@ -145,7 +160,6 @@ func (d *pushMessageDispatcher) Start(
 
 	// Start subscriber
 	if err := d.subscriber.StartReading(
-		d.optContext,
 		func(ctxt context.Context, msg *nats.Msg) error {
 			msgName := msgToString(msg)
 			log.WithFields(d.LogTags).Debugf("Processing %s", msgName)

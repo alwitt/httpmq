@@ -76,7 +76,7 @@ func TestAckTransport(t *testing.T) {
 
 	uutTX, err := GetJetStreamACKBroadcaster(js, testName)
 	assert.Nil(err)
-	uutRX1, err := getJetStreamACKReceiver(js, testStream, dummySubject, testConsumer1)
+	uutRX1, err := getJetStreamACKReceiver(utCtxt, js, testStream, dummySubject, testConsumer1)
 	assert.Nil(err)
 
 	// Case 0: start subscription on uutRX1
@@ -84,10 +84,10 @@ func TestAckTransport(t *testing.T) {
 	ackHandler1 := func(_ context.Context, ack AckIndication) {
 		rxChan1 <- ack
 	}
-	err = uutRX1.SubscribeForACKs(utCtxt, &wg, ackHandler1)
+	err = uutRX1.SubscribeForACKs(&wg, ackHandler1)
 	assert.Nil(err)
 	// subscribe again
-	err = uutRX1.SubscribeForACKs(utCtxt, &wg, ackHandler1)
+	err = uutRX1.SubscribeForACKs(&wg, ackHandler1)
 	assert.NotNil(err)
 
 	// Case 1: send an ACK
@@ -112,13 +112,13 @@ func TestAckTransport(t *testing.T) {
 		}
 	}
 
-	uutRX2, err := getJetStreamACKReceiver(js, testStream, dummySubject, testConsumer1)
+	uutRX2, err := getJetStreamACKReceiver(utCtxt, js, testStream, dummySubject, testConsumer1)
 	assert.Nil(err)
 	rxChan2 := make(chan AckIndication, 1)
 	ackHandler2 := func(_ context.Context, ack AckIndication) {
 		rxChan2 <- ack
 	}
-	err = uutRX2.SubscribeForACKs(utCtxt, &wg, ackHandler2)
+	err = uutRX2.SubscribeForACKs(&wg, ackHandler2)
 	assert.Nil(err)
 
 	// Case 2: test with two instances
@@ -150,13 +150,13 @@ func TestAckTransport(t *testing.T) {
 		}
 	}
 
-	uutRX3, err := getJetStreamACKReceiver(js, testStream, dummySubject, testConsumer2)
+	uutRX3, err := getJetStreamACKReceiver(utCtxt, js, testStream, dummySubject, testConsumer2)
 	assert.Nil(err)
 	rxChan3 := make(chan AckIndication, 1)
 	ackHandler3 := func(_ context.Context, ack AckIndication) {
 		rxChan3 <- ack
 	}
-	err = uutRX3.SubscribeForACKs(utCtxt, &wg, ackHandler3)
+	err = uutRX3.SubscribeForACKs(&wg, ackHandler3)
 	assert.Nil(err)
 
 	// Case 3: test with different consumer

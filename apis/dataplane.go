@@ -81,6 +81,7 @@ func GetAPIRestJetStreamDataplaneHandler(
 // @tags Dataplane
 // @Accept plain
 // @Produce json
+// @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param subjectName path string true "JetStream subject to publish under"
 // @Param message body string true "Message to publish in Base64 encoding"
 // @Success 200 {object} StandardResponse "success"
@@ -111,6 +112,12 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, 
 	if !ok {
 		msg := "No subject name provided"
 		log.WithFields(localLogTags).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
+	if err := common.ValidateSubjectName(subjectName); err != nil {
+		msg := "Invalid subject string"
+		log.WithError(err).WithFields(localLogTags).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
@@ -173,6 +180,7 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessageHandler() http.HandlerFu
 // @tags Dataplane
 // @Accept json
 // @Produce json
+// @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Param consumerName path string true "JetStream consumer name"
 // @Param sequenceNum body dataplane.AckSeqNum true "Message message sequence numbers"
@@ -207,13 +215,23 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
+	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
+		msg := "Invalid stream name"
+		log.WithError(err).WithFields(localLogTags).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
 	consumerName, ok := vars["consumerName"]
 	if !ok {
 		msg := "No consumer name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(
-			w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r,
-		)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
+	if err := common.ValidateTopLevelEntityName(consumerName, h.validate); err != nil {
+		msg := "Invalid consumer name"
+		log.WithError(err).WithFields(localLogTags).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
 
@@ -276,6 +294,7 @@ type APIRestRespDataMessage struct {
 // server internal error.
 // @tags Dataplane
 // @Produce json
+// @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Param consumerName path string true "JetStream consumer name"
 // @Param subject_name query string true "JetStream subject to subscribe to"
@@ -314,10 +333,22 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
+	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
+		msg := "Invalid stream name"
+		log.WithError(err).WithFields(localLogTagsInitial).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
 	consumerName, ok := vars["consumerName"]
 	if !ok {
 		msg := "No consumer name provided"
 		log.WithFields(localLogTagsInitial).Errorf(msg)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		return
+	}
+	if err := common.ValidateTopLevelEntityName(consumerName, h.validate); err != nil {
+		msg := "Invalid consumer name"
+		log.WithError(err).WithFields(localLogTagsInitial).Errorf(msg)
 		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
 		return
 	}
@@ -560,17 +591,17 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribeHandler() http.HandlerFun
 // -----------------------------------------------------------------------
 
 // Alive godoc
-// @Summary For liveness check
-// @Description Will return success to indicate REST API module is live
+// @Summary For dataplane REST API liveness check
+// @Description Will return success to indicate dataplane REST API module is live
 // @tags Dataplane
 // @Produce json
 // @Success 200 {object} StandardResponse "success"
 // @Failure 400 {string} string "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Router /alive [get]
+// @Router /v1/data/alive [get]
 func (h APIRestJetStreamDataplaneHandler) Alive(w http.ResponseWriter, r *http.Request) {
-	restCall := "GET /alive"
+	restCall := "GET /v1/data/alive"
 	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
 }
 
@@ -584,17 +615,17 @@ func (h APIRestJetStreamDataplaneHandler) AliveHandler() http.HandlerFunc {
 // -----------------------------------------------------------------------
 
 // Ready godoc
-// @Summary For readiness check
-// @Description Will return success if REST API module is ready for use
+// @Summary For dataplane REST API readiness check
+// @Description Will return success if dataplane REST API module is ready for use
 // @tags Dataplane
 // @Produce json
 // @Success 200 {object} StandardResponse "success"
 // @Failure 400 {string} string "error"
 // @Failure 404 {string} string "error"
 // @Failure 500 {object} StandardResponse "error"
-// @Router /ready [get]
+// @Router /v1/data/ready [get]
 func (h APIRestJetStreamDataplaneHandler) Ready(w http.ResponseWriter, r *http.Request) {
-	restCall := "GET /ready"
+	restCall := "GET /v1/data/ready"
 	msg := "not ready"
 	if h.natsClient.NATs().Status() == nats.CONNECTED {
 		h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)

@@ -112,11 +112,11 @@ func TestMessageTransportPushSub(t *testing.T) {
 	log.Debug("============================= 1 =============================")
 
 	// Case 0: define new subscribers
-	rxSub1, err := getJetStreamPushSubscriber(js, stream1, subject1, consumer1, nil)
+	rxSub1, err := getJetStreamPushSubscriber(utCtxt, js, stream1, subject1, consumer1, nil)
 	assert.Nil(err)
-	rxSub2, err := getJetStreamPushSubscriber(js, stream1, subject2, consumer2, nil)
+	rxSub2, err := getJetStreamPushSubscriber(utCtxt, js, stream1, subject2, consumer2, nil)
 	assert.Nil(err)
-	rxSub3, err := getJetStreamPushSubscriber(js, stream1, subject3, consumer3, nil)
+	rxSub3, err := getJetStreamPushSubscriber(utCtxt, js, stream1, subject3, consumer3, nil)
 	assert.Nil(err)
 	log.Debug("============================= 2 =============================")
 
@@ -140,10 +140,10 @@ func TestMessageTransportPushSub(t *testing.T) {
 		rxChan3 <- msg
 		return nil
 	}
-	assert.Nil(rxSub1.StartReading(utCtxt, msgHandler1, internalErrorHandler, &wg))
-	assert.NotNil(rxSub1.StartReading(utCtxt, msgHandler1, internalErrorHandler, &wg))
-	assert.Nil(rxSub2.StartReading(utCtxt, msgHandler2, internalErrorHandler, &wg))
-	assert.Nil(rxSub3.StartReading(utCtxt, msgHandler3, internalErrorHandler, &wg))
+	assert.Nil(rxSub1.StartReading(msgHandler1, internalErrorHandler, &wg))
+	assert.NotNil(rxSub1.StartReading(msgHandler1, internalErrorHandler, &wg))
+	assert.Nil(rxSub2.StartReading(msgHandler2, internalErrorHandler, &wg))
+	assert.Nil(rxSub3.StartReading(msgHandler3, internalErrorHandler, &wg))
 	log.Debug("============================= 3 =============================")
 
 	publisher, err := GetJetStreamPublisher(js, testName)
@@ -310,9 +310,9 @@ func TestMessageTransportPushSubGroup(t *testing.T) {
 	log.Debug("============================= 1 =============================")
 
 	// Case 0: define new subscribers
-	rxSub1, err := getJetStreamPushSubscriber(js1, stream1, subject1, consumer1, &group1)
+	rxSub1, err := getJetStreamPushSubscriber(utCtxt, js1, stream1, subject1, consumer1, &group1)
 	assert.Nil(err)
-	rxSub2, err := getJetStreamPushSubscriber(js2, stream1, subject1, consumer1, &group1)
+	rxSub2, err := getJetStreamPushSubscriber(utCtxt, js2, stream1, subject1, consumer1, &group1)
 	assert.Nil(err)
 	log.Debug("============================= 2 =============================")
 
@@ -334,8 +334,8 @@ func TestMessageTransportPushSubGroup(t *testing.T) {
 		rxChan <- msgTuple{msg: msg, id: 2}
 		return nil
 	}
-	assert.Nil(rxSub1.StartReading(utCtxt, msgHandler1, internalErrorHandler, &wg))
-	assert.Nil(rxSub2.StartReading(utCtxt, msgHandler2, internalErrorHandler, &wg))
+	assert.Nil(rxSub1.StartReading(msgHandler1, internalErrorHandler, &wg))
+	assert.Nil(rxSub2.StartReading(msgHandler2, internalErrorHandler, &wg))
 	log.Debug("============================= 3 =============================")
 
 	publisher, err := GetJetStreamPublisher(js1, testName)
@@ -442,7 +442,7 @@ func TestMessageTranscoding(t *testing.T) {
 	log.Debug("============================= 1 =============================")
 
 	// Case 0: define new subscribers
-	rxSub1, err := getJetStreamPushSubscriber(js, stream1, subject1, consumer1, nil)
+	rxSub1, err := getJetStreamPushSubscriber(utCtxt, js, stream1, subject1, consumer1, nil)
 	assert.Nil(err)
 	log.Debug("============================= 2 =============================")
 
@@ -456,7 +456,7 @@ func TestMessageTranscoding(t *testing.T) {
 		rxChan1 <- msg
 		return nil
 	}
-	assert.Nil(rxSub1.StartReading(utCtxt, msgHandler1, internalErrorHandler, &wg))
+	assert.Nil(rxSub1.StartReading(msgHandler1, internalErrorHandler, &wg))
 	log.Debug("============================= 3 =============================")
 
 	publisher, err := GetJetStreamPublisher(js, testName)

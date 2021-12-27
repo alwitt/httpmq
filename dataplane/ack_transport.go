@@ -30,17 +30,17 @@ import (
 // AckSeqNum are the sequence numbers of the NATs JetStream message
 type AckSeqNum struct {
 	// Stream is the JetStream message sequence number for this stream
-	Stream uint64 `json:"stream" validate:"required"`
+	Stream uint64 `json:"stream" validate:"required,gte=0"`
 	// Consumer is the JetStream message sequence number for this consumer
-	Consumer uint64 `json:"consumer" validate:"required"`
+	Consumer uint64 `json:"consumer" validate:"required,gte=0"`
 }
 
 // AckIndication is the ACK of a NATs JetStream message which contains its key parameters
 type AckIndication struct {
 	// Stream is the name of the stream
-	Stream string `json:"stream" validate:"required"`
+	Stream string `json:"stream" validate:"required,alphaunicode|uuid"`
 	// Consumer is the name of the consumer
-	Consumer string `json:"consumer" validate:"required"`
+	Consumer string `json:"consumer" validate:"required,alphaunicode|uuid"`
 	// SeqNum is the sequence number of the JetStream message
 	SeqNum AckSeqNum `json:"seq_num" validate:"required,dive"`
 }
@@ -63,9 +63,7 @@ type JetStreamAckHandler func(context.Context, AckIndication)
 // JetStreamACKReceiver processes JetStream message ACKs being broadcast through NATs subjects
 type JetStreamACKReceiver interface {
 	// SubscribeForACKs start receiving JetStream message ACKs
-	SubscribeForACKs(
-		opContext context.Context, wg *sync.WaitGroup, handler JetStreamAckHandler,
-	) error
+	SubscribeForACKs(wg *sync.WaitGroup, handler JetStreamAckHandler) error
 }
 
 // jetStreamACKReceiverImpl implements JetStreamACKReceiver
@@ -77,11 +75,12 @@ type jetStreamACKReceiverImpl struct {
 	ackSubscription *nats.Subscription
 	lock            *sync.Mutex
 	validate        *validator.Validate
+	ctxt            context.Context
 }
 
 // getJetStreamACKReceiver define JetStreamACKReceiver
 func getJetStreamACKReceiver(
-	natsClient *core.NatsClient, stream, subject, consumer string,
+	opContext context.Context, natsClient *core.NatsClient, stream, subject, consumer string,
 ) (JetStreamACKReceiver, error) {
 	ackSubject := defineACKBroadcastSubject(stream, consumer)
 	logTags := log.Fields{
@@ -91,6 +90,22 @@ func getJetStreamACKReceiver(
 		"subject":   subject,
 		"consumer":  consumer,
 	}
+	logTags, err := common.UpdateLogTags(opContext, logTags)
+	if err != nil {
+		log.WithError(err).WithFields(logTags).Errorf("Failed to update logtags")
+		return nil, err
+	}
+	// Add context for log
+	validate := validator.New()
+	{
+		t := wrapperForValidation{
+			Stream: stream, Consumer: consumer, Subject: &subject,
+		}
+		if err := t.Validate(validate); err != nil {
+			log.WithError(err).WithFields(logTags).Error("Unable to define ACK receiver")
+			return nil, err
+		}
+	}
 	return &jetStreamACKReceiverImpl{
 		Component:       common.Component{LogTags: logTags},
 		ackSubject:      ackSubject,
@@ -98,13 +113,14 @@ func getJetStreamACKReceiver(
 		subscribed:      false,
 		ackSubscription: nil,
 		lock:            new(sync.Mutex),
-		validate:        validator.New(),
+		validate:        validate,
+		ctxt:            opContext,
 	}, nil
 }
 
 // SubscribeForACKs start receiving JetStream message ACKs
 func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
-	opContext context.Context, wg *sync.WaitGroup, handler JetStreamAckHandler,
+	wg *sync.WaitGroup, handler JetStreamAckHandler,
 ) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -112,35 +128,30 @@ func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 	if r.subscribed {
 		return fmt.Errorf("already instructed to subscribe to %s", r.ackSubject)
 	}
-	localLogTags, err := common.UpdateLogTags(opContext, r.LogTags)
-	if err != nil {
-		log.WithError(err).WithFields(r.LogTags).Errorf("Failed to update logtags")
-		return err
-	}
 	r.subscribed = true
 	// Subscribe to the ACK channel for updates
 	ackSub, err := r.nats.NATs().Subscribe(r.ackSubject, func(msg *nats.Msg) {
 		// Process the message
 		var ackInfo AckIndication
 		if err := json.Unmarshal(msg.Data, &ackInfo); err != nil {
-			log.WithError(err).WithFields(localLogTags).Errorf(
+			log.WithError(err).WithFields(r.LogTags).Errorf(
 				"Failed to read ACK message: %s", msg.Data,
 			)
 			return
 		}
 		// Validate the message
 		if err := r.validate.Struct(&ackInfo); err != nil {
-			log.WithError(err).WithFields(localLogTags).Errorf(
+			log.WithError(err).WithFields(r.LogTags).Errorf(
 				"Failed to validate ACK message: %s", msg.Data,
 			)
 			return
 		}
 		// Forward the message
-		log.WithFields(localLogTags).Debugf("Received %s", ackInfo.String())
-		handler(opContext, ackInfo)
+		log.WithFields(r.LogTags).Debugf("Received %s", ackInfo.String())
+		handler(r.ctxt, ackInfo)
 	})
 	if err != nil {
-		log.WithError(err).WithFields(localLogTags).Errorf(
+		log.WithError(err).WithFields(r.LogTags).Errorf(
 			"Failed to subscribe to ACK channel %s", r.ackSubject,
 		)
 		return err
@@ -150,14 +161,14 @@ func (r *jetStreamACKReceiverImpl) SubscribeForACKs(
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		<-opContext.Done()
-		log.WithFields(localLogTags).Debugf("Unsubscribing from ACK channel %s", r.ackSubject)
+		<-r.ctxt.Done()
+		log.WithFields(r.LogTags).Debugf("Unsubscribing from ACK channel %s", r.ackSubject)
 		if err := r.ackSubscription.Unsubscribe(); err != nil {
-			log.WithError(err).WithFields(localLogTags).Errorf(
+			log.WithError(err).WithFields(r.LogTags).Errorf(
 				"Error occurred when unsubscribing from ACK channel %s", r.ackSubject,
 			)
 		}
-		log.WithFields(localLogTags).Infof("Unsubscribed from ACK channel %s", r.ackSubject)
+		log.WithFields(r.LogTags).Infof("Unsubscribed from ACK channel %s", r.ackSubject)
 	}()
 	return nil
 }
