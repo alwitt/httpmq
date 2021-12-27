@@ -141,10 +141,10 @@ func RunDataplaneServer(
 	)
 
 	// Health check
-	_ = apis.RegisterPathPrefix(mainRouter, "/alive", map[string]http.HandlerFunc{
+	_ = apis.RegisterPathPrefix(mainRouter, "/v1/data/alive", map[string]http.HandlerFunc{
 		"get": httpHandler.AliveHandler(),
 	})
-	_ = apis.RegisterPathPrefix(mainRouter, "/ready", map[string]http.HandlerFunc{
+	_ = apis.RegisterPathPrefix(mainRouter, "/v1/data/ready", map[string]http.HandlerFunc{
 		"get": httpHandler.ReadyHandler(),
 	})
 

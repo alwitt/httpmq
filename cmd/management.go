@@ -142,10 +142,10 @@ func RunManagementServer(
 	})
 
 	// Health check
-	_ = apis.RegisterPathPrefix(mainRouter, "/alive", map[string]http.HandlerFunc{
+	_ = apis.RegisterPathPrefix(mainRouter, "/v1/admin/alive", map[string]http.HandlerFunc{
 		"get": httpHandler.AliveHandler(),
 	})
-	_ = apis.RegisterPathPrefix(mainRouter, "/ready", map[string]http.HandlerFunc{
+	_ = apis.RegisterPathPrefix(mainRouter, "/v1/admin/ready", map[string]http.HandlerFunc{
 		"get": httpHandler.ReadyHandler(),
 	})
 

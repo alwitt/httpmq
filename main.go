@@ -54,7 +54,7 @@ var cmdArgs cliArgs
 var logTags log.Fields
 
 // @title httpmq
-// @version v0.1.4
+// @version v0.1.5
 // @description HTTP/2 based message broker built around NATS JetStream
 
 // @host localhost:3000
@@ -73,7 +73,7 @@ func main() {
 	}
 
 	app := &cli.App{
-		Version:     "v0.1.4",
+		Version:     "v0.1.5",
 		Usage:       "application entrypoint",
 		Description: "HTTP/2 based message broker built around NATS JetStream",
 		Flags: []cli.Flag{
