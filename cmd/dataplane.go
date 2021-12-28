@@ -42,7 +42,7 @@ func RunDataplaneServer(
 ) error {
 	logTags := log.Fields{
 		"module":    "cmd",
-		"component": "management",
+		"component": "dataplane",
 		"instance":  instance,
 	}
 
