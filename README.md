@@ -74,10 +74,10 @@ $ make
 $ make test
 ```
 
-By default, the server application is `httpmq.bin`.
+By default, the server application is named `httpmq.bin`.
 
 ```shell
-$ ./httpmq.bin --help
+$ ./httpmq.bin -h
 NAME:
    httpmq.bin - application entrypoint
 
@@ -85,26 +85,22 @@ USAGE:
    httpmq.bin [global options] command [command options] [arguments...]
 
 VERSION:
-   v0.1.3
+   v0.2.0
 
 DESCRIPTION:
    HTTP/2 based message broker built around NATS JetStream
 
 COMMANDS:
    management  Run the httpmq management server
-   dataplane   Run the httpmq data plane server
+   dataplane   Run the httpmq dataplane server
    help, h     Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --json-log, -j                                     Whether to log in JSON format (default: false) [$LOG_AS_JSON]
-   --log-level value, -l value                        Logging level: [debug info warn error] (default: warn) [$LOG_LEVEL]
-   --http-idle-timeout value, -t value                HTTP connection idle timeout (default: 1h) [$HTTP_CONNECTION_IDLE_TIMEOUT]
-   --nats-server-uri value, --nsu value               NATS server URI (default: nats://127.0.0.1:4222) [$NATS_SERVER_URI]
-   --nats-connect-timeout value, --ncto value         NATS connection timeout (default: 15s) [$NATS_CONNECT_TIMEOUT]
-   --nats-reconnect-wait value, --nrcw value          NATS duration between reconnect attempts (default: 15s) [$NATS_RECONNECT_WAIT]
-   --nats-max-reconnect-attempts value, --nmra value  NATS maximum reconnect attempts (default: -1) [$NATS_MAX_RECONNECT_ATTEMPTS]
-   --help, -h                                         show help (default: false)
-   --version, -v                                      print the version (default: false)
+   --json-log, -j                 Whether to log in JSON format (default: false) [$LOG_AS_JSON]
+   --log-level value, -l value    Logging level: [debug info warn error] (default: warn) [$LOG_LEVEL]
+   --config-file value, -c value  Application config file. Use DEFAULT if not specified. [$CONFIG_FILE]
+   --help, -h                     show help (default: false)
+   --version, -v                  print the version (default: false)
 ```
 
 ```shell
@@ -119,15 +115,13 @@ DESCRIPTION:
    Serves the REST API for managing JetStream streams and consumers
 
 OPTIONS:
-   --management-server-port value, --msp value              Management server port (default: 3000) [$MANAGEMENT_SERVER_PORT]
-   --management-server-endpoint-prefix value, --msep value  Set the end-point path prefix for the management APIs (default: /) [$MANAGEMENT_SERVER_ENDPOINT_PREFIX]
-   --help, -h                                               show help (default: false)
+   --help, -h  show help (default: false)
 ```
 
 ```shell
 $ ./httpmq.bin dataplane -h
 NAME:
-   httpmq.bin dataplane - Run the httpmq data plane server
+   httpmq.bin dataplane - Run the httpmq dataplane server
 
 USAGE:
    httpmq.bin dataplane [command options] [arguments...]
@@ -136,9 +130,7 @@ DESCRIPTION:
    Serves the REST API for message publish, and subscribing through JetStream
 
 OPTIONS:
-   --dataplane-server-port value, --dsp value              Dataplane server port (default: 3001) [$DATAPLANE_SERVER_PORT]
-   --dataplane-server-endpoint-prefix value, --dsep value  Set the end-point path prefix for the dataplane APIs (default: /) [$DATAPLANE_SERVER_ENDPOINT_PREFIX]
-   --help, -h                                              show help (default: false)
+   --help, -h  show help (default: false)
 ```
 
 ---
@@ -147,25 +139,25 @@ OPTIONS:
 To start the management server locally
 
 ```shell
-./httpmq.bin -l debug --nmra 1 management
+./httpmq.bin -l info management
 ```
 
 ```shell
-$ ./httpmq.bin -l debug --nmra 1 management
-2021/12/08 10:22:51  info Created JetStream client  component=jetstream-backend instance=nats://127.0.0.1:4222 module=core
-2021/12/08 10:22:51  info Started HTTP server on http://:3000 component=management instance=dvm-personal module=cmd
+$ ./httpmq.bin -l info management
+2021/12/28 15:21:00  info Created JetStream client  component=jetstream-backend instance=nats://127.0.0.1:4222 module=core
+2021/12/28 15:21:00  info Started HTTP server on http://127.0.0.1:3000 component=management instance=dvm-personal module=cmd
 ```
 
 To start the dataplane server locally
 
 ```shell
-./httpmq.bin -l debug --nmra 1 dataplane
+./httpmq.bin -l info dataplane
 ```
 
 ```shell
-$ ./httpmq.bin -l debug --nmra 1 dataplane
-2021/12/08 10:24:31  info Created JetStream client  component=jetstream-backend instance=nats://127.0.0.1:4222 module=core
-2021/12/08 10:24:31  info Started HTTP server on http://:3001 component=management instance=dvm-personal module=cmd
+$ ./httpmq.bin -l info dataplane
+2021/12/28 15:21:19  info Created JetStream client  component=jetstream-backend instance=nats://127.0.0.1:4222 module=core
+2021/12/28 15:21:19  info Started HTTP server on http://127.0.0.1:3001 component=management instance=dvm-personal module=cmd
 ```
 
 ---
