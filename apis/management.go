@@ -38,14 +38,22 @@ type APIRestJetStreamManagementHandler struct {
 // GetAPIRestJetStreamManagementHandler define APIRestJetStreamManagementHandler
 func GetAPIRestJetStreamManagementHandler(
 	core management.JetStreamController,
+	httpConfig *common.HTTPConfig,
 ) (APIRestJetStreamManagementHandler, error) {
 	logTags := log.Fields{
 		"module":    "rest",
 		"component": "jetstream-management",
 	}
+	offLimitHeaders := make(map[string]bool)
+	for _, header := range httpConfig.Logging.DoNotLogHeaders {
+		offLimitHeaders[header] = true
+	}
 	return APIRestJetStreamManagementHandler{
 		APIRestHandler: APIRestHandler{
-			Component: common.Component{LogTags: logTags},
+			Component:             common.Component{LogTags: logTags},
+			startOfRequestLog:     httpConfig.Logging.StartOfRequestMessage,
+			endOfRequestLog:       httpConfig.Logging.EndOfRequestMessage,
+			offLimitHeadersForLog: offLimitHeaders,
 		}, core: core, validate: validator.New(),
 	}, nil
 }

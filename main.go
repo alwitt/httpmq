@@ -17,36 +17,28 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
 	"time"
 
 	"github.com/alwitt/httpmq/cmd"
+	"github.com/alwitt/httpmq/common"
 	"github.com/alwitt/httpmq/core"
 	"github.com/apex/log"
 	apexJSON "github.com/apex/log/handlers/json"
 	"github.com/go-playground/validator/v10"
 	"github.com/nats-io/nats.go"
+	"github.com/spf13/viper"
 	"github.com/urfave/cli/v2"
 )
 
-type natsArgs struct {
-	ServerURI           string `validate:"required,uri"`
-	ConnectTimeout      time.Duration
-	MaxReconnectAttempt int `validate:"gte=-1"`
-	ReconnectWait       time.Duration
-}
-
 type cliArgs struct {
-	JSONLog     bool
-	LogLevel    string   `validate:"required,oneof=debug info warn error"`
-	NATS        natsArgs `validate:"required,dive"`
-	Hostname    string
-	IdleTimeout time.Duration
-	// For various subcommands
-	Management cmd.ManagementCLIArgs `validate:"-"`
-	Dataplane  cmd.DataplaneCLIArgs  `validate:"-"`
+	JSONLog    bool
+	LogLevel   string `validate:"required,oneof=debug info warn error"`
+	ConfigFile string `validate:"omitempty,file"`
+	Hostname   string
 }
 
 var cmdArgs cliArgs
@@ -54,7 +46,7 @@ var cmdArgs cliArgs
 var logTags log.Fields
 
 // @title httpmq
-// @version v0.1.5
+// @version v0.2.0
 // @description HTTP/2 based message broker built around NATS JetStream
 
 // @host localhost:3000
@@ -72,8 +64,10 @@ func main() {
 		"instance":  hostname,
 	}
 
+	common.InstallDefaultConfigValues()
+
 	app := &cli.App{
-		Version:     "v0.1.5",
+		Version:     "v0.2.0",
 		Usage:       "application entrypoint",
 		Description: "HTTP/2 based message broker built around NATS JetStream",
 		Flags: []cli.Flag{
@@ -98,56 +92,15 @@ func main() {
 				Destination: &cmdArgs.LogLevel,
 				Required:    false,
 			},
-			// General
-			&cli.DurationFlag{
-				Name:        "http-idle-timeout",
-				Usage:       "HTTP connection idle timeout",
-				Aliases:     []string{"t"},
-				EnvVars:     []string{"HTTP_CONNECTION_IDLE_TIMEOUT"},
-				Value:       time.Hour,
-				DefaultText: "1h",
-				Destination: &cmdArgs.IdleTimeout,
-				Required:    false,
-			},
-			// NATs
+			// Config file
 			&cli.StringFlag{
-				Name:        "nats-server-uri",
-				Usage:       "NATS server URI",
-				Aliases:     []string{"nsu"},
-				EnvVars:     []string{"NATS_SERVER_URI"},
-				Value:       "nats://127.0.0.1:4222",
-				DefaultText: "nats://127.0.0.1:4222",
-				Destination: &cmdArgs.NATS.ServerURI,
-				Required:    false,
-			},
-			&cli.DurationFlag{
-				Name:        "nats-connect-timeout",
-				Usage:       "NATS connection timeout",
-				Aliases:     []string{"ncto"},
-				EnvVars:     []string{"NATS_CONNECT_TIMEOUT"},
-				Value:       time.Second * 15,
-				DefaultText: "15s",
-				Destination: &cmdArgs.NATS.ConnectTimeout,
-				Required:    false,
-			},
-			&cli.DurationFlag{
-				Name:        "nats-reconnect-wait",
-				Usage:       "NATS duration between reconnect attempts",
-				Aliases:     []string{"nrcw"},
-				EnvVars:     []string{"NATS_RECONNECT_WAIT"},
-				Value:       time.Second * 15,
-				DefaultText: "15s",
-				Destination: &cmdArgs.NATS.ReconnectWait,
-				Required:    false,
-			},
-			&cli.IntFlag{
-				Name:        "nats-max-reconnect-attempts",
-				Usage:       "NATS maximum reconnect attempts",
-				Aliases:     []string{"nmra"},
-				EnvVars:     []string{"NATS_MAX_RECONNECT_ATTEMPTS"},
-				Value:       -1,
-				DefaultText: "-1",
-				Destination: &cmdArgs.NATS.MaxReconnectAttempt,
+				Name:        "config-file",
+				Usage:       "Application config file. Use DEFAULT if not specified.",
+				Aliases:     []string{"c"},
+				EnvVars:     []string{"CONFIG_FILE"},
+				Value:       "",
+				DefaultText: "",
+				Destination: &cmdArgs.ConfigFile,
 				Required:    false,
 			},
 		},
@@ -157,14 +110,12 @@ func main() {
 				Name:        "management",
 				Usage:       "Run the httpmq management server",
 				Description: "Serves the REST API for managing JetStream streams and consumers",
-				Flags:       cmd.GetManagementCLIFlags(&cmdArgs.Management),
 				Action:      startManagementServer,
 			},
 			{
 				Name:        "dataplane",
-				Usage:       "Run the httpmq data plane server",
+				Usage:       "Run the httpmq dataplane server",
 				Description: "Serves the REST API for message publish, and subscribing through JetStream",
-				Flags:       cmd.GetDataplaneCLIFlags(&cmdArgs.Dataplane),
 				Action:      startDataplaneServer,
 			},
 		},
@@ -196,38 +147,67 @@ func setupLogging() {
 }
 
 // initialCmdArgsProcessing perform initial CMD arg processing
-func initialCmdArgsProcessing() error {
+func initialCmdArgsProcessing() (*common.SystemConfig, error) {
 	validate := validator.New()
+	// Validate command line argument
 	if err := validate.Struct(&cmdArgs); err != nil {
 		log.WithError(err).WithFields(logTags).Error("Invalid CMD args")
-		return err
+		return nil, err
 	}
 	setupLogging()
-	tmp, err := json.Marshal(&cmdArgs)
-	// args don't marshal
+	tmp, err := json.MarshalIndent(&cmdArgs, "", "  ")
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Error("Failed to marshal args")
-		return err
+		return nil, err
 	}
-	log.Debugf("Starting params %s", tmp)
-	return nil
+	log.Debugf("Starting params\n%s", tmp)
+	// Parse the config file
+	if len(cmdArgs.ConfigFile) > 0 {
+		viper.SetConfigFile(cmdArgs.ConfigFile)
+		if err := viper.ReadInConfig(); err != nil {
+			log.WithError(err).WithFields(logTags).Errorf(
+				"Failed to read config file %s", cmdArgs.ConfigFile,
+			)
+			return nil, err
+		}
+	}
+	var config common.SystemConfig
+	if err := viper.Unmarshal(&config); err != nil {
+		log.WithError(err).WithFields(logTags).Errorf(
+			"Failed to parse config file %s", cmdArgs.ConfigFile,
+		)
+		return nil, err
+	}
+	tmp, err = json.MarshalIndent(&config, "", "  ")
+	if err != nil {
+		log.WithError(err).WithFields(logTags).Error("Failed to marshal config files")
+		return nil, err
+	}
+	log.Debugf("Config file\n%s", tmp)
+	if err := validate.Struct(&config); err != nil {
+		log.WithError(err).WithFields(logTags).Error("Invalid config file content")
+		return nil, err
+	}
+	return &config, nil
 }
 
 // prepareJetStreamClient define the NATS client
-func prepareJetStreamClient(ctxtCancel context.CancelFunc) (*core.NatsClient, error) {
+func prepareJetStreamClient(
+	config common.NATSConfig, ctxtCancel context.CancelFunc,
+) (*core.NatsClient, error) {
 	natsParam := core.NATSConnectParams{
-		ServerURI:           cmdArgs.NATS.ServerURI,
-		ConnectTimeout:      cmdArgs.NATS.ConnectTimeout,
-		MaxReconnectAttempt: cmdArgs.NATS.MaxReconnectAttempt,
-		ReconnectWait:       cmdArgs.NATS.ReconnectWait,
+		ServerURI:           config.ServerURI,
+		ConnectTimeout:      time.Second * time.Duration(config.ConnectTimeout),
+		MaxReconnectAttempt: config.Reconnect.MaxAttempts,
+		ReconnectWait:       time.Second * time.Duration(config.Reconnect.WaitInterval),
 		OnDisconnectCallback: func(_ *nats.Conn, e error) {
 			log.WithError(e).WithFields(logTags).Errorf(
-				"NATS client disconnected from server %s", cmdArgs.NATS.ServerURI,
+				"NATS client disconnected from server %s", config.ServerURI,
 			)
 		},
 		OnReconnectCallback: func(_ *nats.Conn) {
 			log.WithFields(logTags).Warnf(
-				"NATS client reconnected with server %s", cmdArgs.NATS.ServerURI,
+				"NATS client reconnected with server %s", config.ServerURI,
 			)
 		},
 		OnCloseCallback: func(_ *nats.Conn) {
@@ -262,27 +242,29 @@ func signalRecvSetup(wg *sync.WaitGroup, ctxtCancel context.CancelFunc) {
 
 // startManagementServer run the management server
 func startManagementServer(c *cli.Context) error {
-	if err := initialCmdArgsProcessing(); err != nil {
+	config, err := initialCmdArgsProcessing()
+	if err != nil {
 		return err
+	}
+	if config.Management == nil {
+		return fmt.Errorf("management server can't start without its configurations")
 	}
 
 	wg, runTimeContext, rtCancel := defineControlVars()
 	defer wg.Wait()
 	defer rtCancel()
 
-	js, err := prepareJetStreamClient(rtCancel)
+	js, err := prepareJetStreamClient(config.NATS, rtCancel)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf(
-			"Failed to define NATS client with %s", cmdArgs.NATS.ServerURI,
+			"Failed to define NATS client with %s", config.NATS.ServerURI,
 		)
 		return nil
 	}
 
 	signalRecvSetup(wg, rtCancel)
 
-	return cmd.RunManagementServer(
-		runTimeContext, cmdArgs.Management, cmdArgs.IdleTimeout, cmdArgs.Hostname, js,
-	)
+	return cmd.RunManagementServer(runTimeContext, config.Management, cmdArgs.Hostname, js)
 }
 
 // ============================================================================
@@ -290,18 +272,22 @@ func startManagementServer(c *cli.Context) error {
 
 // startDataplaneServer run the dataplane server
 func startDataplaneServer(c *cli.Context) error {
-	if err := initialCmdArgsProcessing(); err != nil {
+	config, err := initialCmdArgsProcessing()
+	if err != nil {
 		return err
+	}
+	if config.Dataplane == nil {
+		return fmt.Errorf("dataplane server can't start without its configurations")
 	}
 
 	wg, runTimeContext, rtCancel := defineControlVars()
 	defer wg.Wait()
 	defer rtCancel()
 
-	js, err := prepareJetStreamClient(rtCancel)
+	js, err := prepareJetStreamClient(config.NATS, rtCancel)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf(
-			"Failed to define NATS client with %s", cmdArgs.NATS.ServerURI,
+			"Failed to define NATS client with %s", config.NATS.ServerURI,
 		)
 		return nil
 	}
@@ -309,6 +295,6 @@ func startDataplaneServer(c *cli.Context) error {
 	signalRecvSetup(wg, rtCancel)
 
 	return cmd.RunDataplaneServer(
-		runTimeContext, cmdArgs.Dataplane, cmdArgs.IdleTimeout, cmdArgs.Hostname, js, wg,
+		runTimeContext, config.Dataplane, cmdArgs.Hostname, js, wg,
 	)
 }

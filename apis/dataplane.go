@@ -49,6 +49,7 @@ type APIRestJetStreamDataplaneHandler struct {
 func GetAPIRestJetStreamDataplaneHandler(
 	baseContext context.Context,
 	client *core.NatsClient,
+	httpConfig *common.HTTPConfig,
 	runTimePublisher dataplane.JetStreamPublisher,
 	ackBroadcast dataplane.JetStreamACKBroadcaster,
 	wg *sync.WaitGroup,
@@ -57,9 +58,16 @@ func GetAPIRestJetStreamDataplaneHandler(
 		"module":    "rest",
 		"component": "jetstream-dataplane",
 	}
+	offLimitHeaders := make(map[string]bool)
+	for _, header := range httpConfig.Logging.DoNotLogHeaders {
+		offLimitHeaders[header] = true
+	}
 	return APIRestJetStreamDataplaneHandler{
 		APIRestHandler: APIRestHandler{
-			Component: common.Component{LogTags: logTags},
+			Component:             common.Component{LogTags: logTags},
+			startOfRequestLog:     httpConfig.Logging.StartOfRequestMessage,
+			endOfRequestLog:       httpConfig.Logging.EndOfRequestMessage,
+			offLimitHeadersForLog: offLimitHeaders,
 		},
 		natsClient:   client,
 		publisher:    runTimePublisher,

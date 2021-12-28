@@ -65,16 +65,16 @@ func writeRESTResponse(
 			w.Header().Add("Httpmq-Request-ID", v.ID)
 		}
 	}
-	w.WriteHeader(respCode)
 	t, err := json.Marshal(resp)
 	if err != nil {
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return err
 	}
 	if _, err = w.Write(t); err != nil {
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return err
 	}
+	w.WriteHeader(respCode)
 	return nil
 }
 
@@ -99,6 +99,19 @@ func RegisterPathPrefix(
 // APIRestHandler base REST handler
 type APIRestHandler struct {
 	common.Component
+	startOfRequestLog, endOfRequestLog string
+	offLimitHeadersForLog              map[string]bool
+}
+
+// addRequestMetaToLog helper function for adding request metadata to a log message
+func (h APIRestHandler) addRequestMetaToLog(metadata log.Fields, r *http.Request) {
+	for headerField, headerValues := range r.Header {
+		if _, present := h.offLimitHeadersForLog[headerField]; !present {
+			metadata[headerField] = headerValues
+		}
+	}
+	metadata["host"] = r.Host
+	metadata["referer"] = r.Referer()
 }
 
 // reply helper function for writing responses
@@ -120,12 +133,8 @@ func (h APIRestHandler) reply(
 	}
 	localLogTags["response_timestamp"] = time.Now().UTC().Format(time.RFC3339Nano)
 	// Request params
-	for headerField, headerValues := range r.Header {
-		localLogTags[headerField] = headerValues
-	}
-	localLogTags["host"] = r.Host
-	localLogTags["referer"] = r.Referer()
-	log.WithFields(localLogTags).Warn("Request complete")
+	h.addRequestMetaToLog(localLogTags, r)
+	log.WithFields(localLogTags).Warn(h.endOfRequestLog)
 }
 
 // Write logging support
@@ -137,7 +146,6 @@ func (h APIRestHandler) Write(p []byte) (n int, err error) {
 // attachRequestID middleware function to attach a request ID to a API request
 func (h APIRestHandler) attachRequestID(next http.HandlerFunc) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		localLogTags, _ := common.UpdateLogTags(r.Context(), h.LogTags)
 		// use provided request id from incoming request if any
 		reqID := r.Header.Get("Httpmq-Request-ID")
 		if reqID == "" {
@@ -148,8 +156,10 @@ func (h APIRestHandler) attachRequestID(next http.HandlerFunc) http.HandlerFunc 
 		params := common.RequestParam{
 			ID: reqID, Method: r.Method, URI: r.URL.String(), Timestamp: time.Now(),
 		}
-		log.WithFields(localLogTags).Debugf("New request ID %s", reqID)
 		ctx := context.WithValue(r.Context(), common.RequestParam{}, params)
+		localLogTags, _ := common.UpdateLogTags(ctx, h.LogTags)
+		h.addRequestMetaToLog(localLogTags, r)
+		log.WithFields(localLogTags).Warn(h.startOfRequestLog)
 
 		next(rw, r.WithContext(ctx))
 	}

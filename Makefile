@@ -20,6 +20,11 @@ lint: .prepare ## Lint the files
 	@golint ./...
 	@golangci-lint run ./...
 
+.PHONY: fix
+fix: .prepare ## Lint and fix vialoations
+	@go mod tidy
+	@golangci-lint run --fix ./...
+
 .PHONY: compose
 compose: clean .prepare ## Run docker-compose to create the DEV ENV
 	@docker-compose -f docker/docker-compose.yaml up -d
@@ -45,7 +50,7 @@ build: lint ## Build project binaries
 	@pip3 install --user pre-commit
 	@pre-commit install
 	@pre-commit install-hooks
-	@GO111MODULE=on go get -v -u github.com/go-critic/go-critic/cmd/gocritic@v0.5.4
+	@GO111MODULE=on go install github.com/go-critic/go-critic/cmd/gocritic@v0.5.4
 	@GO111MODULE=on go get -v -u github.com/swaggo/swag/cmd/swag
 	@touch .prepare
 

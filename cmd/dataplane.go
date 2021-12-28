@@ -22,59 +22,20 @@ import (
 	"time"
 
 	"github.com/alwitt/httpmq/apis"
+	"github.com/alwitt/httpmq/common"
 	"github.com/alwitt/httpmq/core"
 	"github.com/alwitt/httpmq/dataplane"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
-	"github.com/urfave/cli/v2"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
 
-// DataplaneRestEndpoints end-point path configs for dataplane API
-type DataplaneRestEndpoints struct {
-	PathPrefix string
-}
-
-// DataplaneCLIArgs arguments
-type DataplaneCLIArgs struct {
-	ServerPort int `validate:"required,gt=0,lt=65536"`
-	Endpoints  DataplaneRestEndpoints
-}
-
-// GetDataplaneCLIFlags retrieve the set of CMD flags for dataplane server
-func GetDataplaneCLIFlags(args *DataplaneCLIArgs) []cli.Flag {
-	return []cli.Flag{
-		&cli.IntFlag{
-			Name:        "dataplane-server-port",
-			Usage:       "Dataplane server port",
-			Aliases:     []string{"dsp"},
-			EnvVars:     []string{"DATAPLANE_SERVER_PORT"},
-			Value:       3001,
-			DefaultText: "3001",
-			Destination: &args.ServerPort,
-			Required:    false,
-		},
-		// End-point related
-		&cli.StringFlag{
-			Name:        "dataplane-server-endpoint-prefix",
-			Usage:       "Set the end-point path prefix for the dataplane APIs",
-			Aliases:     []string{"dsep"},
-			EnvVars:     []string{"DATAPLANE_SERVER_ENDPOINT_PREFIX"},
-			Value:       "/",
-			DefaultText: "/",
-			Destination: &args.Endpoints.PathPrefix,
-			Required:    false,
-		},
-	}
-}
-
 // RunDataplaneServer run the dataplane server
 func RunDataplaneServer(
 	runTimeContext context.Context,
-	params DataplaneCLIArgs,
-	idleTimeout time.Duration,
+	params *common.DataplaneServerConfig,
 	instance string,
 	natsClient *core.NatsClient,
 	wg *sync.WaitGroup,
@@ -86,7 +47,7 @@ func RunDataplaneServer(
 	}
 
 	validate := validator.New()
-	if err := validate.Struct(&params); err != nil {
+	if err := validate.Struct(params); err != nil {
 		log.WithError(err).WithFields(logTags).Error("Invalid CMD args")
 		return err
 	}
@@ -106,7 +67,7 @@ func RunDataplaneServer(
 	localCtxt, lclCancel := context.WithCancel(runTimeContext)
 	defer lclCancel()
 	httpHandler, err := apis.GetAPIRestJetStreamDataplaneHandler(
-		localCtxt, natsClient, msgPub, ackPub, wg,
+		localCtxt, natsClient, &params.HTTPSetting, msgPub, ackPub, wg,
 	)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define HTTP handler")
@@ -148,12 +109,14 @@ func RunDataplaneServer(
 		"get": httpHandler.ReadyHandler(),
 	})
 
-	serverListen := fmt.Sprintf(":%d", params.ServerPort)
+	serverListen := fmt.Sprintf(
+		"%s:%d", params.HTTPSetting.Server.ListenOn, params.HTTPSetting.Server.Port,
+	)
 	httpSrv := &http.Server{
 		Addr:         serverListen,
-		WriteTimeout: time.Second * 60,
-		ReadTimeout:  time.Second * 60,
-		IdleTimeout:  idleTimeout,
+		WriteTimeout: time.Second * time.Duration(params.HTTPSetting.Server.WriteTimeout),
+		ReadTimeout:  time.Second * time.Duration(params.HTTPSetting.Server.ReadTimeout),
+		IdleTimeout:  time.Second * time.Duration(params.HTTPSetting.Server.IdleTimeout),
 		Handler:      h2c.NewHandler(router, &http2.Server{}),
 	}
 

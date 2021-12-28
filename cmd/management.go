@@ -21,59 +21,20 @@ import (
 	"time"
 
 	"github.com/alwitt/httpmq/apis"
+	"github.com/alwitt/httpmq/common"
 	"github.com/alwitt/httpmq/core"
 	"github.com/alwitt/httpmq/management"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
-	"github.com/urfave/cli/v2"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
 
-// ManagementRestEndpoints end-point path configs for management control API
-type ManagementRestEndpoints struct {
-	PathPrefix string
-}
-
-// ManagementCLIArgs arguments
-type ManagementCLIArgs struct {
-	ServerPort int `validate:"required,gt=0,lt=65536"`
-	Endpoints  ManagementRestEndpoints
-}
-
-// GetManagementCLIFlags retrieve the set of CMD flags for management server
-func GetManagementCLIFlags(args *ManagementCLIArgs) []cli.Flag {
-	return []cli.Flag{
-		&cli.IntFlag{
-			Name:        "management-server-port",
-			Usage:       "Management server port",
-			Aliases:     []string{"msp"},
-			EnvVars:     []string{"MANAGEMENT_SERVER_PORT"},
-			Value:       3000,
-			DefaultText: "3000",
-			Destination: &args.ServerPort,
-			Required:    false,
-		},
-		// End-point related
-		&cli.StringFlag{
-			Name:        "management-server-endpoint-prefix",
-			Usage:       "Set the end-point path prefix for the management APIs",
-			Aliases:     []string{"msep"},
-			EnvVars:     []string{"MANAGEMENT_SERVER_ENDPOINT_PREFIX"},
-			Value:       "/",
-			DefaultText: "/",
-			Destination: &args.Endpoints.PathPrefix,
-			Required:    false,
-		},
-	}
-}
-
 // RunManagementServer run the management server
 func RunManagementServer(
 	runtimeContext context.Context,
-	params ManagementCLIArgs,
-	idleTimeout time.Duration,
+	params *common.ManagementServerConfig,
 	instance string,
 	natsClient *core.NatsClient,
 ) error {
@@ -84,7 +45,7 @@ func RunManagementServer(
 	}
 
 	validate := validator.New()
-	if err := validate.Struct(&params); err != nil {
+	if err := validate.Struct(params); err != nil {
 		log.WithError(err).WithFields(logTags).Error("Invalid CMD args")
 		return err
 	}
@@ -95,7 +56,7 @@ func RunManagementServer(
 		return err
 	}
 
-	httpHandler, err := apis.GetAPIRestJetStreamManagementHandler(controller)
+	httpHandler, err := apis.GetAPIRestJetStreamManagementHandler(controller, &params.HTTPSetting)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define HTTP handler")
 		return err
@@ -149,12 +110,14 @@ func RunManagementServer(
 		"get": httpHandler.ReadyHandler(),
 	})
 
-	serverListen := fmt.Sprintf(":%d", params.ServerPort)
+	serverListen := fmt.Sprintf(
+		"%s:%d", params.HTTPSetting.Server.ListenOn, params.HTTPSetting.Server.Port,
+	)
 	httpSrv := &http.Server{
 		Addr:         serverListen,
-		WriteTimeout: time.Second * 60,
-		ReadTimeout:  time.Second * 60,
-		IdleTimeout:  idleTimeout,
+		WriteTimeout: time.Second * time.Duration(params.HTTPSetting.Server.WriteTimeout),
+		ReadTimeout:  time.Second * time.Duration(params.HTTPSetting.Server.ReadTimeout),
+		IdleTimeout:  time.Second * time.Duration(params.HTTPSetting.Server.IdleTimeout),
 		Handler:      h2c.NewHandler(router, &http2.Server{}),
 	}
 
