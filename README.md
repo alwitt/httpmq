@@ -311,6 +311,10 @@ $ curl -X POST 'http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testC
 
 # [3. Additional Topics](#table-of-content)
 
+* [httpmq OpenAPI Specification](https://github.com/alwitt/httpmq-api/blob/main/README.md)
+
+* [Application Configuration File](docs/config-file.md)
+
 * [Message Retransmission](docs/message-retransmit.md)
 
 * [Consumer Delivery Group](docs/delivery-group.md)
