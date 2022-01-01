@@ -3,6 +3,6 @@
 tmp
 .vscode
 *mock*
-docs
+docs/swagger.*
 out
 *.bin

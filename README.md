@@ -19,7 +19,8 @@
   * [2.3 Define Elements For Testing](#23-define-elements-for-testing)
   * [2.4 Publishing Messages](#24-publishing-messages)
   * [2.5 Subscribing For Messages](#25-subscribing-for-messages)
-- [3. License](#3-license)
+- [3. Additional Topics](#3-additional-topics)
+- [4. License](#4-license)
 
 ---
 
@@ -308,7 +309,13 @@ $ curl -X POST 'http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testC
 {"success":true}
 ```
 
-# [3. License](#table-of-content)
+# [3. Additional Topics](#table-of-content)
+
+* [Message Retransmission](docs/message-retransmit.md)
+
+* [Consumer Delivery Group](delivery-group.md)
+
+# [4. License](#table-of-content)
 
 Unless otherwise noted, the httpmq source files are distributed under the Apache Version 2.0 license found in the LICENSE file.
 
