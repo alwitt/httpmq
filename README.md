@@ -313,7 +313,7 @@ $ curl -X POST 'http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testC
 
 * [Message Retransmission](docs/message-retransmit.md)
 
-* [Consumer Delivery Group](delivery-group.md)
+* [Consumer Delivery Group](docs/delivery-group.md)
 
 # [4. License](#table-of-content)
 
