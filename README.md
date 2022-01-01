@@ -9,17 +9,21 @@
 [ReportCard-Url]: https://goreportcard.com/report/github.com/alwitt/httpmq
 [ReportCard-Image]: https://goreportcard.com/badge/github.com/alwitt/httpmq
 
+# Table of Content
+
 - [1. Introduction](#1-introduction)
-  * [1.1 References](#1.1-references)
+  * [1.1 References](#11-references)
 - [2. Getting Started](#2-getting-started)
-  * [2.1 Start the Management API](#2.1-start-the-management-api)
-  * [2.2 Start the Dataplane API](#2.2-start-the-dataplane-api)
-  * [2.3 Define Elements For Testing](#2.3-define-elements-for-testing)
-  * [2.4 Publishing Messages](#2.4-publishing-messages)
-  * [2.5 Subscribing For Messages](#2.5-subscribing-for-messages)
+  * [2.1 Start the Management API](#21-start-the-management-api)
+  * [2.2 Start the Dataplane API](#22-start-the-dataplane-api)
+  * [2.3 Define Elements For Testing](#23-define-elements-for-testing)
+  * [2.4 Publishing Messages](#24-publishing-messages)
+  * [2.5 Subscribing For Messages](#25-subscribing-for-messages)
 - [3. License](#3-license)
 
-# 1. Introduction
+---
+
+# [1. Introduction](#table-of-content)
 
 [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) is (as described in its documentation) a persistent message streaming solution designed to address "`problems identified with streaming in technology today - complexity, fragility, and a lack of scalability`". With `JetStream` serving as the core, `httpmq` is a thin HTTP/2 API layer which exposes some of core features of `JetStream`.
 
@@ -53,7 +57,7 @@ Through the `dataplane` API group, users can:
 
 The `httpmq` application hosts the two API groups as different runtime modes; the application is either serving the `management` API group, or serving the `dataplane` API group.
 
-## 1.1 References
+## [1.1 References](#table-of-content)
 
 * [NATS](https://nats.io)
 * [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream)
@@ -67,7 +71,7 @@ The `httpmq` application hosts the two API groups as different runtime modes; th
 $ node widdershins --code --summary=true --search=false /path/to/docs/swagger.yaml -o README.md
 ``` -->
 
-# 2. Getting Started
+# [2. Getting Started](#table-of-content)
 
 A helper Makefile is included to automate the common development tasks. The available make targets are:
 
@@ -137,7 +141,7 @@ ok  	github.com/alwitt/httpmq/dataplane	0.967s
 ok  	github.com/alwitt/httpmq/management	0.081s
 ```
 
-## 2.1 Start the Management API
+## [2.1 Start the Management API](#table-of-content)
 
 Start `httpmq` serving the management API group
 
@@ -147,7 +151,7 @@ $ ./httpmq.bin -l info management
 2021/12/28 15:21:00  info Started HTTP server on http://127.0.0.1:3000 component=management instance=dvm-personal module=cmd
 ```
 
-## 2.2 Start the Dataplane API
+## [2.2 Start the Dataplane API](#table-of-content)
 
 Start `httpmq` serving the dataplane API group
 
@@ -157,7 +161,7 @@ $ ./httpmq.bin -l info dataplane
 2021/12/28 15:21:19  info Started HTTP server on http://127.0.0.1:3001 component=dataplane instance=dvm-personal module=cmd
 ```
 
-## 2.3 Define Elements For Testing
+## [2.3 Define Elements For Testing](#table-of-content)
 
 Define a test stream
 
@@ -173,7 +177,6 @@ $ curl -X POST 'http://127.0.0.1:3000/v1/admin/stream' \
     ]
 }'
 {"success":true}
-$
 ```
 
 Verify the stream is defined
@@ -222,7 +225,6 @@ $ curl -X POST 'http://127.0.0.1:3000/v1/admin/stream/testStream00/consumer' \
     "filter_subject": "test-subject.01"
 }'
 {"success":true}
-$
 ```
 
 Verify the consumer is defined
@@ -258,14 +260,13 @@ $ curl 'http://127.0.0.1:3000/v1/admin/stream/testStream00/consumer/testConsumer
 }
 ```
 
-## 2.4 Publishing Messages
+## [2.4 Publishing Messages](#table-of-content)
 
 Publish a message for a subject
 
 ```shell
 $ curl -X POST 'http://127.0.0.1:3001/v1/data/subject/test-subject.01' --header 'Content-Type: text/plain' --data-raw "$(echo 'Hello World' | base64)"
 {"success":true}
-$
 ```
 
 > **IMPORTANT:** The message body must be Base64 encoded.
@@ -275,7 +276,7 @@ $
 > SGVsbG8gV29ybGQK
 > ```
 
-## 2.5 Subscribing For Messages
+## [2.5 Subscribing For Messages](#table-of-content)
 
 Subscribe to messages for a consumer on a stream
 
@@ -290,7 +291,6 @@ After receiving a message, acknowledge receiving that message with
 ```shell
 $ curl -X POST 'http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testConsumer00/ack' --header 'Content-Type: application/json' --data-raw '{"consumer": 1,"stream": 1}'
 {"success":true}
-$
 ```
 
 The `consumer` and `stream` fields are the sequence numbers which arrived with the message.
@@ -306,10 +306,9 @@ When acknowledging this message now, use `'{"consumer": 2,"stream": 1}'` as the 
 ```shell
 $ curl -X POST 'http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testConsumer00/ack' --header 'Content-Type: application/json' --data-raw '{"consumer": 2,"stream": 1}'
 {"success":true}
-$
 ```
 
-# 3. License
+# [3. License](#table-of-content)
 
 Unless otherwise noted, the httpmq source files are distributed under the Apache Version 2.0 license found in the LICENSE file.
 
