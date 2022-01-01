@@ -9,21 +9,91 @@
 [ReportCard-Url]: https://goreportcard.com/report/github.com/alwitt/httpmq
 [ReportCard-Image]: https://goreportcard.com/badge/github.com/alwitt/httpmq
 
-# Documentation
+- [1. Introduction](#1-introduction)
+  * [1.1 References](#1.1-references)
+- [2. Getting Started](#2-getting-started)
+  * [2.1 Start the Management API](#2.1-start-the-management-api)
+  * [2.2 Start the Dataplane API](#2.2-start-the-dataplane-api)
+  * [2.3 Define Elements For Testing](#2.3-define-elements-for-testing)
+  * [2.4 Publishing Messages](#2.4-publishing-messages)
+  * [2.5 Subscribing For Messages](#2.5-subscribing-for-messages)
+- [3. License](#3-license)
 
-The REST API documentation can be found in here: [httpmq-api](https://github.com/alwitt/httpmq-api/blob/main/README.md).
+# 1. Introduction
+
+[NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) is (as described in its documentation) a persistent message streaming solution designed to address "`problems identified with streaming in technology today - complexity, fragility, and a lack of scalability`". With `JetStream` serving as the core, `httpmq` is a thin HTTP/2 API layer which exposes some of core features of `JetStream`.
+
+The `httpmq` application serves two API groups:
+
+* `management`: allow users to administer JetStream streams, consumers, and subjects.
+* `dataplane`: allow users to publish and subscribe through JetStream subjects.
+
+Through the `management` API group, users can:
+
+* For streams:
+  * Define new stream.
+  * Fetch parameters of all defined streams.
+  * Fetch parameters of one defined stream.
+  * Change a stream's data retention policy.
+  * Change a stream's subjects of interest.
+  * Delete a stream.
+
+* For consumers:
+  * Define new consumer on a stream.
+    * Supports delivery / queue groups.
+  * Fetch parameters of all defined consumers of a stream.
+  * Fetch parameters of one defined consumer of a stream.
+  * Delete a consumer.
+
+Through the `dataplane` API group, users can:
+
+* Publish messages to a subject.
+* Push-subscribe for messages on a particular subject as a consumer of a stream.
+  * Supports delivery / queue groups.
+
+The `httpmq` application hosts the two API groups as different runtime modes; the application is either serving the `management` API group, or serving the `dataplane` API group.
+
+## 1.1 References
+
+* [NATS](https://nats.io)
+* [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream)
+* [NATS Subject-Based Messaging](https://docs.nats.io/nats-concepts/subjects)
+* [NATS Queue Group / JetStream Delivery Group](https://docs.nats.io/nats-concepts/core-nats/queue)
+* [NATS JetStream Deep Dive](https://docs.nats.io/using-nats/developer/develop_jetstream)
+* [httpmq OpenAPI Specification](https://github.com/alwitt/httpmq-api/blob/main/README.md).
 
 <!-- Documentation generated with [widdershins](https://github.com/Mermade/widdershins)
 ```shell
 $ node widdershins --code --summary=true --search=false /path/to/docs/swagger.yaml -o README.md
 ``` -->
 
-# Getting Started
+# 2. Getting Started
 
-Start the local development NATS server with JetStream enabled
+A helper Makefile is included to automate the common development tasks. The available make targets are:
 
 ```shell
-make compose
+$ make help
+lint                           Lint the files
+fix                            Lint and fix vialoations
+compose                        Run docker-compose to create the DEV ENV
+doc                            Generate the OpenAPI spec
+mock                           Generate test mock interfaces
+test                           Run unittests
+build                          Build project binaries
+clean                          Clean up DEV ENV
+help                           Display this help screen
+```
+
+First, start the local development NATS server with JetStream enabled:
+
+```shell
+$ make compose
+Removing docker_nats_1 ... done
+Removing network docker_httpmq-test
+Removing volume docker_nats_js_store
+Creating network "docker_httpmq-test" with driver "bridge"
+Creating volume "docker_nats_js_store" with default driver
+Creating docker_nats_1 ... done
 ```
 
 ```shell
@@ -53,94 +123,23 @@ $ docker logs docker_nats_1
 [1] 2021/12/08 18:15:54.796280 [INF] Server is ready
 ```
 
-Available Makefile targets are
-
-```shell
-$ make help
-lint                           Lint the files
-compose                        Run docker-compose to create the DEV ENV
-doc                            Generate the OpenAPI spec
-mock                           Generate test mock interfaces
-test                           Run unittests
-build                          Build project binaries
-clean                          Clean up DEV ENV
-help                           Display this help screen
-```
-
 Verify the project builds, and passes unit-tests
 
 ```shell
 $ make
 $ make test
+?   	github.com/alwitt/httpmq	[no test files]
+?   	github.com/alwitt/httpmq/apis	[no test files]
+?   	github.com/alwitt/httpmq/cmd	[no test files]
+ok  	github.com/alwitt/httpmq/common	0.323s
+?   	github.com/alwitt/httpmq/core	[no test files]
+ok  	github.com/alwitt/httpmq/dataplane	0.967s
+ok  	github.com/alwitt/httpmq/management	0.081s
 ```
 
-By default, the server application is named `httpmq.bin`.
+## 2.1 Start the Management API
 
-```shell
-$ ./httpmq.bin -h
-NAME:
-   httpmq.bin - application entrypoint
-
-USAGE:
-   httpmq.bin [global options] command [command options] [arguments...]
-
-VERSION:
-   v0.2.0
-
-DESCRIPTION:
-   HTTP/2 based message broker built around NATS JetStream
-
-COMMANDS:
-   management  Run the httpmq management server
-   dataplane   Run the httpmq dataplane server
-   help, h     Shows a list of commands or help for one command
-
-GLOBAL OPTIONS:
-   --json-log, -j                 Whether to log in JSON format (default: false) [$LOG_AS_JSON]
-   --log-level value, -l value    Logging level: [debug info warn error] (default: warn) [$LOG_LEVEL]
-   --config-file value, -c value  Application config file. Use DEFAULT if not specified. [$CONFIG_FILE]
-   --help, -h                     show help (default: false)
-   --version, -v                  print the version (default: false)
-```
-
-```shell
-$ ./httpmq.bin management -h
-NAME:
-   httpmq.bin management - Run the httpmq management server
-
-USAGE:
-   httpmq.bin management [command options] [arguments...]
-
-DESCRIPTION:
-   Serves the REST API for managing JetStream streams and consumers
-
-OPTIONS:
-   --help, -h  show help (default: false)
-```
-
-```shell
-$ ./httpmq.bin dataplane -h
-NAME:
-   httpmq.bin dataplane - Run the httpmq dataplane server
-
-USAGE:
-   httpmq.bin dataplane [command options] [arguments...]
-
-DESCRIPTION:
-   Serves the REST API for message publish, and subscribing through JetStream
-
-OPTIONS:
-   --help, -h  show help (default: false)
-```
-
----
-## Start Local Test Servers
-
-To start the management server locally
-
-```shell
-./httpmq.bin -l info management
-```
+Start `httpmq` serving the management API group
 
 ```shell
 $ ./httpmq.bin -l info management
@@ -148,25 +147,22 @@ $ ./httpmq.bin -l info management
 2021/12/28 15:21:00  info Started HTTP server on http://127.0.0.1:3000 component=management instance=dvm-personal module=cmd
 ```
 
-To start the dataplane server locally
+## 2.2 Start the Dataplane API
 
-```shell
-./httpmq.bin -l info dataplane
-```
+Start `httpmq` serving the dataplane API group
 
 ```shell
 $ ./httpmq.bin -l info dataplane
 2021/12/28 15:21:19  info Created JetStream client  component=jetstream-backend instance=nats://127.0.0.1:4222 module=core
-2021/12/28 15:21:19  info Started HTTP server on http://127.0.0.1:3001 component=management instance=dvm-personal module=cmd
+2021/12/28 15:21:19  info Started HTTP server on http://127.0.0.1:3001 component=dataplane instance=dvm-personal module=cmd
 ```
 
----
-## Define Elements For Testing
+## 2.3 Define Elements For Testing
 
-Start by defining a JetStream stream
+Define a test stream
 
 ```shell
-curl -X POST 'http://127.0.0.1:3000/v1/admin/stream' \
+$ curl -X POST 'http://127.0.0.1:3000/v1/admin/stream' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "name": "testStream00",
@@ -176,17 +172,14 @@ curl -X POST 'http://127.0.0.1:3000/v1/admin/stream' \
         "test-subject.01"
     ]
 }'
+{"success":true}
+$
 ```
-
-Response should be `{"success":true}`.
 
 Verify the stream is defined
 
 ```shell
-curl 'http://127.0.0.1:3000/v1/admin/stream/testStream00'
-```
-
-```json
+$ curl 'http://127.0.0.1:3000/v1/admin/stream/testStream00' | jq '.'
 {
   "success": true,
   "stream": {
@@ -217,10 +210,10 @@ curl 'http://127.0.0.1:3000/v1/admin/stream/testStream00'
 }
 ```
 
-Define a consumer for the stream
+Define a test consumer on this stream
 
 ```shell
-curl -X POST 'http://127.0.0.1:3000/v1/admin/stream/testStream00/consumer' \
+$ curl -X POST 'http://127.0.0.1:3000/v1/admin/stream/testStream00/consumer' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "max_inflight": 4,
@@ -228,17 +221,14 @@ curl -X POST 'http://127.0.0.1:3000/v1/admin/stream/testStream00/consumer' \
     "name": "testConsumer00",
     "filter_subject": "test-subject.01"
 }'
+{"success":true}
+$
 ```
-
-Response should be `{"success":true}`.
 
 Verify the consumer is defined
 
 ```shell
-curl 'http://127.0.0.1:3000/v1/admin/stream/testStream00/consumer/testConsumer00'
-```
-
-```json
+$ curl 'http://127.0.0.1:3000/v1/admin/stream/testStream00/consumer/testConsumer00' | jq '.'
 {
   "success": true,
   "consumer": {
@@ -268,13 +258,14 @@ curl 'http://127.0.0.1:3000/v1/admin/stream/testStream00/consumer/testConsumer00
 }
 ```
 
----
-## Publishing Messages
+## 2.4 Publishing Messages
 
-To publish a message for a subject
+Publish a message for a subject
 
 ```shell
-curl -X POST 'http://127.0.0.1:3001/v1/data/subject/test-subject.01' --header 'Content-Type: text/plain' --data-raw "$(echo 'Hello World' | base64)"
+$ curl -X POST 'http://127.0.0.1:3001/v1/data/subject/test-subject.01' --header 'Content-Type: text/plain' --data-raw "$(echo 'Hello World' | base64)"
+{"success":true}
+$
 ```
 
 > **IMPORTANT:** The message body must be Base64 encoded.
@@ -284,27 +275,25 @@ curl -X POST 'http://127.0.0.1:3001/v1/data/subject/test-subject.01' --header 'C
 > SGVsbG8gV29ybGQK
 > ```
 
----
-## Subscribing For Messages
+## 2.5 Subscribing For Messages
 
-To subscribe to messages for a consumer on a stream
-
-```shell
-curl http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testConsumer00?subject_name=test-subject.01 --http2-prior-knowledge
-```
+Subscribe to messages for a consumer on a stream
 
 ```shell
 $ curl http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testConsumer00?subject_name=test-subject.01 --http2-prior-knowledge
 {"success":true,"stream":"testStream00","subject":"test-subject.01","consumer":"testConsumer00","sequence":{"stream":1,"consumer":1},"b64_msg":"SGVsbG8gV29ybGQK"}
+...
 ```
 
-After receiving a message, acknowledge receiving the message with
+After receiving a message, acknowledge receiving that message with
 
 ```shell
-curl -X POST 'http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testConsumer00/ack' --header 'Content-Type: application/json' --data-raw '{"consumer": 1,"stream": 1}'
+$ curl -X POST 'http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testConsumer00/ack' --header 'Content-Type: application/json' --data-raw '{"consumer": 1,"stream": 1}'
+{"success":true}
+$
 ```
 
-The `consumer` and `stream` fields are the sequence numbers which came with the message.
+The `consumer` and `stream` fields are the sequence numbers which arrived with the message.
 
 If an acknowledgement is not sent within the consumer's configured max ACK wait duration, the message will be sent through this consumer's subscription again. This time, the `stream` sequence number is unchanged, but the `consumer` sequence number is increased by one.
 
@@ -314,7 +303,13 @@ If an acknowledgement is not sent within the consumer's configured max ACK wait 
 
 When acknowledging this message now, use `'{"consumer": 2,"stream": 1}'` as the payload.
 
-# License
+```shell
+$ curl -X POST 'http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testConsumer00/ack' --header 'Content-Type: application/json' --data-raw '{"consumer": 2,"stream": 1}'
+{"success":true}
+$
+```
+
+# 3. License
 
 Unless otherwise noted, the httpmq source files are distributed under the Apache Version 2.0 license found in the LICENSE file.
 

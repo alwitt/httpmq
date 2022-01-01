@@ -159,7 +159,7 @@ type APIRestRespConsumerConfig struct {
 	AckWait time.Duration `json:"ack_wait" swaggertype:"primitive,integer" validate:"required"`
 	// FilterSubject sets the consumer to filter for subjects matching this NATs subject string
 	//
-	// See https://docs.nats.io/running-a-nats-service/nats_admin/jetstream_admin/naming
+	// See https://docs.nats.io/nats-concepts/subjects
 	FilterSubject string `json:"filter_subject,omitempty"`
 	// MaxWaiting NATS JetStream does not clearly document this
 	MaxWaiting int `json:"max_waiting,omitempty"`

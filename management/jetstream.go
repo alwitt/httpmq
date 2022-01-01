@@ -67,7 +67,7 @@ type JetStreamConsumerParam struct {
 	Notes string `json:"notes,omitempty"`
 	// FilterSubject sets the consumer to filter for subjects matching this NATs subject string
 	//
-	// See https://docs.nats.io/running-a-nats-service/nats_admin/jetstream_admin/naming
+	// See https://docs.nats.io/nats-concepts/subjects
 	FilterSubject *string `json:"filter_subject,omitempty"`
 	// DeliveryGroup creates a consumer using a delivery group name.
 	//
