@@ -77,7 +77,7 @@ jobs:
 
     env:
       IMAGE_REPO: alwitt/httpmq
-      IMAGE_TAG: "0.2.2"
+      IMAGE_TAG: "0.2.3"
 
     steps:
       - uses: actions/checkout@v2
