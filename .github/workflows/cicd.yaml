@@ -100,26 +100,26 @@ jobs:
             ${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}
           push: ${{ github.ref == 'refs/heads/main' }}
 
-      - name: Build management API specific image and push to Docker Hub for only main branch
-        uses: docker/build-push-action@v2
-        with:
-          context: ./
-          file: ./docker/Dockerfile.management-api
-          tags: |
-            ${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}-management
-          build-args: |
-            BASE_IMG=${{ env.IMAGE_REPO }}
-            BASE_IMG_TAG=${{ env.IMAGE_TAG }}
-          push: ${{ github.ref == 'refs/heads/main' }}
+      # - name: Build management API specific image and push to Docker Hub for only main branch
+      #   uses: docker/build-push-action@v2
+      #   with:
+      #     context: ./
+      #     file: ./docker/Dockerfile.management-api
+      #     tags: |
+      #       ${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}-management
+      #     build-args: |
+      #       BASE_IMG=${{ env.IMAGE_REPO }}
+      #       BASE_IMG_TAG=${{ env.IMAGE_TAG }}
+      #     push: ${{ github.ref == 'refs/heads/main' }}
 
-      - name: Build dataplane API specific image and push to Docker Hub for only main branch
-        uses: docker/build-push-action@v2
-        with:
-          context: ./
-          file: ./docker/Dockerfile.dataplane-api
-          tags: |
-            ${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}-dataplane
-          build-args: |
-            BASE_IMG=${{ env.IMAGE_REPO }}
-            BASE_IMG_TAG=${{ env.IMAGE_TAG }}
-          push: ${{ github.ref == 'refs/heads/main' }}
+      # - name: Build dataplane API specific image and push to Docker Hub for only main branch
+      #   uses: docker/build-push-action@v2
+      #   with:
+      #     context: ./
+      #     file: ./docker/Dockerfile.dataplane-api
+      #     tags: |
+      #       ${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}-dataplane
+      #     build-args: |
+      #       BASE_IMG=${{ env.IMAGE_REPO }}
+      #       BASE_IMG_TAG=${{ env.IMAGE_TAG }}
+      #     push: ${{ github.ref == 'refs/heads/main' }}
