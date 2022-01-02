@@ -58,6 +58,7 @@ func getStdRESTErrorMsg(code int, message *string) StandardResponse {
 func writeRESTResponse(
 	w http.ResponseWriter, r *http.Request, respCode int, resp interface{},
 ) error {
+	w.WriteHeader(respCode)
 	w.Header().Set("content-type", "application/json")
 	if r.Context().Value(common.RequestParam{}) != nil {
 		v, ok := r.Context().Value(common.RequestParam{}).(common.RequestParam)
@@ -74,7 +75,6 @@ func writeRESTResponse(
 		w.WriteHeader(http.StatusInternalServerError)
 		return err
 	}
-	w.WriteHeader(respCode)
 	return nil
 }
 
