@@ -30,7 +30,7 @@ management:
     # HTTP server parameters
     server_config:
       # the interface the HTTP server will listen on
-      listen_on: 127.0.0.1
+      listen_on: 0.0.0.0
       # the port the HTTP server will listen on
       listen_port: 3000
       # the maximum duration for reading the entire request,
@@ -68,7 +68,7 @@ dataplane:
   # the HTTP API / server parameters for the dataplane API server
   api_server:
     server_config:
-      listen_on: 127.0.0.1
+      listen_on: 0.0.0.0
       listen_port: 3001
       read_timeout_sec: 60
       write_timeout_sec: 60
@@ -128,13 +128,13 @@ nats:
 management:
   api_server:
     server_config:
-      listen_on: 0.0.0.0
+      listen_on: 192.168.12.128
       listen_port: 3000
 
 dataplane:
   api_server:
     server_config:
-      listen_on: 0.0.0.0
+      listen_on: 192.168.13.128
       listen_port: 3000
 ```
 

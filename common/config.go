@@ -124,7 +124,7 @@ func InstallDefaultConfigValues() {
 
 	// Default Management server settings
 	viper.SetDefault("management.endpoint_config.path_prefix", "/")
-	viper.SetDefault("management.api_server.server_config.listen_on", "127.0.0.1")
+	viper.SetDefault("management.api_server.server_config.listen_on", "0.0.0.0")
 	viper.SetDefault("management.api_server.server_config.listen_port", 3000)
 	viper.SetDefault("management.api_server.server_config.read_timeout_sec", 60)
 	viper.SetDefault("management.api_server.server_config.write_timeout_sec", 60)
@@ -143,7 +143,7 @@ func InstallDefaultConfigValues() {
 
 	// Default Dataplane server settings
 	viper.SetDefault("dataplane.endpoint_config.path_prefix", "/")
-	viper.SetDefault("dataplane.api_server.server_config.listen_on", "127.0.0.1")
+	viper.SetDefault("dataplane.api_server.server_config.listen_on", "0.0.0.0")
 	viper.SetDefault("dataplane.api_server.server_config.listen_port", 3001)
 	viper.SetDefault("dataplane.api_server.server_config.read_timeout_sec", 60)
 	viper.SetDefault("dataplane.api_server.server_config.write_timeout_sec", 60)
