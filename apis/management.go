@@ -1021,9 +1021,9 @@ func (h APIRestJetStreamManagementHandler) Alive(w http.ResponseWriter, r *http.
 
 // AliveHandler Wrapper around Alive
 func (h APIRestJetStreamManagementHandler) AliveHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
 		h.Alive(w, r)
-	}
+	})
 }
 
 // -----------------------------------------------------------------------
@@ -1062,7 +1062,7 @@ func (h APIRestJetStreamManagementHandler) Ready(w http.ResponseWriter, r *http.
 
 // ReadyHandler Wrapper around Alive
 func (h APIRestJetStreamManagementHandler) ReadyHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
 		h.Ready(w, r)
-	}
+	})
 }

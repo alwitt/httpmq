@@ -615,9 +615,9 @@ func (h APIRestJetStreamDataplaneHandler) Alive(w http.ResponseWriter, r *http.R
 
 // AliveHandler Wrapper around Alive
 func (h APIRestJetStreamDataplaneHandler) AliveHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
 		h.Alive(w, r)
-	}
+	})
 }
 
 // -----------------------------------------------------------------------
@@ -648,7 +648,7 @@ func (h APIRestJetStreamDataplaneHandler) Ready(w http.ResponseWriter, r *http.R
 
 // ReadyHandler Wrapper around Alive
 func (h APIRestJetStreamDataplaneHandler) ReadyHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
 		h.Ready(w, r)
-	}
+	})
 }

@@ -314,7 +314,7 @@ func (js jetStreamControllerImpl) ChangeStreamSubjects(
 		)
 	} else {
 		t, _ := json.Marshal(newSubjects)
-		log.WithFields(localLogTags).Errorf("Change stream %s subjects to %s", stream, t)
+		log.WithFields(localLogTags).Infof("Change stream %s subjects to %s", stream, t)
 	}
 	return err
 }
