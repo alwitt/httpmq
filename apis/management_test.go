@@ -116,6 +116,7 @@ func TestStreamManagement(t *testing.T) {
 		var msg StandardResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 	}
 
@@ -135,6 +136,7 @@ func TestStreamManagement(t *testing.T) {
 		var msg APIRestRespAllJetStreams
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 		info, ok := msg.Streams[stream1]
 		assert.True(ok)
@@ -157,6 +159,7 @@ func TestStreamManagement(t *testing.T) {
 		var msg APIRestRespOneJetStream
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 		assert.Equal(stream1, msg.Stream.Config.Name)
 		assert.EqualValues(subjects1, msg.Stream.Config.Subjects)
@@ -179,6 +182,7 @@ func TestStreamManagement(t *testing.T) {
 		var msg StandardResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.False(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 		assert.Equal(http.StatusInternalServerError, msg.Error.Code)
 	}
@@ -206,6 +210,7 @@ func TestStreamManagement(t *testing.T) {
 		var msg StandardResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 	}
 	{
@@ -224,6 +229,7 @@ func TestStreamManagement(t *testing.T) {
 		var msg APIRestRespOneJetStream
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 		assert.Equal(stream1, msg.Stream.Config.Name)
 		assert.EqualValues(subjects4, msg.Stream.Config.Subjects)
@@ -252,6 +258,7 @@ func TestStreamManagement(t *testing.T) {
 		var msg StandardResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 	}
 	{
@@ -270,6 +277,7 @@ func TestStreamManagement(t *testing.T) {
 		var msg APIRestRespOneJetStream
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 		assert.Equal(stream1, msg.Stream.Config.Name)
 		assert.Equal(maxMsgAge5, msg.Stream.Config.MaxAge)
@@ -292,6 +300,7 @@ func TestStreamManagement(t *testing.T) {
 		var msg StandardResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 	}
 	{
@@ -310,6 +319,7 @@ func TestStreamManagement(t *testing.T) {
 		var msg StandardResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.False(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 		assert.Equal(http.StatusInternalServerError, msg.Error.Code)
 	}
@@ -410,6 +420,7 @@ func TestConsumerManagement(t *testing.T) {
 		var msg StandardResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 	}
 
@@ -430,6 +441,7 @@ func TestConsumerManagement(t *testing.T) {
 		var msg APIRestRespOneJetStream
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 		assert.Equal(stream1, msg.Stream.Config.Name)
 		assert.EqualValues(subjects1, msg.Stream.Config.Subjects)
@@ -452,6 +464,7 @@ func TestConsumerManagement(t *testing.T) {
 		var msg APIRestRespAllJetStreamConsumers
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 		assert.Empty(msg.Consumers)
 	}
@@ -479,6 +492,7 @@ func TestConsumerManagement(t *testing.T) {
 		var msg StandardResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 	}
 
@@ -499,6 +513,7 @@ func TestConsumerManagement(t *testing.T) {
 		var msg APIRestRespAllJetStreamConsumers
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 		assert.Len(msg.Consumers, 1)
 		info, ok := msg.Consumers[consumer4]
@@ -526,6 +541,7 @@ func TestConsumerManagement(t *testing.T) {
 		var msg APIRestRespOneJetStreamConsumer
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 		assert.Equal(consumer4, msg.Consumer.Name)
 		assert.Equal(2, msg.Consumer.Config.MaxAckPending)
@@ -552,6 +568,7 @@ func TestConsumerManagement(t *testing.T) {
 		var msg StandardResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 	}
 	{
@@ -574,6 +591,7 @@ func TestConsumerManagement(t *testing.T) {
 		var msg StandardResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.False(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 		assert.Equal(http.StatusInternalServerError, msg.Error.Code)
 	}
@@ -595,6 +613,7 @@ func TestConsumerManagement(t *testing.T) {
 		var msg StandardResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 	}
 	{
@@ -613,6 +632,7 @@ func TestConsumerManagement(t *testing.T) {
 		var msg StandardResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.False(msg.Success)
+		assert.Equal(testReqID, msg.RequestID)
 		checkHeader(respRecorder, testReqID)
 		assert.Equal(http.StatusInternalServerError, msg.Error.Code)
 	}

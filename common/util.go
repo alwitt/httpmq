@@ -83,3 +83,8 @@ func ValidateSubjectName(subject string) error {
 	}
 	return nil
 }
+
+// GetStrPtr is a helper function to convert a string to *string
+func GetStrPtr(s string) *string {
+	return &s
+}

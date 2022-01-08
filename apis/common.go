@@ -32,25 +32,44 @@ type ErrorDetail struct {
 	Code int `json:"code" validate:"required"`
 	// Msg is an optional descriptive message
 	Msg *string `json:"message,omitempty"`
+	// Detail is an optional descriptive message providing additional details on the error
+	Detail *string `json:"context,omitempty"`
 }
 
 // StandardResponse standard REST API response
 type StandardResponse struct {
 	// Success indicates whether the request was successful
 	Success bool `json:"success" validate:"required"`
+	// RequestID gives the request ID to match against logs
+	RequestID string `json:"request_id" validate:"required"`
 	// Error are details in case of errors
 	Error *ErrorDetail `json:"error,omitempty"`
 }
 
+// readRequestIDFromContext reads the request ID from the request context if available
+func readRequestIDFromContext(ctxt context.Context) string {
+	if ctxt.Value(common.RequestParam{}) != nil {
+		v, ok := ctxt.Value(common.RequestParam{}).(common.RequestParam)
+		if ok {
+			return v.ID
+		}
+	}
+	return ""
+}
+
 // getStdRESTSuccessMsg defines a standard success message
-func getStdRESTSuccessMsg() StandardResponse {
-	return StandardResponse{Success: true}
+func getStdRESTSuccessMsg(ctxt context.Context) StandardResponse {
+	return StandardResponse{Success: true, RequestID: readRequestIDFromContext(ctxt)}
 }
 
 // getStdRESTErrorMsg defines a standard error message
-func getStdRESTErrorMsg(code int, message *string) StandardResponse {
+func getStdRESTErrorMsg(
+	ctxt context.Context, code int, message *string, detail *string,
+) StandardResponse {
 	return StandardResponse{
-		Success: false, Error: &ErrorDetail{Code: code, Msg: message},
+		Success:   false,
+		RequestID: readRequestIDFromContext(ctxt),
+		Error:     &ErrorDetail{Code: code, Msg: message, Detail: detail},
 	}
 }
 

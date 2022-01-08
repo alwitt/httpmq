@@ -266,7 +266,9 @@ func (h APIRestJetStreamManagementHandler) CreateStream(w http.ResponseWriter, r
 		h.reply(
 			w,
 			http.StatusInternalServerError,
-			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			getStdRESTErrorMsg(
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
+			),
 			restCall,
 			r,
 		)
@@ -278,7 +280,9 @@ func (h APIRestJetStreamManagementHandler) CreateStream(w http.ResponseWriter, r
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		msg := "Unable to parse request body"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -287,13 +291,13 @@ func (h APIRestJetStreamManagementHandler) CreateStream(w http.ResponseWriter, r
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 			), restCall, r,
 		)
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
+	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
 }
 
 // CreateStreamHandler Wrapper around CreateStream
@@ -333,7 +337,9 @@ func (h APIRestJetStreamManagementHandler) GetAllStreams(w http.ResponseWriter, 
 		convertedInfo[streamName] = convertStreamInfo(streamInfo)
 	}
 	resp := APIRestRespAllJetStreams{
-		StandardResponse: StandardResponse{Success: true}, Streams: convertedInfo,
+		StandardResponse: StandardResponse{
+			Success: true, RequestID: readRequestIDFromContext(r.Context()),
+		}, Streams: convertedInfo,
 	}
 
 	h.reply(w, http.StatusOK, resp, restCall, r)
@@ -378,7 +384,9 @@ func (h APIRestJetStreamManagementHandler) GetStream(w http.ResponseWriter, r *h
 		h.reply(
 			w,
 			http.StatusInternalServerError,
-			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			getStdRESTErrorMsg(
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
+			),
 			restCall,
 			r,
 		)
@@ -390,13 +398,17 @@ func (h APIRestJetStreamManagementHandler) GetStream(w http.ResponseWriter, r *h
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -406,14 +418,16 @@ func (h APIRestJetStreamManagementHandler) GetStream(w http.ResponseWriter, r *h
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 			), restCall, r,
 		)
 		return
 	}
 	resp := APIRestRespOneJetStream{
-		StandardResponse: StandardResponse{Success: true},
-		Stream:           convertStreamInfo(streamInfo),
+		StandardResponse: StandardResponse{
+			Success: true, RequestID: readRequestIDFromContext(r.Context()),
+		},
+		Stream: convertStreamInfo(streamInfo),
 	}
 
 	h.reply(w, http.StatusOK, resp, restCall, r)
@@ -461,7 +475,9 @@ func (h APIRestJetStreamManagementHandler) ChangeStreamSubjects(
 		h.reply(
 			w,
 			http.StatusInternalServerError,
-			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			getStdRESTErrorMsg(
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
+			),
 			restCall,
 			r,
 		)
@@ -473,13 +489,17 @@ func (h APIRestJetStreamManagementHandler) ChangeStreamSubjects(
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -487,14 +507,18 @@ func (h APIRestJetStreamManagementHandler) ChangeStreamSubjects(
 	if err := json.NewDecoder(r.Body).Decode(&subjects); err != nil {
 		msg := "Unable to parse request body"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
 	if err := h.validate.Struct(&subjects); err != nil {
 		msg := "Bad request body"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -503,13 +527,13 @@ func (h APIRestJetStreamManagementHandler) ChangeStreamSubjects(
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 			), restCall, r,
 		)
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
+	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
 }
 
 // ChangeStreamSubjectsHandler Wrapper around ChangeStreamSubjects
@@ -548,7 +572,9 @@ func (h APIRestJetStreamManagementHandler) UpdateStreamLimits(
 		h.reply(
 			w,
 			http.StatusInternalServerError,
-			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			getStdRESTErrorMsg(
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
+			),
 			restCall,
 			r,
 		)
@@ -560,13 +586,17 @@ func (h APIRestJetStreamManagementHandler) UpdateStreamLimits(
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -574,7 +604,9 @@ func (h APIRestJetStreamManagementHandler) UpdateStreamLimits(
 	if err := json.NewDecoder(r.Body).Decode(&limits); err != nil {
 		msg := "Unable to parse request body"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -583,13 +615,13 @@ func (h APIRestJetStreamManagementHandler) UpdateStreamLimits(
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 			), restCall, r,
 		)
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
+	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
 }
 
 // UpdateStreamLimitsHandler Wrapper around UpdateStreamLimits
@@ -624,7 +656,9 @@ func (h APIRestJetStreamManagementHandler) DeleteStream(w http.ResponseWriter, r
 		h.reply(
 			w,
 			http.StatusInternalServerError,
-			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			getStdRESTErrorMsg(
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
+			),
 			restCall,
 			r,
 		)
@@ -636,13 +670,17 @@ func (h APIRestJetStreamManagementHandler) DeleteStream(w http.ResponseWriter, r
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -651,13 +689,13 @@ func (h APIRestJetStreamManagementHandler) DeleteStream(w http.ResponseWriter, r
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 			), restCall, r,
 		)
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
+	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
 }
 
 // DeleteStreamHandler Wrapper around DeleteStream
@@ -697,7 +735,9 @@ func (h APIRestJetStreamManagementHandler) CreateConsumer(w http.ResponseWriter,
 		h.reply(
 			w,
 			http.StatusInternalServerError,
-			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			getStdRESTErrorMsg(
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
+			),
 			restCall,
 			r,
 		)
@@ -709,13 +749,17 @@ func (h APIRestJetStreamManagementHandler) CreateConsumer(w http.ResponseWriter,
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -723,7 +767,9 @@ func (h APIRestJetStreamManagementHandler) CreateConsumer(w http.ResponseWriter,
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		msg := "Unable to parse request body"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -732,13 +778,13 @@ func (h APIRestJetStreamManagementHandler) CreateConsumer(w http.ResponseWriter,
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 			), restCall, r,
 		)
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
+	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
 }
 
 // CreateConsumerHandler Wrapper around CreateConsumer
@@ -782,7 +828,9 @@ func (h APIRestJetStreamManagementHandler) GetAllConsumers(
 		h.reply(
 			w,
 			http.StatusInternalServerError,
-			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			getStdRESTErrorMsg(
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
+			),
 			restCall,
 			r,
 		)
@@ -794,13 +842,17 @@ func (h APIRestJetStreamManagementHandler) GetAllConsumers(
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -810,8 +862,10 @@ func (h APIRestJetStreamManagementHandler) GetAllConsumers(
 		converted[consumerName] = convertConsumerInfo(consumerInfo)
 	}
 	resp := APIRestRespAllJetStreamConsumers{
-		StandardResponse: StandardResponse{Success: true},
-		Consumers:        converted,
+		StandardResponse: StandardResponse{
+			Success: true, RequestID: readRequestIDFromContext(r.Context()),
+		},
+		Consumers: converted,
 	}
 	h.reply(w, http.StatusOK, resp, restCall, r)
 }
@@ -856,7 +910,9 @@ func (h APIRestJetStreamManagementHandler) GetConsumer(w http.ResponseWriter, r 
 		h.reply(
 			w,
 			http.StatusInternalServerError,
-			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			getStdRESTErrorMsg(
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
+			),
 			restCall,
 			r,
 		)
@@ -868,26 +924,34 @@ func (h APIRestJetStreamManagementHandler) GetConsumer(w http.ResponseWriter, r 
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 	consumerName, ok := vars["consumerName"]
 	if !ok {
 		msg := "No consumer name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(consumerName, h.validate); err != nil {
 		msg := "Invalid consumer name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -897,15 +961,17 @@ func (h APIRestJetStreamManagementHandler) GetConsumer(w http.ResponseWriter, r 
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 			), restCall, r,
 		)
 		return
 	}
 
 	resp := APIRestRespOneJetStreamConsumer{
-		StandardResponse: StandardResponse{Success: true},
-		Consumer:         convertConsumerInfo(info),
+		StandardResponse: StandardResponse{
+			Success: true, RequestID: readRequestIDFromContext(r.Context()),
+		},
+		Consumer: convertConsumerInfo(info),
 	}
 	h.reply(w, http.StatusOK, resp, restCall, r)
 }
@@ -943,7 +1009,9 @@ func (h APIRestJetStreamManagementHandler) DeleteConsumer(w http.ResponseWriter,
 		h.reply(
 			w,
 			http.StatusInternalServerError,
-			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			getStdRESTErrorMsg(
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
+			),
 			restCall,
 			r,
 		)
@@ -955,26 +1023,34 @@ func (h APIRestJetStreamManagementHandler) DeleteConsumer(w http.ResponseWriter,
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 	consumerName, ok := vars["consumerName"]
 	if !ok {
 		msg := "No consumer name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(consumerName, h.validate); err != nil {
 		msg := "Invalid consumer name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -983,13 +1059,13 @@ func (h APIRestJetStreamManagementHandler) DeleteConsumer(w http.ResponseWriter,
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 			), restCall, r,
 		)
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
+	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
 }
 
 // DeleteConsumerHandler Wrapper around DeleteConsumer
@@ -1016,7 +1092,7 @@ func (h APIRestJetStreamManagementHandler) DeleteConsumerHandler() http.HandlerF
 // @Router /v1/admin/alive [get]
 func (h APIRestJetStreamManagementHandler) Alive(w http.ResponseWriter, r *http.Request) {
 	restCall := "GET /v1/admin/alive"
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
+	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
 }
 
 // AliveHandler Wrapper around Alive
@@ -1044,16 +1120,16 @@ func (h APIRestJetStreamManagementHandler) Ready(w http.ResponseWriter, r *http.
 	if ready, err := h.core.Ready(); err != nil {
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 			), restCall, r,
 		)
 	} else {
 		if ready {
-			h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
+			h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
 		} else {
 			h.reply(
 				w, http.StatusInternalServerError, getStdRESTErrorMsg(
-					http.StatusInternalServerError, &msg,
+					r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 				), restCall, r,
 			)
 		}

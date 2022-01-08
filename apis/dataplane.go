@@ -108,7 +108,9 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, 
 		h.reply(
 			w,
 			http.StatusInternalServerError,
-			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			getStdRESTErrorMsg(
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
+			),
 			restCall,
 			r,
 		)
@@ -120,13 +122,17 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, 
 	if !ok {
 		msg := "No subject name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateSubjectName(subjectName); err != nil {
 		msg := "Invalid subject string"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -140,7 +146,9 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, 
 			msg := "Failed to base64 decode body"
 			log.WithError(err).WithFields(localLogTags).Errorf(msg)
 			h.reply(
-				w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r,
+				w, http.StatusBadRequest, getStdRESTErrorMsg(
+					r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+				), restCall, r,
 			)
 			return
 		}
@@ -148,7 +156,9 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, 
 			msg := "Base64 decode resulted in empty body"
 			log.WithFields(localLogTags).Errorf(msg)
 			h.reply(
-				w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r,
+				w, http.StatusBadRequest, getStdRESTErrorMsg(
+					r.Context(), http.StatusBadRequest, &msg, nil,
+				), restCall, r,
 			)
 			return
 		}
@@ -161,13 +171,13 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, 
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 			), restCall, r,
 		)
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
+	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
 }
 
 // PublishMessageHandler Wrapper around PublishMessage
@@ -208,7 +218,9 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 		h.reply(
 			w,
 			http.StatusInternalServerError,
-			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			getStdRESTErrorMsg(
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
+			),
 			restCall,
 			r,
 		)
@@ -220,26 +232,34 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 	consumerName, ok := vars["consumerName"]
 	if !ok {
 		msg := "No consumer name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(consumerName, h.validate); err != nil {
 		msg := "Invalid consumer name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -247,7 +267,9 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 	if err := json.NewDecoder(r.Body).Decode(&sequence); err != nil {
 		msg := "Unable to parse request body"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -255,7 +277,9 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 	if err := h.validate.Struct(&sequence); err != nil {
 		msg := "Unable to parse request body"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -271,13 +295,13 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 		log.WithError(err).WithFields(localLogTags).Error(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 			), restCall, r,
 		)
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
+	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
 }
 
 // ReceiveMsgACKHandler Wrapper around ReceiveMsgACK
@@ -324,7 +348,9 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		h.reply(
 			w,
 			http.StatusInternalServerError,
-			getStdRESTErrorMsg(http.StatusInternalServerError, &msg),
+			getStdRESTErrorMsg(
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
+			),
 			restCall,
 			r,
 		)
@@ -338,26 +364,34 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTagsInitial).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTagsInitial).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 	consumerName, ok := vars["consumerName"]
 	if !ok {
 		msg := "No consumer name provided"
 		log.WithFields(localLogTagsInitial).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, nil,
+		), restCall, r)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(consumerName, h.validate); err != nil {
 		msg := "Invalid consumer name"
 		log.WithError(err).WithFields(localLogTagsInitial).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r)
+		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
+			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+		), restCall, r)
 		return
 	}
 
@@ -374,7 +408,9 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 			msg := "Missing subscribe subject / Multiple subjects"
 			log.WithFields(localLogTagsInitial).Errorf(msg)
 			h.reply(
-				w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r,
+				w, http.StatusBadRequest, getStdRESTErrorMsg(
+					r.Context(), http.StatusBadRequest, &msg, nil,
+				), restCall, r,
 			)
 			return
 		}
@@ -388,7 +424,9 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 				msg := "Multiple max_msg_inflight"
 				log.WithFields(localLogTagsInitial).Errorf(msg)
 				h.reply(
-					w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r,
+					w, http.StatusBadRequest, getStdRESTErrorMsg(
+						r.Context(), http.StatusBadRequest, &msg, nil,
+					), restCall, r,
 				)
 				return
 			}
@@ -397,7 +435,9 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 				msg := "Unable to parse max_msg_inflight"
 				log.WithError(err).WithFields(localLogTagsInitial).Errorf(msg)
 				h.reply(
-					w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r,
+					w, http.StatusBadRequest, getStdRESTErrorMsg(
+						r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
+					), restCall, r,
 				)
 				return
 			}
@@ -412,7 +452,9 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 				msg := "Multiple delivery groups"
 				log.WithFields(localLogTagsInitial).Errorf(msg)
 				h.reply(
-					w, http.StatusBadRequest, getStdRESTErrorMsg(http.StatusBadRequest, &msg), restCall, r,
+					w, http.StatusBadRequest, getStdRESTErrorMsg(
+						r.Context(), http.StatusBadRequest, &msg, nil,
+					), restCall, r,
 				)
 				return
 			}
@@ -448,7 +490,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		log.WithFields(logTags).Errorf(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, nil,
 			), restCall, r,
 		)
 		return
@@ -472,7 +514,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		log.WithError(err).WithFields(logTags).Errorf(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 			), restCall, r,
 		)
 		return
@@ -503,7 +545,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		log.WithError(err).WithFields(logTags).Errorf(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 			), restCall, r,
 		)
 		return
@@ -517,7 +559,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		log.WithError(err).WithFields(logTags).Errorf(msg)
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
 			), restCall, r,
 		)
 	}
@@ -530,7 +572,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 			msg := "Server stopping"
 			h.reply(
 				w, http.StatusInternalServerError, getStdRESTErrorMsg(
-					http.StatusInternalServerError, &msg,
+					r.Context(), http.StatusInternalServerError, &msg, nil,
 				), restCall, r,
 			)
 		case <-r.Context().Done():
@@ -538,7 +580,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 			complete = true
 			log.WithFields(logTags).Info("Terminating PUSH subscription on request end")
 			resp := APIRestRespDataMessage{
-				StandardResponse: getStdRESTSuccessMsg(),
+				StandardResponse: getStdRESTSuccessMsg(r.Context()),
 			}
 			h.reply(w, http.StatusOK, resp, restCall, r)
 		case err, ok := <-internalError:
@@ -559,8 +601,10 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 					break
 				}
 				resp := APIRestRespDataMessage{
-					StandardResponse: StandardResponse{Success: true},
-					MsgToDeliver:     converted,
+					StandardResponse: StandardResponse{
+						Success: true, RequestID: readRequestIDFromContext(r.Context()),
+					},
+					MsgToDeliver: converted,
 				}
 				// Serialize as JSON
 				serialize, err := json.Marshal(&resp)
@@ -610,7 +654,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribeHandler() http.HandlerFun
 // @Router /v1/data/alive [get]
 func (h APIRestJetStreamDataplaneHandler) Alive(w http.ResponseWriter, r *http.Request) {
 	restCall := "GET /v1/data/alive"
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
+	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
 }
 
 // AliveHandler Wrapper around Alive
@@ -636,11 +680,11 @@ func (h APIRestJetStreamDataplaneHandler) Ready(w http.ResponseWriter, r *http.R
 	restCall := "GET /v1/data/ready"
 	msg := "not ready"
 	if h.natsClient.NATs().Status() == nats.CONNECTED {
-		h.reply(w, http.StatusOK, getStdRESTSuccessMsg(), restCall, r)
+		h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
 	} else {
 		h.reply(
 			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				http.StatusInternalServerError, &msg,
+				r.Context(), http.StatusInternalServerError, &msg, nil,
 			), restCall, r,
 		)
 	}
