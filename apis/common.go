@@ -33,7 +33,7 @@ type ErrorDetail struct {
 	// Msg is an optional descriptive message
 	Msg *string `json:"message,omitempty"`
 	// Detail is an optional descriptive message providing additional details on the error
-	Detail *string `json:"context,omitempty"`
+	Detail *string `json:"detail,omitempty"`
 }
 
 // StandardResponse standard REST API response
