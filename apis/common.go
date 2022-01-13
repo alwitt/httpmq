@@ -131,6 +131,10 @@ func (h APIRestHandler) addRequestMetaToLog(metadata log.Fields, r *http.Request
 	}
 	metadata["host"] = r.Host
 	metadata["referer"] = r.Referer()
+	metadata["remote_addr"] = r.RemoteAddr
+	metadata["http_version"] = r.Proto
+	metadata["http_version_major"] = r.ProtoMajor
+	metadata["http_version_minor"] = r.ProtoMinor
 }
 
 // reply helper function for writing responses
