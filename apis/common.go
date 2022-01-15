@@ -162,7 +162,7 @@ func (h APIRestHandler) reply(
 
 // Write logging support
 func (h APIRestHandler) Write(p []byte) (n int, err error) {
-	log.WithFields(h.LogTags).Infof("%s", p)
+	log.WithFields(h.LogTags).Debugf("%s", p)
 	return len(p), nil
 }
 
