@@ -288,13 +288,21 @@ func TestJetStreamControllerConsumers(t *testing.T) {
 			Name: consumer1, MaxInflight: 1, Mode: "push",
 		}
 		assert.Nil(uut.CreateConsumerForStream(utCtxt, stream1, param))
+		consumerInfo, err := uut.GetConsumerForStream(utCtxt, stream1, consumer1)
+		assert.Nil(err)
+		assert.Equal(consumer1, consumerInfo.Name)
+		assert.Equal(1, consumerInfo.Config.MaxAckPending)
 	}
 	// With different params
 	{
 		param := JetStreamConsumerParam{
 			Name: consumer1, MaxInflight: 2, Mode: "push",
 		}
-		assert.NotNil(uut.CreateConsumerForStream(utCtxt, stream1, param))
+		assert.Nil(uut.CreateConsumerForStream(utCtxt, stream1, param))
+		consumerInfo, err := uut.GetConsumerForStream(utCtxt, stream1, consumer1)
+		assert.Nil(err)
+		assert.Equal(consumer1, consumerInfo.Name)
+		assert.Equal(2, consumerInfo.Config.MaxAckPending)
 	}
 
 	// Case 3: re-use the consumer again on a different stream
