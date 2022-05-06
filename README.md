@@ -2,7 +2,7 @@
 
 [HTTP/2](https://http2.github.io/) based [message broker](https://en.wikipedia.org/wiki/Message_broker) built around [NATS JetStream](https://nats.io).
 
-[![License Apache 2][License-Image]][License-Url] [![Go Report Card][ReportCard-Image]][ReportCard-Url] ![CICD workflow](https://github.com/alwitt/httpmq/actions/workflows/cicd.yaml/badge.svg) [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Falwitt%2Fhttpmq.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Falwitt%2Fhttpmq?ref=badge_shield)
+[![License Apache 2][License-Image]][License-Url] [![Go Report Card][ReportCard-Image]][ReportCard-Url] ![CICD workflow](https://github.com/alwitt/httpmq/actions/workflows/cicd.yaml/badge.svg)
 
 [License-Url]: https://www.apache.org/licenses/LICENSE-2.0
 [License-Image]: https://img.shields.io/badge/License-Apache2-blue.svg
@@ -21,7 +21,6 @@
   * [2.5 Subscribing For Messages](#25-subscribing-for-messages)
 - [3. Additional Topics](#3-additional-topics)
 - [4. Officially Supported Client SDKs](#4-officially-supported-client-sdks)
-- [5. License](#5-license)
 
 ---
 
@@ -325,9 +324,3 @@ $ curl -X POST 'http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testC
 | Language | SDK | Notes |
 |----------|-----|-------|
 | Golang | [httpmq-go](https://github.com/alwitt/httpmq-go) | |
-
-# [5. License](#table-of-content)
-
-Unless otherwise noted, the httpmq source files are distributed under the Apache Version 2.0 license found in the LICENSE file.
-
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Falwitt%2Fhttpmq.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Falwitt%2Fhttpmq?ref=badge_large)
