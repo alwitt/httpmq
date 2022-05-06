@@ -52,7 +52,7 @@ jobs:
 
     services:
       nats:
-        image: alwitt/nats-js:2.6.2-alpine
+        image: alwitt/nats-js:2.8.2-alpine
         ports:
           - 4222:4222
 
