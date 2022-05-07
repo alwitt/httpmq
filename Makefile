@@ -31,7 +31,7 @@ compose: clean .prepare ## Run docker-compose to create the DEV ENV
 
 .PHONY: doc
 doc: .prepare ## Generate the OpenAPI spec
-	@swag init
+	@swag init -g main.go --parseDependency
 	@rm docs/docs.go
 
 .PHONY: mock
