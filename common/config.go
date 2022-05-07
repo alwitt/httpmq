@@ -49,10 +49,8 @@ type HTTPServerConfig struct {
 
 // HTTPRequestLogging defines HTTP request logging parameters
 type HTTPRequestLogging struct {
-	// StartOfRequestMessage is the message logged marking start of a request
-	StartOfRequestMessage string `mapstructure:"start_of_request_message" json:"start_of_request_message"`
-	// EndOfRequestMessage is the message logged marking end of a request
-	EndOfRequestMessage string `mapstructure:"end_of_request_message" json:"end_of_request_message"`
+	// RequestIDHeader is the HTTP header containing the API request ID
+	RequestIDHeader string `mapstructure:"request_id_header" json:"request_id_header"`
 	// DoNotLogHeaders is the list of headers to not include in logging metadata
 	DoNotLogHeaders []string `mapstructure:"do_not_log_headers" json:"do_not_log_headers"`
 }
@@ -130,10 +128,7 @@ func InstallDefaultConfigValues() {
 	viper.SetDefault("management.api_server.server_config.write_timeout_sec", 60)
 	viper.SetDefault("management.api_server.server_config.idle_timeout_sec", 600)
 	viper.SetDefault(
-		"management.api_server.logging_config.start_of_request_message", "Request Starting",
-	)
-	viper.SetDefault(
-		"management.api_server.logging_config.end_of_request_message", "Request Complete",
+		"management.api_server.logging_config.request_id_header", "Httpmq-Request-ID",
 	)
 	viper.SetDefault(
 		"management.api_server.logging_config.do_not_log_headers", []string{
@@ -149,10 +144,7 @@ func InstallDefaultConfigValues() {
 	viper.SetDefault("dataplane.api_server.server_config.write_timeout_sec", 60)
 	viper.SetDefault("dataplane.api_server.server_config.idle_timeout_sec", 600)
 	viper.SetDefault(
-		"dataplane.api_server.logging_config.start_of_request_message", "Request Starting",
-	)
-	viper.SetDefault(
-		"dataplane.api_server.logging_config.end_of_request_message", "Request Complete",
+		"dataplane.api_server.logging_config.request_id_header", "Httpmq-Request-ID",
 	)
 	viper.SetDefault(
 		"dataplane.api_server.logging_config.do_not_log_headers", []string{

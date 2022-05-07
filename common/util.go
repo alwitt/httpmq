@@ -16,20 +16,12 @@ package common
 
 import (
 	"bytes"
-	"context"
 	"encoding/gob"
 	"fmt"
 	"strings"
 
-	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
 )
-
-// Component is the base structure for all components
-type Component struct {
-	// LogTags the Apex logging message metadata tags
-	LogTags log.Fields
-}
 
 // DeepCopy is helper function for performing deep-copy
 //
@@ -40,22 +32,6 @@ func DeepCopy(src, dst interface{}) error {
 		return err
 	}
 	return gob.NewDecoder(bytes.NewBuffer(buf.Bytes())).Decode(dst)
-}
-
-// UpdateLogTags add additional fields to the existing log tags with information from Context
-func UpdateLogTags(ctxt context.Context, original log.Fields) (log.Fields, error) {
-	newLogTags := log.Fields{}
-	if err := DeepCopy(&original, &newLogTags); err != nil {
-		log.WithError(err).WithFields(original).Errorf("Failed to deep-copy logtags")
-		return original, err
-	}
-	if ctxt.Value(RequestParam{}) != nil {
-		v, ok := ctxt.Value(RequestParam{}).(RequestParam)
-		if ok {
-			v.UpdateLogTags(newLogTags)
-		}
-	}
-	return newLogTags, nil
 }
 
 // ValidateTopLevelEntityName performs validation of stream and consumer names.

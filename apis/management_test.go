@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alwitt/goutils"
 	"github.com/alwitt/httpmq/common"
 	"github.com/alwitt/httpmq/core"
 	"github.com/alwitt/httpmq/management"
@@ -81,8 +82,7 @@ func TestStreamManagement(t *testing.T) {
 
 	uut, err := GetAPIRestJetStreamManagementHandler(mgmt, &common.HTTPConfig{
 		Logging: common.HTTPRequestLogging{
-			StartOfRequestMessage: "UT Request Start",
-			EndOfRequestMessage:   "UT Request Complete",
+			RequestIDHeader: "Httpmq-Request-ID",
 		},
 	})
 	assert.Nil(err)
@@ -93,8 +93,9 @@ func TestStreamManagement(t *testing.T) {
 		assert.Nil(err)
 
 		respRecorder := httptest.NewRecorder()
-		handler := uut.ReadyHandler()
-		handler.ServeHTTP(respRecorder, req)
+		router := mux.NewRouter()
+		router.HandleFunc("/v1/admin/ready", uut.LoggingMiddleware(uut.ReadyHandler()))
+		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
 	}
@@ -122,12 +123,13 @@ func TestStreamManagement(t *testing.T) {
 		assert.Nil(err)
 
 		respRecorder := httptest.NewRecorder()
-		handler := uut.CreateStreamHandler()
-		handler.ServeHTTP(respRecorder, req)
+		router := mux.NewRouter()
+		router.HandleFunc("/v1/admin/stream", uut.LoggingMiddleware(uut.CreateStreamHandler()))
+		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
 		respMsg := respRecorder.Body.Bytes()
-		var msg StandardResponse
+		var msg goutils.RestAPIBaseResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
 		assert.Equal(testReqID, msg.RequestID)
@@ -142,8 +144,9 @@ func TestStreamManagement(t *testing.T) {
 		assert.Nil(err)
 
 		respRecorder := httptest.NewRecorder()
-		handler := uut.GetAllStreamsHandler()
-		handler.ServeHTTP(respRecorder, req)
+		router := mux.NewRouter()
+		router.HandleFunc("/v1/admin/stream", uut.LoggingMiddleware(uut.GetAllStreamsHandler()))
+		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
 		respMsg := respRecorder.Body.Bytes()
@@ -165,7 +168,9 @@ func TestStreamManagement(t *testing.T) {
 
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
-		router.HandleFunc("/v1/admin/stream/{streamName}", uut.GetStreamHandler())
+		router.HandleFunc(
+			"/v1/admin/stream/{streamName}", uut.LoggingMiddleware(uut.GetStreamHandler()),
+		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
@@ -188,12 +193,14 @@ func TestStreamManagement(t *testing.T) {
 
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
-		router.HandleFunc("/v1/admin/stream/{streamName}", uut.GetStreamHandler())
+		router.HandleFunc(
+			"/v1/admin/stream/{streamName}", uut.LoggingMiddleware(uut.GetStreamHandler()),
+		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusInternalServerError, respRecorder.Code)
 		respMsg := respRecorder.Body.Bytes()
-		var msg StandardResponse
+		var msg goutils.RestAPIBaseResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.False(msg.Success)
 		assert.Equal(testReqID, msg.RequestID)
@@ -216,12 +223,15 @@ func TestStreamManagement(t *testing.T) {
 
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
-		router.HandleFunc("/v1/admin/stream/{streamName}/subject", uut.ChangeStreamSubjectsHandler())
+		router.HandleFunc(
+			"/v1/admin/stream/{streamName}/subject",
+			uut.LoggingMiddleware(uut.ChangeStreamSubjectsHandler()),
+		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
 		respMsg := respRecorder.Body.Bytes()
-		var msg StandardResponse
+		var msg goutils.RestAPIBaseResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
 		assert.Equal(testReqID, msg.RequestID)
@@ -235,7 +245,9 @@ func TestStreamManagement(t *testing.T) {
 
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
-		router.HandleFunc("/v1/admin/stream/{streamName}", uut.GetStreamHandler())
+		router.HandleFunc(
+			"/v1/admin/stream/{streamName}", uut.LoggingMiddleware(uut.GetStreamHandler()),
+		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
@@ -264,12 +276,15 @@ func TestStreamManagement(t *testing.T) {
 
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
-		router.HandleFunc("/v1/admin/stream/{streamName}/limit", uut.UpdateStreamLimitsHandler())
+		router.HandleFunc(
+			"/v1/admin/stream/{streamName}/limit",
+			uut.LoggingMiddleware(uut.UpdateStreamLimitsHandler()),
+		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
 		respMsg := respRecorder.Body.Bytes()
-		var msg StandardResponse
+		var msg goutils.RestAPIBaseResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
 		assert.Equal(testReqID, msg.RequestID)
@@ -283,7 +298,9 @@ func TestStreamManagement(t *testing.T) {
 
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
-		router.HandleFunc("/v1/admin/stream/{streamName}", uut.GetStreamHandler())
+		router.HandleFunc(
+			"/v1/admin/stream/{streamName}", uut.LoggingMiddleware(uut.GetStreamHandler()),
+		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
@@ -306,12 +323,14 @@ func TestStreamManagement(t *testing.T) {
 
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
-		router.HandleFunc("/v1/admin/stream/{streamName}", uut.DeleteStreamHandler())
+		router.HandleFunc(
+			"/v1/admin/stream/{streamName}", uut.LoggingMiddleware(uut.DeleteStreamHandler()),
+		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
 		respMsg := respRecorder.Body.Bytes()
-		var msg StandardResponse
+		var msg goutils.RestAPIBaseResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
 		assert.Equal(testReqID, msg.RequestID)
@@ -325,12 +344,14 @@ func TestStreamManagement(t *testing.T) {
 
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
-		router.HandleFunc("/v1/admin/stream/{streamName}", uut.GetStreamHandler())
+		router.HandleFunc(
+			"/v1/admin/stream/{streamName}", uut.LoggingMiddleware(uut.GetStreamHandler()),
+		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusInternalServerError, respRecorder.Code)
 		respMsg := respRecorder.Body.Bytes()
-		var msg StandardResponse
+		var msg goutils.RestAPIBaseResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.False(msg.Success)
 		assert.Equal(testReqID, msg.RequestID)
@@ -385,8 +406,7 @@ func TestConsumerManagement(t *testing.T) {
 
 	uut, err := GetAPIRestJetStreamManagementHandler(mgmt, &common.HTTPConfig{
 		Logging: common.HTTPRequestLogging{
-			StartOfRequestMessage: "UT Request Start",
-			EndOfRequestMessage:   "UT Request Complete",
+			RequestIDHeader: "Httpmq-Request-ID",
 		},
 	})
 	assert.Nil(err)
@@ -397,8 +417,9 @@ func TestConsumerManagement(t *testing.T) {
 		assert.Nil(err)
 
 		respRecorder := httptest.NewRecorder()
-		handler := uut.ReadyHandler()
-		handler.ServeHTTP(respRecorder, req)
+		router := mux.NewRouter()
+		router.HandleFunc("/v1/admin/ready", uut.LoggingMiddleware(uut.ReadyHandler()))
+		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
 	}
@@ -426,12 +447,13 @@ func TestConsumerManagement(t *testing.T) {
 		assert.Nil(err)
 
 		respRecorder := httptest.NewRecorder()
-		handler := uut.CreateStreamHandler()
-		handler.ServeHTTP(respRecorder, req)
+		router := mux.NewRouter()
+		router.HandleFunc("/v1/admin/stream", uut.LoggingMiddleware(uut.CreateStreamHandler()))
+		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
 		respMsg := respRecorder.Body.Bytes()
-		var msg StandardResponse
+		var msg goutils.RestAPIBaseResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
 		assert.Equal(testReqID, msg.RequestID)
@@ -447,7 +469,9 @@ func TestConsumerManagement(t *testing.T) {
 
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
-		router.HandleFunc("/v1/admin/stream/{streamName}", uut.GetStreamHandler())
+		router.HandleFunc(
+			"/v1/admin/stream/{streamName}", uut.LoggingMiddleware(uut.GetStreamHandler()),
+		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
@@ -470,7 +494,10 @@ func TestConsumerManagement(t *testing.T) {
 
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
-		router.HandleFunc("/v1/admin/stream/{streamName}/consumer", uut.GetAllConsumersHandler())
+		router.HandleFunc(
+			"/v1/admin/stream/{streamName}/consumer",
+			uut.LoggingMiddleware(uut.GetAllConsumersHandler()),
+		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
@@ -498,12 +525,15 @@ func TestConsumerManagement(t *testing.T) {
 
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
-		router.HandleFunc("/v1/admin/stream/{streamName}/consumer", uut.CreateConsumerHandler())
+		router.HandleFunc(
+			"/v1/admin/stream/{streamName}/consumer",
+			uut.LoggingMiddleware(uut.CreateConsumerHandler()),
+		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
 		respMsg := respRecorder.Body.Bytes()
-		var msg StandardResponse
+		var msg goutils.RestAPIBaseResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
 		assert.Equal(testReqID, msg.RequestID)
@@ -519,7 +549,10 @@ func TestConsumerManagement(t *testing.T) {
 
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
-		router.HandleFunc("/v1/admin/stream/{streamName}/consumer", uut.GetAllConsumersHandler())
+		router.HandleFunc(
+			"/v1/admin/stream/{streamName}/consumer",
+			uut.LoggingMiddleware(uut.GetAllConsumersHandler()),
+		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
@@ -546,7 +579,8 @@ func TestConsumerManagement(t *testing.T) {
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
 		router.HandleFunc(
-			"/v1/admin/stream/{streamName}/consumer/{consumerName}", uut.GetConsumerHandler(),
+			"/v1/admin/stream/{streamName}/consumer/{consumerName}",
+			uut.LoggingMiddleware(uut.GetConsumerHandler()),
 		)
 		router.ServeHTTP(respRecorder, req)
 
@@ -573,13 +607,14 @@ func TestConsumerManagement(t *testing.T) {
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
 		router.HandleFunc(
-			"/v1/admin/stream/{streamName}/consumer/{consumerName}", uut.DeleteConsumerHandler(),
+			"/v1/admin/stream/{streamName}/consumer/{consumerName}",
+			uut.LoggingMiddleware(uut.DeleteConsumerHandler()),
 		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
 		respMsg := respRecorder.Body.Bytes()
-		var msg StandardResponse
+		var msg goutils.RestAPIBaseResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
 		assert.Equal(testReqID, msg.RequestID)
@@ -596,13 +631,14 @@ func TestConsumerManagement(t *testing.T) {
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
 		router.HandleFunc(
-			"/v1/admin/stream/{streamName}/consumer/{consumerName}", uut.GetConsumerHandler(),
+			"/v1/admin/stream/{streamName}/consumer/{consumerName}",
+			uut.LoggingMiddleware(uut.GetConsumerHandler()),
 		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusInternalServerError, respRecorder.Code)
 		respMsg := respRecorder.Body.Bytes()
-		var msg StandardResponse
+		var msg goutils.RestAPIBaseResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.False(msg.Success)
 		assert.Equal(testReqID, msg.RequestID)
@@ -619,12 +655,14 @@ func TestConsumerManagement(t *testing.T) {
 
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
-		router.HandleFunc("/v1/admin/stream/{streamName}", uut.DeleteStreamHandler())
+		router.HandleFunc(
+			"/v1/admin/stream/{streamName}", uut.LoggingMiddleware(uut.DeleteStreamHandler()),
+		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusOK, respRecorder.Code)
 		respMsg := respRecorder.Body.Bytes()
-		var msg StandardResponse
+		var msg goutils.RestAPIBaseResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.True(msg.Success)
 		assert.Equal(testReqID, msg.RequestID)
@@ -638,12 +676,14 @@ func TestConsumerManagement(t *testing.T) {
 
 		router := mux.NewRouter()
 		respRecorder := httptest.NewRecorder()
-		router.HandleFunc("/v1/admin/stream/{streamName}", uut.GetStreamHandler())
+		router.HandleFunc(
+			"/v1/admin/stream/{streamName}", uut.LoggingMiddleware(uut.GetStreamHandler()),
+		)
 		router.ServeHTTP(respRecorder, req)
 
 		assert.Equal(http.StatusInternalServerError, respRecorder.Code)
 		respMsg := respRecorder.Body.Bytes()
-		var msg StandardResponse
+		var msg goutils.RestAPIBaseResponse
 		assert.Nil(json.Unmarshal(respMsg, &msg))
 		assert.False(msg.Success)
 		assert.Equal(testReqID, msg.RequestID)

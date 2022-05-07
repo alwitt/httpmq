@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/alwitt/goutils"
 	"github.com/alwitt/httpmq/common"
 	"github.com/alwitt/httpmq/core"
 	"github.com/apex/log"
@@ -44,7 +45,7 @@ type JetStreamPushSubscriber interface {
 
 // jetStreamPushSubscriberImpl implements JetStreamPushSubscriber
 type jetStreamPushSubscriberImpl struct {
-	common.Component
+	goutils.Component
 	nats       *core.NatsClient
 	reading    bool
 	sub        *nats.Subscription
@@ -68,11 +69,7 @@ func getJetStreamPushSubscriber(
 		"subject":   subject,
 		"consumer":  consumer,
 	}
-	logTags, err := common.UpdateLogTags(ctxt, logTags)
-	if err != nil {
-		log.WithError(err).WithFields(logTags).Errorf("Failed to update logtags")
-		return nil, err
-	}
+	goutils.ModifyLogMetadataByRestRequestParam(ctxt, logTags)
 	{
 		validate := validator.New()
 		t := wrapperForValidation{
@@ -86,6 +83,7 @@ func getJetStreamPushSubscriber(
 	// Create the subscription now
 	var s *nats.Subscription
 	// Build the subscription based on whether deliveryGroup is defined
+	var err error
 	if deliveryGroup != nil {
 		s, err = natsClient.JetStream().QueueSubscribeSync(
 			subject, *deliveryGroup, nats.Durable(consumer),
@@ -98,7 +96,7 @@ func getJetStreamPushSubscriber(
 		return nil, err
 	}
 	return &jetStreamPushSubscriberImpl{
-		Component:  common.Component{LogTags: logTags},
+		Component:  goutils.Component{LogTags: logTags},
 		nats:       natsClient,
 		sub:        s,
 		forwardMsg: nil,
@@ -175,7 +173,7 @@ type JetStreamPublisher interface {
 
 // jetStreamPublisherImpl implements JetStreamPublisher
 type jetStreamPublisherImpl struct {
-	common.Component
+	goutils.Component
 	nats *core.NatsClient
 }
 
@@ -187,17 +185,18 @@ func GetJetStreamPublisher(
 		"module": "dataplane", "component": "js-publisher", "instance": instance,
 	}
 	return &jetStreamPublisherImpl{
-		Component: common.Component{LogTags: logTags}, nats: natsClient,
+		Component: goutils.Component{
+			LogTags: logTags,
+			LogTagModifiers: []goutils.LogMetadataModifier{
+				goutils.ModifyLogMetadataByRestRequestParam,
+			},
+		}, nats: natsClient,
 	}, nil
 }
 
 // Publish publishes a new message into JetStream on a subject
 func (s *jetStreamPublisherImpl) Publish(ctxt context.Context, subject string, msg []byte) error {
-	localLogTags, err := common.UpdateLogTags(ctxt, s.LogTags)
-	if err != nil {
-		log.WithError(err).WithFields(s.LogTags).Errorf("Failed to update logtags")
-		return err
-	}
+	localLogTags := s.GetLogTagsForContext(ctxt)
 	if err := common.ValidateSubjectName(subject); err != nil {
 		log.WithError(err).WithFields(localLogTags).Errorf("Unable to send message")
 		return err

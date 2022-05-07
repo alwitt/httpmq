@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/alwitt/httpmq/common"
+	"github.com/alwitt/goutils"
 	"github.com/alwitt/httpmq/core"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
@@ -68,7 +68,7 @@ type JetStreamACKReceiver interface {
 
 // jetStreamACKReceiverImpl implements JetStreamACKReceiver
 type jetStreamACKReceiverImpl struct {
-	common.Component
+	goutils.Component
 	ackSubject      string
 	nats            *core.NatsClient
 	subscribed      bool
@@ -90,11 +90,7 @@ func getJetStreamACKReceiver(
 		"subject":   subject,
 		"consumer":  consumer,
 	}
-	logTags, err := common.UpdateLogTags(opContext, logTags)
-	if err != nil {
-		log.WithError(err).WithFields(logTags).Errorf("Failed to update logtags")
-		return nil, err
-	}
+	goutils.ModifyLogMetadataByRestRequestParam(opContext, logTags)
 	// Add context for log
 	validate := validator.New()
 	{
@@ -107,7 +103,7 @@ func getJetStreamACKReceiver(
 		}
 	}
 	return &jetStreamACKReceiverImpl{
-		Component:       common.Component{LogTags: logTags},
+		Component:       goutils.Component{LogTags: logTags},
 		ackSubject:      ackSubject,
 		nats:            natsClient,
 		subscribed:      false,
@@ -183,7 +179,7 @@ type JetStreamACKBroadcaster interface {
 
 // jetStreamACKBroadcasterImpl implements JetStreamACKBroadcaster
 type jetStreamACKBroadcasterImpl struct {
-	common.Component
+	goutils.Component
 	nats     *core.NatsClient
 	validate *validator.Validate
 }
@@ -198,19 +194,20 @@ func GetJetStreamACKBroadcaster(
 		"instance":  instance,
 	}
 	return &jetStreamACKBroadcasterImpl{
-		Component: common.Component{LogTags: logTags},
-		nats:      natsClient,
-		validate:  validator.New(),
+		Component: goutils.Component{
+			LogTags: logTags,
+			LogTagModifiers: []goutils.LogMetadataModifier{
+				goutils.ModifyLogMetadataByRestRequestParam,
+			},
+		},
+		nats:     natsClient,
+		validate: validator.New(),
 	}, nil
 }
 
 // BroadcastACK broadcast a JetStream message ACK
 func (t *jetStreamACKBroadcasterImpl) BroadcastACK(ctxt context.Context, ack AckIndication) error {
-	localLogTags, err := common.UpdateLogTags(ctxt, t.LogTags)
-	if err != nil {
-		log.WithError(err).WithFields(t.LogTags).Errorf("Failed to update logtags")
-		return err
-	}
+	localLogTags := t.GetLogTagsForContext(ctxt)
 	if err := t.validate.Struct(&ack); err != nil {
 		log.WithError(err).WithFields(localLogTags).Error("ACK parameter invalid")
 		return err

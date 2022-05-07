@@ -18,7 +18,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/alwitt/httpmq/common"
+	"github.com/alwitt/goutils"
 	"github.com/apex/log"
 	"github.com/nats-io/nats.go"
 )
@@ -43,7 +43,7 @@ type NATSConnectParams struct {
 
 // NatsClient is a wrapper around NATS client handle objects
 type NatsClient struct {
-	common.Component
+	goutils.Component
 	nc *nats.Conn
 	js nats.JetStreamContext
 }
@@ -103,7 +103,7 @@ func GetJetStream(param NATSConnectParams) (*NatsClient, error) {
 	}
 
 	return &NatsClient{
-		Component: common.Component{LogTags: logTags},
+		Component: goutils.Component{LogTags: logTags},
 		nc:        nc,
 		js:        js,
 	}, err

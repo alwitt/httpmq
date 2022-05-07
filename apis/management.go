@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/alwitt/goutils"
 	"github.com/alwitt/httpmq/common"
 	"github.com/alwitt/httpmq/management"
 	"github.com/apex/log"
@@ -30,7 +31,7 @@ import (
 
 // APIRestJetStreamManagementHandler REST handler for JetStream management
 type APIRestJetStreamManagementHandler struct {
-	APIRestHandler
+	goutils.RestAPIHandler
 	core     management.JetStreamController
 	validate *validator.Validate
 }
@@ -49,11 +50,21 @@ func GetAPIRestJetStreamManagementHandler(
 		offLimitHeaders[header] = true
 	}
 	return APIRestJetStreamManagementHandler{
-		APIRestHandler: APIRestHandler{
-			Component:             common.Component{LogTags: logTags},
-			startOfRequestLog:     httpConfig.Logging.StartOfRequestMessage,
-			endOfRequestLog:       httpConfig.Logging.EndOfRequestMessage,
-			offLimitHeadersForLog: offLimitHeaders,
+		RestAPIHandler: goutils.RestAPIHandler{
+			Component: goutils.Component{
+				LogTags: logTags,
+				LogTagModifiers: []goutils.LogMetadataModifier{
+					goutils.ModifyLogMetadataByRestRequestParam,
+				},
+			},
+			CallRequestIDHeaderField: &httpConfig.Logging.RequestIDHeader,
+			DoNotLogHeaders: func() map[string]bool {
+				result := map[string]bool{}
+				for _, v := range httpConfig.Logging.DoNotLogHeaders {
+					result[v] = true
+				}
+				return result
+			}(),
 		}, core: core, validate: validator.New(),
 	}, nil
 }
@@ -250,68 +261,56 @@ func convertConsumerInfo(original *nats.ConsumerInfo) APIRestRespConsumerInfo {
 // @Produce json
 // @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param setting body management.JSStreamParam true "JetStream stream setting"
-// @Success 200 {object} StandardResponse "success"
-// @Failure 400 {object} StandardResponse "error"
+// @Success 200 {object} goutils.RestAPIBaseResponse "success"
+// @Failure 400 {object} goutils.RestAPIBaseResponse "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream [post]
 func (h APIRestJetStreamManagementHandler) CreateStream(w http.ResponseWriter, r *http.Request) {
-	restCall := "POST /v1/admin/stream"
-
-	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
-	if err != nil {
-		msg := "Prep failed"
-		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
-		h.reply(
-			w,
-			http.StatusInternalServerError,
-			getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			),
-			restCall,
-			r,
-		)
-		return
-	}
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	var respCode int
+	var respBody interface{}
+	defer func() {
+		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+			log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+		}
+	}()
 
 	// Parse the parameters
 	var params management.JSStreamParam
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		msg := "Unable to parse request body"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
 	if err := h.core.CreateStream(r.Context(), params); err != nil {
 		msg := "Failed to create new stream"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
+	respCode = http.StatusOK
+	respBody = h.GetStdRESTSuccessMsg(r.Context())
 }
 
 // CreateStreamHandler Wrapper around CreateStream
 func (h APIRestJetStreamManagementHandler) CreateStreamHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.CreateStream(w, r)
-	})
+	}
 }
 
 // -----------------------------------------------------------------------
 
 // APIRestRespAllJetStreams response for listing all streams
 type APIRestRespAllJetStreams struct {
-	StandardResponse
+	goutils.RestAPIBaseResponse
 	// Streams the set of stream details mapped against its names
 	Streams map[string]APIRestRespStreamInfo `json:"streams,omitempty"`
 }
@@ -323,40 +322,41 @@ type APIRestRespAllJetStreams struct {
 // @Produce json
 // @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Success 200 {object} APIRestRespAllJetStreams "success"
-// @Failure 400 {object} StandardResponse "error"
+// @Failure 400 {object} goutils.RestAPIBaseResponse "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream [get]
 func (h APIRestJetStreamManagementHandler) GetAllStreams(w http.ResponseWriter, r *http.Request) {
-	restCall := "GET /v1/admin/stream"
-
+	localLogTags := h.GetLogTagsForContext(r.Context())
 	allInfo := h.core.GetAllStreams(r.Context())
 	convertedInfo := make(map[string]APIRestRespStreamInfo)
 	for streamName, streamInfo := range allInfo {
 		convertedInfo[streamName] = convertStreamInfo(streamInfo)
 	}
 	resp := APIRestRespAllJetStreams{
-		StandardResponse: StandardResponse{
-			Success: true, RequestID: readRequestIDFromContext(r.Context()),
+		RestAPIBaseResponse: goutils.RestAPIBaseResponse{
+			Success: true, RequestID: h.ReadRequestIDFromContext(r.Context()),
 		}, Streams: convertedInfo,
 	}
 
-	h.reply(w, http.StatusOK, resp, restCall, r)
+	if err := h.WriteRESTResponse(w, http.StatusOK, resp, nil); err != nil {
+		log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+	}
 }
 
 // GetAllStreamsHandler Wrapper around GetAllStreams
 func (h APIRestJetStreamManagementHandler) GetAllStreamsHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.GetAllStreams(w, r)
-	})
+	}
 }
 
 // -----------------------------------------------------------------------
 
 // APIRestRespOneJetStream response for listing one stream
 type APIRestRespOneJetStream struct {
-	StandardResponse
+	goutils.RestAPIBaseResponse
 	// Stream the details for this stream
 	Stream APIRestRespStreamInfo `json:"stream,omitempty"`
 }
@@ -369,46 +369,35 @@ type APIRestRespOneJetStream struct {
 // @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Success 200 {object} APIRestRespOneJetStream "success"
-// @Failure 400 {object} StandardResponse "error"
+// @Failure 400 {object} goutils.RestAPIBaseResponse "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName} [get]
 func (h APIRestJetStreamManagementHandler) GetStream(w http.ResponseWriter, r *http.Request) {
-	restCall := "GET /v1/admin/stream/{streamName}"
-
-	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
-	if err != nil {
-		msg := "Prep failed"
-		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
-		h.reply(
-			w,
-			http.StatusInternalServerError,
-			getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			),
-			restCall,
-			r,
-		)
-		return
-	}
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	var respCode int
+	var respBody interface{}
+	defer func() {
+		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+			log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+		}
+	}()
 
 	vars := mux.Vars(r)
 	streamName, ok := vars["streamName"]
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
@@ -416,28 +405,26 @@ func (h APIRestJetStreamManagementHandler) GetStream(w http.ResponseWriter, r *h
 	if err != nil {
 		msg := fmt.Sprintf("Unable fetch stream %s info", streamName)
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 		return
 	}
 	resp := APIRestRespOneJetStream{
-		StandardResponse: StandardResponse{
-			Success: true, RequestID: readRequestIDFromContext(r.Context()),
+		RestAPIBaseResponse: goutils.RestAPIBaseResponse{
+			Success: true, RequestID: h.ReadRequestIDFromContext(r.Context()),
 		},
 		Stream: convertStreamInfo(streamInfo),
 	}
 
-	h.reply(w, http.StatusOK, resp, restCall, r)
+	respCode = http.StatusOK
+	respBody = resp
 }
 
 // GetStreamHandler Wrapper around GetStream
 func (h APIRestJetStreamManagementHandler) GetStreamHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.GetStream(w, r)
-	})
+	}
 }
 
 // -----------------------------------------------------------------------
@@ -457,49 +444,38 @@ type APIRestReqStreamSubjects struct {
 // @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Param subjects body APIRestReqStreamSubjects true "List of new subjects"
-// @Success 200 {object} StandardResponse "success"
-// @Failure 400 {object} StandardResponse "error"
+// @Success 200 {object} goutils.RestAPIBaseResponse "success"
+// @Failure 400 {object} goutils.RestAPIBaseResponse "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName}/subject [put]
 func (h APIRestJetStreamManagementHandler) ChangeStreamSubjects(
 	w http.ResponseWriter, r *http.Request,
 ) {
-	restCall := "PUT /v1/admin/stream/{streamName}/subject"
-
-	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
-	if err != nil {
-		msg := "Prep failed"
-		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
-		h.reply(
-			w,
-			http.StatusInternalServerError,
-			getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			),
-			restCall,
-			r,
-		)
-		return
-	}
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	var respCode int
+	var respBody interface{}
+	defer func() {
+		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+			log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+		}
+	}()
 
 	vars := mux.Vars(r)
 	streamName, ok := vars["streamName"]
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
@@ -507,40 +483,36 @@ func (h APIRestJetStreamManagementHandler) ChangeStreamSubjects(
 	if err := json.NewDecoder(r.Body).Decode(&subjects); err != nil {
 		msg := "Unable to parse request body"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
 	if err := h.validate.Struct(&subjects); err != nil {
 		msg := "Bad request body"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
 	if err := h.core.ChangeStreamSubjects(r.Context(), streamName, subjects.Subjects); err != nil {
 		msg := fmt.Sprintf("Failed to change stream %s subjects", streamName)
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
+	respCode = http.StatusOK
+	respBody = h.GetStdRESTSuccessMsg(r.Context())
 }
 
 // ChangeStreamSubjectsHandler Wrapper around ChangeStreamSubjects
 func (h APIRestJetStreamManagementHandler) ChangeStreamSubjectsHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.ChangeStreamSubjects(w, r)
-	})
+	}
 }
 
 // -----------------------------------------------------------------------
@@ -554,49 +526,38 @@ func (h APIRestJetStreamManagementHandler) ChangeStreamSubjectsHandler() http.Ha
 // @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Param limits body management.JSStreamLimits true "New stream limits"
-// @Success 200 {object} StandardResponse "success"
-// @Failure 400 {object} StandardResponse "error"
+// @Success 200 {object} goutils.RestAPIBaseResponse "success"
+// @Failure 400 {object} goutils.RestAPIBaseResponse "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName}/limit [put]
 func (h APIRestJetStreamManagementHandler) UpdateStreamLimits(
 	w http.ResponseWriter, r *http.Request,
 ) {
-	restCall := "PUT /v1/admin/stream/{streamName}/limit"
-
-	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
-	if err != nil {
-		msg := "Prep failed"
-		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
-		h.reply(
-			w,
-			http.StatusInternalServerError,
-			getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			),
-			restCall,
-			r,
-		)
-		return
-	}
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	var respCode int
+	var respBody interface{}
+	defer func() {
+		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+			log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+		}
+	}()
 
 	vars := mux.Vars(r)
 	streamName, ok := vars["streamName"]
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
@@ -604,31 +565,28 @@ func (h APIRestJetStreamManagementHandler) UpdateStreamLimits(
 	if err := json.NewDecoder(r.Body).Decode(&limits); err != nil {
 		msg := "Unable to parse request body"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
 	if err := h.core.UpdateStreamLimits(r.Context(), streamName, limits); err != nil {
 		msg := fmt.Sprintf("Failed to change stream %s limits", streamName)
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
+	respCode = http.StatusOK
+	respBody = h.GetStdRESTSuccessMsg(r.Context())
 }
 
 // UpdateStreamLimitsHandler Wrapper around UpdateStreamLimits
 func (h APIRestJetStreamManagementHandler) UpdateStreamLimitsHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.UpdateStreamLimits(w, r)
-	})
+	}
 }
 
 // -----------------------------------------------------------------------
@@ -640,69 +598,56 @@ func (h APIRestJetStreamManagementHandler) UpdateStreamLimitsHandler() http.Hand
 // @Produce json
 // @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
-// @Success 200 {object} StandardResponse "success"
-// @Failure 400 {object} StandardResponse "error"
+// @Success 200 {object} goutils.RestAPIBaseResponse "success"
+// @Failure 400 {object} goutils.RestAPIBaseResponse "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName} [delete]
 func (h APIRestJetStreamManagementHandler) DeleteStream(w http.ResponseWriter, r *http.Request) {
-	restCall := "DELETE /v1/admin/stream/{streamName}"
-
-	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
-	if err != nil {
-		msg := "Prep failed"
-		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
-		h.reply(
-			w,
-			http.StatusInternalServerError,
-			getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			),
-			restCall,
-			r,
-		)
-		return
-	}
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	var respCode int
+	var respBody interface{}
+	defer func() {
+		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+			log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+		}
+	}()
 
 	vars := mux.Vars(r)
 	streamName, ok := vars["streamName"]
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
 	if err := h.core.DeleteStream(r.Context(), streamName); err != nil {
 		msg := fmt.Sprintf("Failed to delete stream %s", streamName)
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
+	respCode = http.StatusOK
+	respBody = h.GetStdRESTSuccessMsg(r.Context())
 }
 
 // DeleteStreamHandler Wrapper around DeleteStream
 func (h APIRestJetStreamManagementHandler) DeleteStreamHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.DeleteStream(w, r)
-	})
+	}
 }
 
 // =======================================================================
@@ -719,47 +664,36 @@ func (h APIRestJetStreamManagementHandler) DeleteStreamHandler() http.HandlerFun
 // @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Param consumerParam body management.JetStreamConsumerParam true "Consumer parameters"
-// @Success 200 {object} StandardResponse "success"
-// @Failure 400 {object} StandardResponse "error"
+// @Success 200 {object} goutils.RestAPIBaseResponse "success"
+// @Failure 400 {object} goutils.RestAPIBaseResponse "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName}/consumer [post]
 func (h APIRestJetStreamManagementHandler) CreateConsumer(w http.ResponseWriter, r *http.Request) {
-	restCall := "POST /v1/admin/stream/{streamName}/consumer"
-
-	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
-	if err != nil {
-		msg := "Prep failed"
-		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
-		h.reply(
-			w,
-			http.StatusInternalServerError,
-			getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			),
-			restCall,
-			r,
-		)
-		return
-	}
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	var respCode int
+	var respBody interface{}
+	defer func() {
+		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+			log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+		}
+	}()
 
 	vars := mux.Vars(r)
 	streamName, ok := vars["streamName"]
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
@@ -767,38 +701,35 @@ func (h APIRestJetStreamManagementHandler) CreateConsumer(w http.ResponseWriter,
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		msg := "Unable to parse request body"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
 	if err := h.core.CreateConsumerForStream(r.Context(), streamName, params); err != nil {
 		msg := fmt.Sprintf("Failed to create consumer on stream %s", streamName)
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
+	respCode = http.StatusOK
+	respBody = h.GetStdRESTSuccessMsg(r.Context())
 }
 
 // CreateConsumerHandler Wrapper around CreateConsumer
 func (h APIRestJetStreamManagementHandler) CreateConsumerHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.CreateConsumer(w, r)
-	})
+	}
 }
 
 // -----------------------------------------------------------------------
 
 // APIRestRespAllJetStreamConsumers response for listing all consumers
 type APIRestRespAllJetStreamConsumers struct {
-	StandardResponse
+	goutils.RestAPIBaseResponse
 	// Consumers the set of consumer details mapped against consumer name
 	Consumers map[string]APIRestRespConsumerInfo `json:"consumers,omitempty"`
 }
@@ -811,48 +742,37 @@ type APIRestRespAllJetStreamConsumers struct {
 // @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Success 200 {object} APIRestRespAllJetStreamConsumers "success"
-// @Failure 400 {object} StandardResponse "error"
+// @Failure 400 {object} goutils.RestAPIBaseResponse "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName}/consumer [get]
 func (h APIRestJetStreamManagementHandler) GetAllConsumers(
 	w http.ResponseWriter, r *http.Request,
 ) {
-	restCall := "GET /v1/admin/stream/{streamName}/consumer"
-
-	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
-	if err != nil {
-		msg := "Prep failed"
-		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
-		h.reply(
-			w,
-			http.StatusInternalServerError,
-			getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			),
-			restCall,
-			r,
-		)
-		return
-	}
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	var respCode int
+	var respBody interface{}
+	defer func() {
+		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+			log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+		}
+	}()
 
 	vars := mux.Vars(r)
 	streamName, ok := vars["streamName"]
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
@@ -862,26 +782,27 @@ func (h APIRestJetStreamManagementHandler) GetAllConsumers(
 		converted[consumerName] = convertConsumerInfo(consumerInfo)
 	}
 	resp := APIRestRespAllJetStreamConsumers{
-		StandardResponse: StandardResponse{
-			Success: true, RequestID: readRequestIDFromContext(r.Context()),
+		RestAPIBaseResponse: goutils.RestAPIBaseResponse{
+			Success: true, RequestID: h.ReadRequestIDFromContext(r.Context()),
 		},
 		Consumers: converted,
 	}
-	h.reply(w, http.StatusOK, resp, restCall, r)
+	respCode = http.StatusOK
+	respBody = resp
 }
 
 // GetAllConsumersHandler Wrapper around GetAllConsumers
 func (h APIRestJetStreamManagementHandler) GetAllConsumersHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.GetAllConsumers(w, r)
-	})
+	}
 }
 
 // -----------------------------------------------------------------------
 
 // APIRestRespOneJetStreamConsumer response for listing one consumer
 type APIRestRespOneJetStreamConsumer struct {
-	StandardResponse
+	goutils.RestAPIBaseResponse
 	// Consumer the details regarding this consumer
 	Consumer APIRestRespConsumerInfo `json:"consumer,omitempty"`
 }
@@ -895,63 +816,50 @@ type APIRestRespOneJetStreamConsumer struct {
 // @Param streamName path string true "JetStream stream name"
 // @Param consumerName path string true "JetStream consumer name"
 // @Success 200 {object} APIRestRespOneJetStreamConsumer "success"
-// @Failure 400 {object} StandardResponse "error"
+// @Failure 400 {object} goutils.RestAPIBaseResponse "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName}/consumer/{consumerName} [get]
 func (h APIRestJetStreamManagementHandler) GetConsumer(w http.ResponseWriter, r *http.Request) {
-	restCall := "GET /v1/admin/stream/{streamName}/consumer/{consumerName}"
-
-	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
-	if err != nil {
-		msg := "Prep failed"
-		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
-		h.reply(
-			w,
-			http.StatusInternalServerError,
-			getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			),
-			restCall,
-			r,
-		)
-		return
-	}
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	var respCode int
+	var respBody interface{}
+	defer func() {
+		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+			log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+		}
+	}()
 
 	vars := mux.Vars(r)
 	streamName, ok := vars["streamName"]
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 	consumerName, ok := vars["consumerName"]
 	if !ok {
 		msg := "No consumer name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(consumerName, h.validate); err != nil {
 		msg := "Invalid consumer name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
@@ -959,28 +867,26 @@ func (h APIRestJetStreamManagementHandler) GetConsumer(w http.ResponseWriter, r 
 	if err != nil {
 		msg := fmt.Sprintf("Failed to read consumer %s on stream %s", consumerName, streamName)
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 		return
 	}
 
 	resp := APIRestRespOneJetStreamConsumer{
-		StandardResponse: StandardResponse{
-			Success: true, RequestID: readRequestIDFromContext(r.Context()),
+		RestAPIBaseResponse: goutils.RestAPIBaseResponse{
+			Success: true, RequestID: h.ReadRequestIDFromContext(r.Context()),
 		},
 		Consumer: convertConsumerInfo(info),
 	}
-	h.reply(w, http.StatusOK, resp, restCall, r)
+	respCode = http.StatusOK
+	respBody = resp
 }
 
 // GetConsumerHandler Wrapper around GetConsumer
 func (h APIRestJetStreamManagementHandler) GetConsumerHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.GetConsumer(w, r)
-	})
+	}
 }
 
 // -----------------------------------------------------------------------
@@ -993,86 +899,71 @@ func (h APIRestJetStreamManagementHandler) GetConsumerHandler() http.HandlerFunc
 // @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param streamName path string true "JetStream stream name"
 // @Param consumerName path string true "JetStream consumer name"
-// @Success 200 {object} StandardResponse "success"
-// @Failure 400 {object} StandardResponse "error"
+// @Success 200 {object} goutils.RestAPIBaseResponse "success"
+// @Failure 400 {object} goutils.RestAPIBaseResponse "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/admin/stream/{streamName}/consumer/{consumerName} [delete]
 func (h APIRestJetStreamManagementHandler) DeleteConsumer(w http.ResponseWriter, r *http.Request) {
-	restCall := "DELETE /v1/admin/stream/{streamName}/consumer/{consumerName}"
-
-	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
-	if err != nil {
-		msg := "Prep failed"
-		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
-		h.reply(
-			w,
-			http.StatusInternalServerError,
-			getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			),
-			restCall,
-			r,
-		)
-		return
-	}
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	var respCode int
+	var respBody interface{}
+	defer func() {
+		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+			log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+		}
+	}()
 
 	vars := mux.Vars(r)
 	streamName, ok := vars["streamName"]
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 	consumerName, ok := vars["consumerName"]
 	if !ok {
 		msg := "No consumer name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(consumerName, h.validate); err != nil {
 		msg := "Invalid consumer name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
 	if err := h.core.DeleteConsumerOnStream(r.Context(), streamName, consumerName); err != nil {
 		msg := fmt.Sprintf("Failed to delete consumer %s on stream %s", consumerName, streamName)
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
+	respCode = http.StatusOK
+	respBody = h.GetStdRESTSuccessMsg(r.Context())
 }
 
 // DeleteConsumerHandler Wrapper around DeleteConsumer
 func (h APIRestJetStreamManagementHandler) DeleteConsumerHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.DeleteConsumer(w, r)
-	})
+	}
 }
 
 // =======================================================================
@@ -1085,21 +976,25 @@ func (h APIRestJetStreamManagementHandler) DeleteConsumerHandler() http.HandlerF
 // @Description Will return success to indicate management REST API module is live
 // @tags Management
 // @Produce json
-// @Success 200 {object} StandardResponse "success"
+// @Success 200 {object} goutils.RestAPIBaseResponse "success"
 // @Failure 400 {string} string "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Router /v1/admin/alive [get]
 func (h APIRestJetStreamManagementHandler) Alive(w http.ResponseWriter, r *http.Request) {
-	restCall := "GET /v1/admin/alive"
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	if err := h.WriteRESTResponse(
+		w, http.StatusOK, h.GetStdRESTSuccessMsg(r.Context()), nil,
+	); err != nil {
+		log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+	}
 }
 
 // AliveHandler Wrapper around Alive
 func (h APIRestJetStreamManagementHandler) AliveHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.Alive(w, r)
-	})
+	}
 }
 
 // -----------------------------------------------------------------------
@@ -1109,36 +1004,39 @@ func (h APIRestJetStreamManagementHandler) AliveHandler() http.HandlerFunc {
 // @Description Will return success if management REST API module is ready for use
 // @tags Management
 // @Produce json
-// @Success 200 {object} StandardResponse "success"
+// @Success 200 {object} goutils.RestAPIBaseResponse "success"
 // @Failure 400 {string} string "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Router /v1/admin/ready [get]
 func (h APIRestJetStreamManagementHandler) Ready(w http.ResponseWriter, r *http.Request) {
-	restCall := "GET /v1/admin/ready"
 	msg := "not ready"
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	var respCode int
+	var respBody interface{}
+	defer func() {
+		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+			log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+		}
+	}()
+
 	if ready, err := h.core.Ready(); err != nil {
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 	} else {
 		if ready {
-			h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
+			respCode = http.StatusOK
+			respBody = h.GetStdRESTSuccessMsg(r.Context())
 		} else {
-			h.reply(
-				w, http.StatusInternalServerError, getStdRESTErrorMsg(
-					r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-				), restCall, r,
-			)
+			respCode = http.StatusInternalServerError
+			respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 		}
 	}
 }
 
 // ReadyHandler Wrapper around Alive
 func (h APIRestJetStreamManagementHandler) ReadyHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.Ready(w, r)
-	})
+	}
 }

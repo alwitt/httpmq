@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/alwitt/goutils"
 	"github.com/alwitt/httpmq/common"
 	"github.com/alwitt/httpmq/core"
 	"github.com/alwitt/httpmq/dataplane"
@@ -36,7 +37,7 @@ import (
 
 // APIRestJetStreamDataplaneHandler REST handler for JetStream dataplane
 type APIRestJetStreamDataplaneHandler struct {
-	APIRestHandler
+	goutils.RestAPIHandler
 	natsClient   *core.NatsClient
 	publisher    dataplane.JetStreamPublisher
 	ackBroadcast dataplane.JetStreamACKBroadcaster
@@ -63,11 +64,21 @@ func GetAPIRestJetStreamDataplaneHandler(
 		offLimitHeaders[header] = true
 	}
 	return APIRestJetStreamDataplaneHandler{
-		APIRestHandler: APIRestHandler{
-			Component:             common.Component{LogTags: logTags},
-			startOfRequestLog:     httpConfig.Logging.StartOfRequestMessage,
-			endOfRequestLog:       httpConfig.Logging.EndOfRequestMessage,
-			offLimitHeadersForLog: offLimitHeaders,
+		RestAPIHandler: goutils.RestAPIHandler{
+			Component: goutils.Component{
+				LogTags: logTags,
+				LogTagModifiers: []goutils.LogMetadataModifier{
+					goutils.ModifyLogMetadataByRestRequestParam,
+				},
+			},
+			CallRequestIDHeaderField: &httpConfig.Logging.RequestIDHeader,
+			DoNotLogHeaders: func() map[string]bool {
+				result := map[string]bool{}
+				for _, v := range httpConfig.Logging.DoNotLogHeaders {
+					result[v] = true
+				}
+				return result
+			}(),
 		},
 		natsClient:   client,
 		publisher:    runTimePublisher,
@@ -92,47 +103,36 @@ func GetAPIRestJetStreamDataplaneHandler(
 // @Param Httpmq-Request-ID header string false "User provided request ID to match against logs"
 // @Param subjectName path string true "JetStream subject to publish under"
 // @Param message body string true "Message to publish in Base64 encoding"
-// @Success 200 {object} StandardResponse "success"
-// @Failure 400 {object} StandardResponse "error"
+// @Success 200 {object} goutils.RestAPIBaseResponse "success"
+// @Failure 400 {object} goutils.RestAPIBaseResponse "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/data/subject/{subjectName} [post]
 func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, r *http.Request) {
-	restCall := "POST /v1/data/subject/{subjectName}"
-
-	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
-	if err != nil {
-		msg := "Prep failed"
-		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
-		h.reply(
-			w,
-			http.StatusInternalServerError,
-			getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			),
-			restCall,
-			r,
-		)
-		return
-	}
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	var respCode int
+	var respBody interface{}
+	defer func() {
+		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+			log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+		}
+	}()
 
 	vars := mux.Vars(r)
 	subjectName, ok := vars["subjectName"]
 	if !ok {
 		msg := "No subject name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateSubjectName(subjectName); err != nil {
 		msg := "Invalid subject string"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
@@ -145,21 +145,15 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, 
 		if err != nil {
 			msg := "Failed to base64 decode body"
 			log.WithError(err).WithFields(localLogTags).Errorf(msg)
-			h.reply(
-				w, http.StatusBadRequest, getStdRESTErrorMsg(
-					r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-				), restCall, r,
-			)
+			respCode = http.StatusBadRequest
+			respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 			return
 		}
 		if decodeNum == 0 {
 			msg := "Base64 decode resulted in empty body"
 			log.WithFields(localLogTags).Errorf(msg)
-			h.reply(
-				w, http.StatusBadRequest, getStdRESTErrorMsg(
-					r.Context(), http.StatusBadRequest, &msg, nil,
-				), restCall, r,
-			)
+			respCode = http.StatusBadRequest
+			respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 			return
 		}
 		decodedMsg = buf.Bytes()
@@ -169,22 +163,20 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessage(w http.ResponseWriter, 
 	if err := h.publisher.Publish(r.Context(), subjectName, decodedMsg); err != nil {
 		msg := fmt.Sprintf("Unable to publish message to %s", subjectName)
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			), restCall, r,
-		)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
+	respCode = http.StatusOK
+	respBody = h.GetStdRESTSuccessMsg(r.Context())
 }
 
 // PublishMessageHandler Wrapper around PublishMessage
 func (h APIRestJetStreamDataplaneHandler) PublishMessageHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.PublishMessage(w, r)
-	})
+	}
 }
 
 // =======================================================================
@@ -202,64 +194,51 @@ func (h APIRestJetStreamDataplaneHandler) PublishMessageHandler() http.HandlerFu
 // @Param streamName path string true "JetStream stream name"
 // @Param consumerName path string true "JetStream consumer name"
 // @Param sequenceNum body dataplane.AckSeqNum true "Message message sequence numbers"
-// @Success 200 {object} StandardResponse "success"
-// @Failure 400 {object} StandardResponse "error"
+// @Success 200 {object} goutils.RestAPIBaseResponse "success"
+// @Failure 400 {object} goutils.RestAPIBaseResponse "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/data/stream/{streamName}/consumer/{consumerName}/ack [post]
 func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r *http.Request) {
-	restCall := "POST /v1/data/stream/{streamName}/consumer/{consumerName}/ack"
-
-	localLogTags, err := common.UpdateLogTags(r.Context(), h.LogTags)
-	if err != nil {
-		msg := "Prep failed"
-		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
-		h.reply(
-			w,
-			http.StatusInternalServerError,
-			getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			),
-			restCall,
-			r,
-		)
-		return
-	}
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	var respCode int
+	var respBody interface{}
+	defer func() {
+		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+			log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+		}
+	}()
 
 	vars := mux.Vars(r)
 	streamName, ok := vars["streamName"]
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 	consumerName, ok := vars["consumerName"]
 	if !ok {
 		msg := "No consumer name provided"
 		log.WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(consumerName, h.validate); err != nil {
 		msg := "Invalid consumer name"
 		log.WithError(err).WithFields(localLogTags).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
@@ -267,9 +246,8 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 	if err := json.NewDecoder(r.Body).Decode(&sequence); err != nil {
 		msg := "Unable to parse request body"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
@@ -277,9 +255,8 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 	if err := h.validate.Struct(&sequence); err != nil {
 		msg := "Unable to parse request body"
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
@@ -293,29 +270,27 @@ func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACK(w http.ResponseWriter, r
 	if err := h.ackBroadcast.BroadcastACK(r.Context(), ackInfo); err != nil {
 		msg := fmt.Sprintf("Failed to broadcast ACK %s", ackInfo.String())
 		log.WithError(err).WithFields(localLogTags).Error(msg)
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 		return
 	}
 
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
+	respCode = http.StatusOK
+	respBody = h.GetStdRESTSuccessMsg(r.Context())
 }
 
 // ReceiveMsgACKHandler Wrapper around ReceiveMsgACK
 func (h APIRestJetStreamDataplaneHandler) ReceiveMsgACKHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.ReceiveMsgACK(w, r)
-	})
+	}
 }
 
 // -----------------------------------------------------------------------
 
 // APIRestRespDataMessage wrapper object for one message from a stream
 type APIRestRespDataMessage struct {
-	StandardResponse
+	goutils.RestAPIBaseResponse
 	dataplane.MsgToDeliver
 }
 
@@ -333,29 +308,20 @@ type APIRestRespDataMessage struct {
 // @Param max_msg_inflight query integer false "Max number of inflight messages (DEFAULT: 1)"
 // @Param delivery_group query string false "Needed if consumer uses delivery groups"
 // @Success 200 {object} APIRestRespDataMessage "success"
-// @Failure 400 {object} StandardResponse "error"
+// @Failure 400 {object} goutils.RestAPIBaseResponse "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Header 200,400,500 {string} Httpmq-Request-ID "Request ID to match against logs"
 // @Router /v1/data/stream/{streamName}/consumer/{consumerName} [get]
 func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r *http.Request) {
-	restCall := "GET /v1/data/stream/{streamName}/consumer/{consumerName}"
-
-	localLogTagsInitial, err := common.UpdateLogTags(r.Context(), h.LogTags)
-	if err != nil {
-		msg := "Prep failed"
-		log.WithError(err).WithFields(h.LogTags).Error("Failed to update logtags")
-		h.reply(
-			w,
-			http.StatusInternalServerError,
-			getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			),
-			restCall,
-			r,
-		)
-		return
-	}
+	localLogTagsInitial := h.GetLogTagsForContext(r.Context())
+	var respCode int
+	var respBody interface{}
+	defer func() {
+		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+			log.WithError(err).WithFields(localLogTagsInitial).Error("Failed to form response")
+		}
+	}()
 
 	// --------------------------------------------------------------------------
 	// Read operation parameters
@@ -364,34 +330,30 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 	if !ok {
 		msg := "No stream name provided"
 		log.WithFields(localLogTagsInitial).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(streamName, h.validate); err != nil {
 		msg := "Invalid stream name"
 		log.WithError(err).WithFields(localLogTagsInitial).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 	consumerName, ok := vars["consumerName"]
 	if !ok {
 		msg := "No consumer name provided"
 		log.WithFields(localLogTagsInitial).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, nil,
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 		return
 	}
 	if err := common.ValidateTopLevelEntityName(consumerName, h.validate); err != nil {
 		msg := "Invalid consumer name"
 		log.WithError(err).WithFields(localLogTagsInitial).Errorf(msg)
-		h.reply(w, http.StatusBadRequest, getStdRESTErrorMsg(
-			r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-		), restCall, r)
+		respCode = http.StatusBadRequest
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 		return
 	}
 
@@ -407,11 +369,8 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		if !ok || len(t) != 1 {
 			msg := "Missing subscribe subject / Multiple subjects"
 			log.WithFields(localLogTagsInitial).Errorf(msg)
-			h.reply(
-				w, http.StatusBadRequest, getStdRESTErrorMsg(
-					r.Context(), http.StatusBadRequest, &msg, nil,
-				), restCall, r,
-			)
+			respCode = http.StatusBadRequest
+			respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 			return
 		}
 		subjectName = t[0]
@@ -423,22 +382,16 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 			if len(t) != 1 {
 				msg := "Multiple max_msg_inflight"
 				log.WithFields(localLogTagsInitial).Errorf(msg)
-				h.reply(
-					w, http.StatusBadRequest, getStdRESTErrorMsg(
-						r.Context(), http.StatusBadRequest, &msg, nil,
-					), restCall, r,
-				)
+				respCode = http.StatusBadRequest
+				respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 				return
 			}
 			p, err := strconv.Atoi(t[0])
 			if err != nil {
 				msg := "Unable to parse max_msg_inflight"
 				log.WithError(err).WithFields(localLogTagsInitial).Errorf(msg)
-				h.reply(
-					w, http.StatusBadRequest, getStdRESTErrorMsg(
-						r.Context(), http.StatusBadRequest, &msg, common.GetStrPtr(err.Error()),
-					), restCall, r,
-				)
+				respCode = http.StatusBadRequest
+				respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, err.Error())
 				return
 			}
 			maxInflightMsg = p
@@ -451,11 +404,8 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 			if len(t) != 1 {
 				msg := "Multiple delivery groups"
 				log.WithFields(localLogTagsInitial).Errorf(msg)
-				h.reply(
-					w, http.StatusBadRequest, getStdRESTErrorMsg(
-						r.Context(), http.StatusBadRequest, &msg, nil,
-					), restCall, r,
-				)
+				respCode = http.StatusBadRequest
+				respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusBadRequest, msg, msg)
 				return
 			}
 			deliveryGroup = new(string)
@@ -467,32 +417,19 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 	// Start operation
 
 	// Define custom log tags for this instance
-	logTags := log.Fields{
-		"module":         "rest",
-		"component":      "jetstream-dataplane",
-		"instance":       "push-subscribe",
-		"stream":         streamName,
-		"subject":        subjectName,
-		"consumer":       consumerName,
-		"delivery_group": deliveryGroup,
-	}
-	if r.Context().Value(common.RequestParam{}) != nil {
-		v, ok := r.Context().Value(common.RequestParam{}).(common.RequestParam)
-		if ok {
-			v.UpdateLogTags(logTags)
-		}
-	}
+	logTags := localLogTagsInitial
+	logTags["stream"] = streamName
+	logTags["subject"] = subjectName
+	logTags["consumer"] = consumerName
+	logTags["delivery_group"] = deliveryGroup
 
 	// Create stream flusher
 	writeFlusher, ok := w.(http.Flusher)
 	if !ok {
 		msg := "Streaming not supported"
 		log.WithFields(logTags).Errorf(msg)
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, nil,
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, msg)
 		return
 	}
 
@@ -512,11 +449,8 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 	if err != nil {
 		msg := "Unable to define dispatcher"
 		log.WithError(err).WithFields(logTags).Errorf(msg)
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 		return
 	}
 
@@ -543,11 +477,8 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 	if err := dispatcher.Start(msgHandler, errorHandler); err != nil {
 		msg := "Unable to start dispatcher"
 		log.WithError(err).WithFields(logTags).Errorf(msg)
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 		return
 	}
 
@@ -557,11 +488,8 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		cancel()
 		complete = true
 		log.WithError(err).WithFields(logTags).Errorf(msg)
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, common.GetStrPtr(err.Error()),
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
 	}
 	for !complete {
 		select {
@@ -570,19 +498,16 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 			complete = true
 			log.WithFields(logTags).Info("Terminating PUSH subscription on server stop")
 			msg := "Server stopping"
-			h.reply(
-				w, http.StatusInternalServerError, getStdRESTErrorMsg(
-					r.Context(), http.StatusInternalServerError, &msg, nil,
-				), restCall, r,
-			)
+			respCode = http.StatusInternalServerError
+			respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, msg)
 		case <-r.Context().Done():
 			// Request closed
 			complete = true
 			log.WithFields(logTags).Info("Terminating PUSH subscription on request end")
-			resp := APIRestRespDataMessage{
-				StandardResponse: getStdRESTSuccessMsg(r.Context()),
+			respCode = http.StatusOK
+			respBody = APIRestRespDataMessage{
+				RestAPIBaseResponse: h.GetStdRESTSuccessMsg(r.Context()),
 			}
-			h.reply(w, http.StatusOK, resp, restCall, r)
 		case err, ok := <-internalError:
 			// Internal system error
 			if ok {
@@ -601,8 +526,8 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 					break
 				}
 				resp := APIRestRespDataMessage{
-					StandardResponse: StandardResponse{
-						Success: true, RequestID: readRequestIDFromContext(r.Context()),
+					RestAPIBaseResponse: goutils.RestAPIBaseResponse{
+						Success: true, RequestID: h.ReadRequestIDFromContext(r.Context()),
 					},
 					MsgToDeliver: converted,
 				}
@@ -632,9 +557,9 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 
 // PushSubscribeHandler Wrapper around PushSubscribe
 func (h APIRestJetStreamDataplaneHandler) PushSubscribeHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.PushSubscribe(w, r)
-	})
+	}
 }
 
 // =======================================================================
@@ -647,21 +572,25 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribeHandler() http.HandlerFun
 // @Description Will return success to indicate dataplane REST API module is live
 // @tags Dataplane
 // @Produce json
-// @Success 200 {object} StandardResponse "success"
+// @Success 200 {object} goutils.RestAPIBaseResponse "success"
 // @Failure 400 {string} string "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Router /v1/data/alive [get]
 func (h APIRestJetStreamDataplaneHandler) Alive(w http.ResponseWriter, r *http.Request) {
-	restCall := "GET /v1/data/alive"
-	h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	if err := h.WriteRESTResponse(
+		w, http.StatusOK, h.GetStdRESTSuccessMsg(r.Context()), nil,
+	); err != nil {
+		log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+	}
 }
 
 // AliveHandler Wrapper around Alive
 func (h APIRestJetStreamDataplaneHandler) AliveHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.Alive(w, r)
-	})
+	}
 }
 
 // -----------------------------------------------------------------------
@@ -671,28 +600,34 @@ func (h APIRestJetStreamDataplaneHandler) AliveHandler() http.HandlerFunc {
 // @Description Will return success if dataplane REST API module is ready for use
 // @tags Dataplane
 // @Produce json
-// @Success 200 {object} StandardResponse "success"
+// @Success 200 {object} goutils.RestAPIBaseResponse "success"
 // @Failure 400 {string} string "error"
 // @Failure 404 {string} string "error"
-// @Failure 500 {object} StandardResponse "error"
+// @Failure 500 {object} goutils.RestAPIBaseResponse "error"
 // @Router /v1/data/ready [get]
 func (h APIRestJetStreamDataplaneHandler) Ready(w http.ResponseWriter, r *http.Request) {
-	restCall := "GET /v1/data/ready"
 	msg := "not ready"
+	localLogTags := h.GetLogTagsForContext(r.Context())
+	var respCode int
+	var respBody interface{}
+	defer func() {
+		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+			log.WithError(err).WithFields(localLogTags).Error("Failed to form response")
+		}
+	}()
+
 	if h.natsClient.NATs().Status() == nats.CONNECTED {
-		h.reply(w, http.StatusOK, getStdRESTSuccessMsg(r.Context()), restCall, r)
+		respCode = http.StatusOK
+		respBody = h.GetStdRESTSuccessMsg(r.Context())
 	} else {
-		h.reply(
-			w, http.StatusInternalServerError, getStdRESTErrorMsg(
-				r.Context(), http.StatusInternalServerError, &msg, nil,
-			), restCall, r,
-		)
+		respCode = http.StatusInternalServerError
+		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, msg)
 	}
 }
 
 // ReadyHandler Wrapper around Alive
 func (h APIRestJetStreamDataplaneHandler) ReadyHandler() http.HandlerFunc {
-	return h.attachRequestID(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		h.Ready(w, r)
-	})
+	}
 }

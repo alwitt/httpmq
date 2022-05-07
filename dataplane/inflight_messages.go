@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/alwitt/httpmq/common"
+	"github.com/alwitt/goutils"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
 	"github.com/nats-io/nats.go"
@@ -46,16 +46,16 @@ type perStreamInflightMessages struct {
 
 // jetStreamInflightMsgProcessorImpl implements JetStreamInflightMsgProcessor
 type jetStreamInflightMsgProcessorImpl struct {
-	common.Component
+	goutils.Component
 	subject, consumer string
-	tp                common.TaskProcessor
+	tp                goutils.TaskProcessor
 	inflightPerStream map[string]*perStreamInflightMessages
 	validate          *validator.Validate
 }
 
 // getJetStreamInflightMsgProcessor define new JetStreamInflightMsgProcessor
 func getJetStreamInflightMsgProcessor(
-	ctxt context.Context, tp common.TaskProcessor, stream, subject, consumer string,
+	ctxt context.Context, tp goutils.TaskProcessor, stream, subject, consumer string,
 ) (JetStreamInflightMsgProcessor, error) {
 	logTags := log.Fields{
 		"module":    "dataplane",
@@ -64,12 +64,7 @@ func getJetStreamInflightMsgProcessor(
 		"subject":   subject,
 		"consumer":  consumer,
 	}
-	if ctxt.Value(common.RequestParam{}) != nil {
-		v, ok := ctxt.Value(common.RequestParam{}).(common.RequestParam)
-		if ok {
-			v.UpdateLogTags(logTags)
-		}
-	}
+	goutils.ModifyLogMetadataByRestRequestParam(ctxt, logTags)
 	validate := validator.New()
 	{
 		t := wrapperForValidation{
@@ -81,7 +76,12 @@ func getJetStreamInflightMsgProcessor(
 		}
 	}
 	instance := jetStreamInflightMsgProcessorImpl{
-		Component:         common.Component{LogTags: logTags},
+		Component: goutils.Component{
+			LogTags: logTags,
+			LogTagModifiers: []goutils.LogMetadataModifier{
+				goutils.ModifyLogMetadataByRestRequestParam,
+			},
+		},
 		subject:           subject,
 		consumer:          consumer,
 		tp:                tp,
@@ -117,6 +117,7 @@ type jsInflightCtrlRecordNewMsg struct {
 func (c *jetStreamInflightMsgProcessorImpl) RecordInflightMessage(
 	callCtxt context.Context, msg *nats.Msg, blocking bool,
 ) error {
+	localLogTags := c.GetLogTagsForContext(callCtxt)
 	resultChan := make(chan error)
 	handler := func(err error) {
 		resultChan <- err
@@ -130,7 +131,7 @@ func (c *jetStreamInflightMsgProcessorImpl) RecordInflightMessage(
 	}
 
 	if err := c.tp.Submit(callCtxt, request); err != nil {
-		log.WithError(err).WithFields(c.LogTags).Errorf("Failed to submit %s", msgToString(msg))
+		log.WithError(err).WithFields(localLogTags).Errorf("Failed to submit %s", msgToString(msg))
 		return err
 	}
 
@@ -153,7 +154,7 @@ func (c *jetStreamInflightMsgProcessorImpl) RecordInflightMessage(
 	}
 
 	if err != nil {
-		log.WithError(err).WithFields(c.LogTags).Errorf("Processing %s failed", msgToString(msg))
+		log.WithError(err).WithFields(localLogTags).Errorf("Processing %s failed", msgToString(msg))
 	}
 	return err
 }
@@ -226,8 +227,9 @@ type jsInflightCtrlRecordACK struct {
 func (c *jetStreamInflightMsgProcessorImpl) HandlerMsgACK(
 	callCtxt context.Context, ack AckIndication, blocking bool,
 ) error {
+	localLogTags := c.GetLogTagsForContext(callCtxt)
 	if err := c.validate.Struct(&ack); err != nil {
-		log.WithError(err).WithFields(c.LogTags).Errorf("Failed to submit %s", ack.String())
+		log.WithError(err).WithFields(localLogTags).Errorf("Failed to submit %s", ack.String())
 		return err
 	}
 
@@ -244,7 +246,7 @@ func (c *jetStreamInflightMsgProcessorImpl) HandlerMsgACK(
 	}
 
 	if err := c.tp.Submit(callCtxt, request); err != nil {
-		log.WithError(err).WithFields(c.LogTags).Errorf("Failed to submit %s", ack.String())
+		log.WithError(err).WithFields(localLogTags).Errorf("Failed to submit %s", ack.String())
 		return err
 	}
 

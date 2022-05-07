@@ -27,7 +27,6 @@ import (
 	"github.com/alwitt/httpmq/dataplane"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
@@ -111,9 +110,7 @@ func RunDataplaneServer(
 	})
 
 	// Add debug logging
-	router.Use(func(next http.Handler) http.Handler {
-		return handlers.CombinedLoggingHandler(httpHandler, next)
-	})
+	// FIXME: switch to middleware
 
 	serverListen := fmt.Sprintf(
 		"%s:%d", params.HTTPSetting.Server.ListenOn, params.HTTPSetting.Server.Port,

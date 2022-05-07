@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/alwitt/goutils"
 	"github.com/alwitt/httpmq/common"
 	"github.com/alwitt/httpmq/core"
 	"github.com/apex/log"
@@ -35,7 +36,7 @@ type MessageDispatcher interface {
 
 // pushMessageDispatcher implements MessageDispatcher for a push consumer
 type pushMessageDispatcher struct {
-	common.Component
+	goutils.Component
 	nats       *core.NatsClient
 	optContext context.Context
 	wg         *sync.WaitGroup
@@ -43,7 +44,7 @@ type pushMessageDispatcher struct {
 	started    bool
 	// msgTracking monitors the set of inflight messages
 	msgTracking   JetStreamInflightMsgProcessor
-	msgTrackingTP common.TaskProcessor
+	msgTrackingTP goutils.TaskProcessor
 	// ackWatcher monitors for ACK being received
 	ackWatcher JetStreamACKReceiver
 	// subscriber connected to JetStream to receive messages
@@ -67,12 +68,7 @@ func GetPushMessageDispatcher(
 		"subject":   subject,
 		"consumer":  consumer,
 	}
-	if ctxt.Value(common.RequestParam{}) != nil {
-		v, ok := ctxt.Value(common.RequestParam{}).(common.RequestParam)
-		if ok {
-			v.UpdateLogTags(logTags)
-		}
-	}
+	goutils.ModifyLogMetadataByRestRequestParam(ctxt, logTags)
 
 	// Initial validation
 	{
@@ -94,7 +90,13 @@ func GetPushMessageDispatcher(
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define ACK receiver")
 		return nil, err
 	}
-	msgTrackingTP, err := common.GetNewTaskProcessorInstance(ctxt, instance, maxInflightMsgs*4)
+	tpLogTags := log.Fields{}
+	_ = common.DeepCopy(logTags, tpLogTags)
+	tpLogTags["component"] = "task-processor"
+	tpLogTags["instance"] = instance
+	msgTrackingTP, err := goutils.GetNewTaskProcessorInstance(
+		ctxt, instance, maxInflightMsgs*4, tpLogTags,
+	)
 	if err != nil {
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define task processor")
 		return nil, err
@@ -115,7 +117,7 @@ func GetPushMessageDispatcher(
 	}
 
 	return &pushMessageDispatcher{
-		Component:     common.Component{LogTags: logTags},
+		Component:     goutils.Component{LogTags: logTags},
 		nats:          natsClient,
 		optContext:    ctxt,
 		wg:            wg,

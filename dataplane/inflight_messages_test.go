@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alwitt/goutils"
 	"github.com/alwitt/httpmq/common"
 	"github.com/alwitt/httpmq/core"
 	"github.com/alwitt/httpmq/management"
@@ -71,7 +72,11 @@ func TestInflightMessageHandling(t *testing.T) {
 	assert.Nil(err)
 	defer js.Close(utCtxt)
 
-	tp, err := common.GetNewTaskProcessorInstance(utCtxt, testName, 4)
+	tpLogTags := log.Fields{}
+	_ = common.DeepCopy(logTags, tpLogTags)
+	tpLogTags["component"] = "task-processor"
+	tpLogTags["instance"] = "unit-tester"
+	tp, err := goutils.GetNewTaskProcessorInstance(utCtxt, testName, 4, tpLogTags)
 	assert.Nil(err)
 
 	jsCtrl, err := management.GetJetStreamController(js, testName)
