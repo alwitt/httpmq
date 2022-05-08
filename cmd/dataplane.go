@@ -109,8 +109,10 @@ func RunDataplaneServer(
 		"get": httpHandler.ReadyHandler(),
 	})
 
-	// Add debug logging
-	// FIXME: switch to middleware
+	// Add logging middleware
+	router.Use(func(next http.Handler) http.Handler {
+		return httpHandler.LoggingMiddleware(next.ServeHTTP)
+	})
 
 	serverListen := fmt.Sprintf(
 		"%s:%d", params.HTTPSetting.Server.ListenOn, params.HTTPSetting.Server.Port,
