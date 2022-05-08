@@ -3,7 +3,7 @@ module github.com/alwitt/httpmq
 go 1.18
 
 require (
-	github.com/alwitt/goutils v0.3.2
+	github.com/alwitt/goutils v0.3.3
 	github.com/apex/log v1.9.0
 	github.com/go-playground/validator/v10 v10.11.0
 	github.com/google/uuid v1.3.0
