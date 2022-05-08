@@ -20,7 +20,6 @@ import (
 	"sync"
 
 	"github.com/alwitt/goutils"
-	"github.com/alwitt/httpmq/common"
 	"github.com/alwitt/httpmq/core"
 	"github.com/apex/log"
 	"github.com/go-playground/validator/v10"
@@ -90,10 +89,15 @@ func GetPushMessageDispatcher(
 		log.WithError(err).WithFields(logTags).Errorf("Unable to define ACK receiver")
 		return nil, err
 	}
-	tpLogTags := log.Fields{}
-	_ = common.DeepCopy(logTags, tpLogTags)
-	tpLogTags["component"] = "task-processor"
-	tpLogTags["instance"] = instance
+	tpLogTags := log.Fields{
+		"module":    "dataplane",
+		"component": "task-processor",
+		"instance":  instance,
+		"stream":    stream,
+		"subject":   subject,
+		"consumer":  consumer,
+	}
+	goutils.ModifyLogMetadataByRestRequestParam(ctxt, logTags)
 	msgTrackingTP, err := goutils.GetNewTaskProcessorInstance(
 		ctxt, instance, maxInflightMsgs*4, tpLogTags,
 	)

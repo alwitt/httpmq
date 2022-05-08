@@ -72,10 +72,11 @@ func TestInflightMessageHandling(t *testing.T) {
 	assert.Nil(err)
 	defer js.Close(utCtxt)
 
-	tpLogTags := log.Fields{}
-	_ = common.DeepCopy(logTags, tpLogTags)
-	tpLogTags["component"] = "task-processor"
-	tpLogTags["instance"] = "unit-tester"
+	tpLogTags := log.Fields{
+		"module":    "dataplane_test",
+		"component": "task-processor",
+		"instance":  "unit-tester",
+	}
 	tp, err := goutils.GetNewTaskProcessorInstance(utCtxt, testName, 4, tpLogTags)
 	assert.Nil(err)
 
