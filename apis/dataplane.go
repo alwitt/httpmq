@@ -323,6 +323,11 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		}
 	}()
 
+	// Send support headers for SSE first
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Content-Type", "text/event-stream")
+
 	// --------------------------------------------------------------------------
 	// Read operation parameters
 	vars := mux.Vars(r)

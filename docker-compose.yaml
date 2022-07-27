@@ -32,4 +32,4 @@ services:
       - httpmq-test
     volumes:
       - nats_js_store:/mnt/nats
-      - ./test_nats.conf:/nats-server.conf
+      - ./docker/test_nats.conf:/nats-server.conf

@@ -27,7 +27,7 @@ fix: .prepare ## Lint and fix vialoations
 
 .PHONY: compose
 compose: clean .prepare ## Run docker-compose to create the DEV ENV
-	@docker-compose -f docker/docker-compose.yaml up -d
+	@docker-compose -f docker-compose.yaml up -d
 
 .PHONY: doc
 doc: .prepare ## Generate the OpenAPI spec
@@ -46,6 +46,10 @@ test: .prepare ## Run unittests
 build: lint ## Build project binaries
 	@go build -o httpmq.bin .
 
+.PHONY: build-docker
+build-docker: build ## Build docker image
+	@docker build --rm --tag httpmq:local-dev . --load
+
 .prepare: ## Prepare the project for local development
 	@pip3 install --user pre-commit
 	@pre-commit install
@@ -56,7 +60,7 @@ build: lint ## Build project binaries
 
 .PHONY: clean
 clean: .prepare ## Clean up DEV ENV
-	@docker-compose -f docker/docker-compose.yaml down --volume
+	@docker-compose -f docker-compose.yaml down --volume
 
 help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
