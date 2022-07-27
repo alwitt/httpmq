@@ -295,8 +295,8 @@ type APIRestRespDataMessage struct {
 }
 
 // PushSubscribe godoc
-// @Summary Establish a pull subscribe session
-// @Description Establish a JetStream pull subscribe session for a client. This is a long lived
+// @Summary Establish a push subscribe session
+// @Description Establish a JetStream push subscribe session for a client. This is a long lived
 // server send event stream. The stream will close on client disconnect, server shutdown, or
 // server internal error.
 // @tags Dataplane
