@@ -74,9 +74,9 @@ type APIRestRespStreamConfig struct {
 	// Name is the stream name
 	Name string `json:"name" validate:"required"`
 	// Description is an optional description of the stream
-	Description string `json:"description,omitempty"`
+	Description string `json:"description"`
 	// Subjects is the list subjects this stream is listening on
-	Subjects []string `json:"subjects,omitempty"`
+	Subjects []string `json:"subjects"`
 	// MaxConsumers is the max number of consumers allowed on the stream
 	MaxConsumers int `json:"max_consumers" validate:"required"`
 	// MaxMsgs is the max number of messages the stream will store.
@@ -94,7 +94,7 @@ type APIRestRespStreamConfig struct {
 	// MaxMsgsPerSubject is the maximum number of subjects allowed on this stream
 	MaxMsgsPerSubject int64 `json:"max_msgs_per_subject" validate:"required"`
 	// MaxMsgSize is the max size of a message allowed in this stream
-	MaxMsgSize int32 `json:"max_msg_size,omitempty"`
+	MaxMsgSize int32 `json:"max_msg_size"`
 }
 
 // APIRestRespStreamState adhoc structure for persenting nats.StreamState
@@ -155,27 +155,27 @@ func convertStreamInfo(original *nats.StreamInfo) APIRestRespStreamInfo {
 // APIRestRespConsumerConfig adhoc structure for persenting nats.ConsumerConfig
 type APIRestRespConsumerConfig struct {
 	// Description an optional description of the consumer
-	Description string `json:"notes,omitempty"`
+	Description string `json:"notes"`
 	// DeliverSubject subject this consumer is listening on
-	DeliverSubject string `json:"deliver_subject,omitempty"`
+	DeliverSubject string `json:"deliver_subject"`
 	// DeliverGroup is the delivery group if this consumer uses delivery group
 	//
 	// A consumer using delivery group allows multiple clients to subscribe under the same consumer
 	// and group name tuple. For subjects this consumer listens to, the messages will be shared
 	// amongst the connected clients.
-	DeliverGroup string `json:"deliver_group,omitempty"`
+	DeliverGroup string `json:"deliver_group"`
 	// MaxDeliver max number of times a message can be deliveried (including retry) to this consumer
-	MaxDeliver int `json:"max_deliver,omitempty"`
+	MaxDeliver int `json:"max_deliver"`
 	// AckWait duration (ns) to wait for an ACK for the delivery of a message
 	AckWait time.Duration `json:"ack_wait" swaggertype:"primitive,integer" validate:"required"`
 	// FilterSubject sets the consumer to filter for subjects matching this NATs subject string
 	//
 	// See https://docs.nats.io/nats-concepts/subjects
-	FilterSubject string `json:"filter_subject,omitempty"`
+	FilterSubject string `json:"filter_subject"`
 	// MaxWaiting NATS JetStream does not clearly document this
-	MaxWaiting int `json:"max_waiting,omitempty"`
+	MaxWaiting int `json:"max_waiting"`
 	// MaxAckPending controls the max number of un-ACKed messages permitted in-flight
-	MaxAckPending int `json:"max_ack_pending,omitempty"`
+	MaxAckPending int `json:"max_ack_pending"`
 }
 
 // APIRestRespSequenceInfo adhoc structure for persenting nats.SequenceInfo
@@ -185,7 +185,7 @@ type APIRestRespSequenceInfo struct {
 	// Stream is stream level sequence number
 	Stream uint64 `json:"stream_seq" validate:"required"`
 	// Last timestamp when these values updated
-	Last *time.Time `json:"last_active,omitempty"`
+	Last *time.Time `json:"last_active"`
 }
 
 // APIRestRespConsumerInfo adhoc structure for persenting nats.ConsumerInfo
@@ -312,7 +312,7 @@ func (h APIRestJetStreamManagementHandler) CreateStreamHandler() http.HandlerFun
 type APIRestRespAllJetStreams struct {
 	goutils.RestAPIBaseResponse
 	// Streams the set of stream details mapped against its names
-	Streams map[string]APIRestRespStreamInfo `json:"streams,omitempty"`
+	Streams map[string]APIRestRespStreamInfo `json:"streams"`
 }
 
 // GetAllStreams godoc
@@ -358,7 +358,7 @@ func (h APIRestJetStreamManagementHandler) GetAllStreamsHandler() http.HandlerFu
 type APIRestRespOneJetStream struct {
 	goutils.RestAPIBaseResponse
 	// Stream the details for this stream
-	Stream APIRestRespStreamInfo `json:"stream,omitempty"`
+	Stream APIRestRespStreamInfo `json:"stream"`
 }
 
 // GetStream godoc
@@ -731,7 +731,7 @@ func (h APIRestJetStreamManagementHandler) CreateConsumerHandler() http.HandlerF
 type APIRestRespAllJetStreamConsumers struct {
 	goutils.RestAPIBaseResponse
 	// Consumers the set of consumer details mapped against consumer name
-	Consumers map[string]APIRestRespConsumerInfo `json:"consumers,omitempty"`
+	Consumers map[string]APIRestRespConsumerInfo `json:"consumers"`
 }
 
 // GetAllConsumers godoc
@@ -804,7 +804,7 @@ func (h APIRestJetStreamManagementHandler) GetAllConsumersHandler() http.Handler
 type APIRestRespOneJetStreamConsumer struct {
 	goutils.RestAPIBaseResponse
 	// Consumer the details regarding this consumer
-	Consumer APIRestRespConsumerInfo `json:"consumer,omitempty"`
+	Consumer APIRestRespConsumerInfo `json:"consumer"`
 }
 
 // GetConsumer godoc
