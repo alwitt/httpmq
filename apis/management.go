@@ -185,7 +185,7 @@ type APIRestRespSequenceInfo struct {
 	// Stream is stream level sequence number
 	Stream uint64 `json:"stream_seq" validate:"required"`
 	// Last timestamp when these values updated
-	Last *time.Time `json:"last_active"`
+	Last *time.Time `json:"last_active,omitempty" validate:"omitempty,optional"`
 }
 
 // APIRestRespConsumerInfo adhoc structure for persenting nats.ConsumerInfo
