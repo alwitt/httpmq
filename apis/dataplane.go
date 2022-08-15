@@ -317,9 +317,12 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 	localLogTagsInitial := h.GetLogTagsForContext(r.Context())
 	var respCode int
 	var respBody interface{}
+	useDeferredResponse := true
 	defer func() {
-		if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
-			log.WithError(err).WithFields(localLogTagsInitial).Error("Failed to form response")
+		if useDeferredResponse {
+			if err := h.WriteRESTResponse(w, respCode, respBody, nil); err != nil {
+				log.WithError(err).WithFields(localLogTagsInitial).Error("Failed to form response")
+			}
 		}
 	}()
 
@@ -439,8 +442,8 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 	}
 
 	// Create the dispatcher
-	runtimeCtxt, cancel := context.WithCancel(r.Context())
-	defer cancel()
+	runtimeCtxt, runtimeCtxtCancel := context.WithCancel(r.Context())
+	defer runtimeCtxtCancel()
 	dispatcher, err := dataplane.GetPushMessageDispatcher(
 		runtimeCtxt,
 		h.natsClient,
@@ -487,32 +490,41 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 		return
 	}
 
+	// Push out the headers to the client
+	w.WriteHeader(200)
+	writeFlusher.Flush()
+	// Stop using the deferred function (defined at the beginning) to return the response
+	useDeferredResponse = false
+
 	// Process events
 	complete := false
 	onError := func(err error, msg string) {
-		cancel()
+		runtimeCtxtCancel()
 		complete = true
-		log.WithError(err).WithFields(logTags).Errorf(msg)
-		respCode = http.StatusInternalServerError
-		respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
+		log.WithError(err).WithFields(logTags).Error(msg)
+		respBody := h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, err.Error())
+		// Serialize error message as JSON
+		if serialize, err := json.Marshal(&respBody); err == nil {
+			// Send the error message as a part of the data stream
+			if written, err := fmt.Fprintf(w, "%s\n", serialize); err == nil {
+				writeFlusher.Flush()
+				log.WithFields(logTags).Debugf("Written %dB", written)
+			} else {
+				log.WithError(err).WithFields(logTags).Error("Failed to transmit message")
+			}
+		} else {
+			log.WithError(err).WithFields(logTags).Error("Failed to serialize message for transmission")
+		}
 	}
 	for !complete {
 		select {
 		case <-h.baseContext.Done():
 			// Server stopping
-			complete = true
-			log.WithFields(logTags).Info("Terminating PUSH subscription on server stop")
-			msg := "Server stopping"
-			respCode = http.StatusInternalServerError
-			respBody = h.GetStdRESTErrorMsg(r.Context(), http.StatusInternalServerError, msg, msg)
+			onError(fmt.Errorf("terminating PUSH subscription on server stop"), "Server stopping")
 		case <-r.Context().Done():
 			// Request closed
 			complete = true
 			log.WithFields(logTags).Info("Terminating PUSH subscription on request end")
-			respCode = http.StatusOK
-			respBody = APIRestRespDataMessage{
-				RestAPIBaseResponse: h.GetStdRESTSuccessMsg(r.Context()),
-			}
 		case err, ok := <-internalError:
 			// Internal system error
 			if ok {
@@ -546,7 +558,7 @@ func (h APIRestJetStreamDataplaneHandler) PushSubscribe(w http.ResponseWriter, r
 				written, err := fmt.Fprintf(w, "%s\n", serialize)
 				writeFlusher.Flush()
 				if err != nil {
-					onError(err, "Failed to transmit message")
+					log.WithError(err).WithFields(logTags).Error("Failed to transmit message")
 					break
 				}
 				log.WithFields(logTags).Debugf("Written %dB", written)
