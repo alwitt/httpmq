@@ -324,3 +324,4 @@ $ curl -X POST 'http://127.0.0.1:3001/v1/data/stream/testStream00/consumer/testC
 | Language | SDK | Notes |
 |----------|-----|-------|
 | Golang | [httpmq-go](https://github.com/alwitt/httpmq-go) | |
+| Python | [httpmq-python](https://github.com/alwitt/httpmq-python) | Requires `asyncio` |
